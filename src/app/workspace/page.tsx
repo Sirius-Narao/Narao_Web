@@ -7,9 +7,11 @@ import { SidebarProvider } from "@/components/ui/sidebar";
 
 export default function Workspace() {
     return (
-        <SidebarProvider>
-            <SidebarArea />
-            <MainArea />
-        </SidebarProvider>
+        <div className="bg-background h-screen w-screen">
+            <SidebarProvider className="bg-background">
+                <SidebarArea />
+                <MainArea />
+            </SidebarProvider>
+        </div>
     );
 }

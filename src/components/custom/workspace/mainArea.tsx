@@ -4,8 +4,8 @@ import { SidebarInset } from "@/components/ui/sidebar";
 
 export default function MainArea() {
     return (
-        <SidebarInset>
-            <div className="bg-red-500 text-foreground h-[95vh] w-full rounded-lg rounded-r-none rounded-b-none absolute bottom-0 right-0">
+        <SidebarInset className="bg-background">
+            <div className="bg-card text-foreground h-[92vh] w-[calc(100%-0.5rem)] rounded-lg absolute bottom-2 p-4 border border-sidebar-border">
                 <div className="">
 
                 </div>
