@@ -11,9 +11,9 @@ export default function Navbar() {
 
     // Update state based on scroll position
     useMotionValueEvent(scrollY, "change", (latest) => {
-        if (latest > 50 && !isScrolled) {
+        if (latest > 250 && !isScrolled) {
             setIsScrolled(true);
-        } else if (latest <= 50 && isScrolled) {
+        } else if (latest <= 250 && isScrolled) {
             setIsScrolled(false);
         }
     });

@@ -3,6 +3,8 @@
 import Navbar from "@/components/custom/navbar";
 import Image from "next/image";
 import heroBg from "@/gradients/gradient_1.jpg";
+import { Button } from "@/components/ui/button";
+import Link from "next/link";
 
 export default function LandingPage() {
   return (
@@ -17,14 +19,21 @@ export default function LandingPage() {
             className="object-cover opacity-30"
           />
           <div className="w-[70%] min-w-[600px] h-screen flex flex-col items-center justify-center relative overflow-hidden">
-            <h1 className="text-8xl font-extrabold tracking-tighter mb-4 z-10 text-left">A note-taking app powered by AI</h1>
-            <p className="text-xl text-muted-foreground max-w-2xl text-center z-10">
-              The next generation of intelligent tools for your workflow.
-              Smooth, fast, and powerful.
+            <h1 className="text-7xl font-extrabold tracking-tighter mb-4 z-10 text-center">A note-taking app powered by AI</h1>
+            <p className="text-xl text-muted-foreground max-w-2xl text-center z-10 mt-2">
+              Write your own notes in your own folders, and let AI manage your workspace as if it were you.
             </p>
+            <div className="flex gap-4 mt-8">
+              <Link href="/workspace">
+                <Button size="lg" className="rounded-full px-8 font-semibold shadow-lg shadow-primary/20 hover:scale-105 transition-all active:scale-95 bg-primary text-primary-foreground text-lg">
+                  Get Started
+                </Button>
+              </Link>
+              <Button variant="ghost" size="lg" className="rounded-full px-8 font-medium transition-all hover:bg-accent/50 text-lg">Login</Button>
+            </div>
           </div>
           {/* Fade out the background image */}
-          <div className="w-full h-124 z-10 bg-gradient-to-b from-transparent to-background absolute bottom-0 left-0"></div>
+          <div className="w-full h-124 z-10 bg-gradient-to-b from-transparent to-background absolute bottom-0 left-0 pointer-events-none"></div>
         </div>
 
         {/* Placeholder content to enable scrolling */}
