@@ -2,7 +2,7 @@
 
 import { Sidebar, SidebarContent, SidebarHeader, SidebarTrigger, SidebarFooter, useSidebar } from "@/components/ui/sidebar";
 import Image from "next/image";
-import { User, Settings, X, Icon, Folder, NotebookPen, MessageCircle, MessageCirclePlus } from "lucide-react";
+import { User, Settings, X, Icon, Folder, NotebookPen, MessageCircle, MessageCirclePlus, Search, MoreHorizontal, MoreVertical } from "lucide-react";
 import { motion, AnimatePresence } from "framer-motion";
 import { Button } from "@/components/ui/button";
 import { cn } from "@/lib/utils";
@@ -19,13 +19,37 @@ import {
     TooltipContent,
     TooltipTrigger,
 } from "@/components/ui/tooltip"
+import { useAreaLocation } from "@/context/areaContextLocation";
+import { InputGroup, InputGroupAddon, InputGroupInput, InputGroupText } from "@/components/ui/input-group";
+import { ScrollArea } from "@/components/ui/scroll-area";
 
 export default function SidebarArea() {
-    const USERNAME_EXAMPLE = "Bruce Wayne";
-    const ANNOUNCES_EXAMPLE = { title: "Announce Example", description: "Announce's description here, text should be short, but it should be visible" };
+    // EXAMPLE DATA
+    const USERNAME_EXAMPLE: string = "Bruce Wayne";
+    const ANNOUNCES_EXAMPLE: { title: string, description: string } = { title: "Announce Example", description: "Announce's description here, text should be short, but it should be visible" };
+    const CHAT_LIST_EXAMPLE: { title: string, description: string, date: string }[] = [
+        { title: "Chat 1", description: "Chat 1 description here, text should be short, but it should be visible", date: "2026-02-03" },
+        { title: "Chat 2", description: "Chat 2 description here, text should be short, but it should be visible", date: "2026-02-02" },
+        { title: "Chat 3", description: "Chat 3 description here, text should be short, but it should be visible", date: "2026-02-01" },
+        { title: "Chat 4", description: "Chat 4 description here, text should be short, but it should be visible", date: "2026-02-01" },
+        { title: "Chat 5", description: "Chat 5 description here, text should be short, but it should be visible", date: "2026-02-01" },
+        { title: "Chat 6", description: "Chat 6 description here, text should be short, but it should be visible", date: "2026-02-01" },
+        { title: "Chat 7", description: "Chat 7 description here, text should be short, but it should be visible", date: "2026-02-01" },
+        { title: "Chat 8", description: "Chat 8 description here, text should be short, but it should be visible", date: "2026-02-01" },
+        { title: "Chat 9", description: "Chat 9 description here, text should be short, but it should be visible", date: "2026-02-01" },
+        { title: "Chat 10", description: "Chat 10 description here, text should be short, but it should be visible", date: "2026-02-01" },
+    ]
+
+    // show announce
     const [showAnnounce, setShowAnnounce] = useState(true);
+    // active tab
     const [activeTab, setActiveTab] = useState(0);
-    const { state } = useSidebar();
+    // sidebar state
+    const { state, setOpen } = useSidebar();
+    // area location
+    const { areaLocation, setAreaLocation } = useAreaLocation();
+    // console.log(areaLocation);
+
     return (
         <Sidebar variant="inset" className="bg-background">
             {/* --------------------------- Header --------------------------- */}
@@ -53,7 +77,7 @@ export default function SidebarArea() {
             </Tooltip>
 
             {/* --------------------------- Content --------------------------- */}
-            <SidebarContent className="bg-background mt-2.5">
+            <SidebarContent className="bg-background mt-2.5 overflow-y-hidden">
                 {/* Slider between tabs */}
                 <div className={cn(
                     "bg-card border border-sidebar-border shadow-lg relative flex items-center justify-between transition-all duration-300 ease-in-out",
@@ -72,7 +96,7 @@ export default function SidebarArea() {
                                     state === "collapsed" ? "w-full py-0" : "w-[calc(100%/3)] py-2"
                                 )}
                                 key={index}
-                                onClick={() => setActiveTab(index)}
+                                onClick={() => { setActiveTab(index); setAreaLocation(index === 0 ? "folders" : index === 1 ? "notes" : "chats") }}
                             >
                                 {activeTab === index && (
                                     <motion.div
@@ -105,6 +129,32 @@ export default function SidebarArea() {
                             </div>
                         )
                     })}
+                </div>
+
+                {/* Search Bar & Chat List */}
+                <div className="mt-2">
+                    <InputGroup className="w-full bg-card shadow-lg transition-all duration-200 ease-in-out group-data-[state=collapsed]:w-10 group-data-[state=collapsed]:h-10 group-data-[state=collapsed]:rounded-full group-data-[state=collapsed]:p-0 group-data-[state=collapsed]:justify-center group-data-[state=collapsed]:mx-auto cursor-pointer hover:bg-card/30 "
+                        onClick={() => { if (state === "collapsed") { setOpen(true) } }}>
+                        <InputGroupAddon align="inline-end" className="group-data-[state=collapsed]:pr-0 group-data-[state=collapsed]:w-full group-data-[state=collapsed]:h-full group-data-[state=collapsed]:justify-center transition-all duration-200 cursor-pointer hover:bg-card/30">
+                            <InputGroupText className="bg-transparent group-data-[state=collapsed]:p-0 cursor-pointer hover:bg-card/30">
+                                <Search />
+                            </InputGroupText>
+                        </InputGroupAddon>
+                        <InputGroupInput placeholder="Look for a chat..." className="bg-card group-data-[state=collapsed]:hidden cursor-pointer hover:bg-card/30" />
+                    </InputGroup>
+                    <ScrollArea className="min-h-[20rem] max-h-[calc(100vh-20rem)] h-fit rounded-lg border border-sidebar-border mt-2 p-2 shadow-lg gap-2 bg-card group-data-[state=collapsed]:hidden">
+                        {CHAT_LIST_EXAMPLE.map((chat, index) => (
+                            <div key={index} className="flex items-center justify-between pl-4 pr-2 py-2 border-l border-t border-sidebar-border shadow-lg rounded-md bg-background hover:bg-background/30 cursor-pointer transition-all duration-100 ease-in-out mb-1">
+                                <div className="flex flex-row items-center gap-2 w-full">
+                                    <p>{chat.title}</p>
+                                    <p className="text-xs text-muted-foreground">{chat.description.slice(0, 10) + "..."}</p>
+                                </div>
+                                <Button variant="ghost" className="p-1 h-6 w-6" asChild>
+                                    <MoreVertical size={16} className="text-muted-foreground" />
+                                </Button>
+                            </div>
+                        ))}
+                    </ScrollArea>
                 </div>
             </SidebarContent>
 

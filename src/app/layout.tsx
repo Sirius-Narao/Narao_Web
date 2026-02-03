@@ -2,6 +2,7 @@ import type { Metadata } from "next";
 import { Alan_Sans, Fira_Mono } from "next/font/google";
 import "./globals.css";
 import { ThemeProvider } from "@/components/theme-provider";
+import { AreaLocationProvider } from "@/context/areaContextLocation";
 
 const alanSans = Alan_Sans({
   variable: "--font-alan-sans",
@@ -58,7 +59,9 @@ export default function RootLayout({
           enableSystem
           disableTransitionOnChange
         >
-          {children}
+          <AreaLocationProvider>
+            {children}
+          </AreaLocationProvider>
         </ThemeProvider>
       </body>
     </html>
