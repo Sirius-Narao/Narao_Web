@@ -219,8 +219,8 @@ export default function SidebarArea() {
                                                 <FolderDown size={16} className="text-muted-foreground group-hover:text-accent-foreground" />
                                                 Move To
                                             </DropdownMenuItem >
-                                            <DropdownMenuItem className="text-red-500 focus:text-red-500 focus:bg-red-500/10 cursor-pointer">
-                                                <Trash2 size={16} className="text-red-500" />
+                                            <DropdownMenuItem className="text-destructive focus:text-destructive focus:bg-destructive/10 cursor-pointer">
+                                                <Trash2 size={16} className="text-destructive" />
                                                 Delete Chat
                                             </DropdownMenuItem>
                                         </DropdownMenuGroup>
