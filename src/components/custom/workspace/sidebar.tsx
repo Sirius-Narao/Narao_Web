@@ -2,7 +2,7 @@
 
 import { Sidebar, SidebarContent, SidebarHeader, SidebarTrigger, SidebarFooter, useSidebar } from "@/components/ui/sidebar";
 import Image from "next/image";
-import { User, Settings, X, Icon, Folder, NotebookPen, MessageCircle, MessageCirclePlus, Search, MoreHorizontal, MoreVertical } from "lucide-react";
+import { User, Settings, X, Icon, Folder, NotebookPen, MessageCircle, MessageCirclePlus, Search, MoreHorizontal, MoreVertical, Pencil, Trash2, FolderDown, CircleOff } from "lucide-react";
 import { motion, AnimatePresence } from "framer-motion";
 import { Button } from "@/components/ui/button";
 import { cn } from "@/lib/utils";
@@ -22,23 +22,29 @@ import {
 import { useAreaLocation } from "@/context/areaContextLocation";
 import { InputGroup, InputGroupAddon, InputGroupInput, InputGroupText } from "@/components/ui/input-group";
 import { ScrollArea } from "@/components/ui/scroll-area";
+import { DropdownMenu, DropdownMenuContent, DropdownMenuGroup, DropdownMenuItem, DropdownMenuLabel, DropdownMenuPortal, DropdownMenuSeparator, DropdownMenuShortcut, DropdownMenuSub, DropdownMenuSubContent, DropdownMenuSubTrigger, DropdownMenuTrigger } from "@/components/ui/dropdown-menu";
+
+import ChatType from "@/types/chatType";
+import dateConvert from "@/lib/dateConvert";
+import quantifyDate from "@/lib/quantifyDate";
+import handleSearch from "@/lib/handleSearch";
 
 export default function SidebarArea() {
     // EXAMPLE DATA
     const USERNAME_EXAMPLE: string = "Bruce Wayne";
     const ANNOUNCES_EXAMPLE: { title: string, description: string } = { title: "Announce Example", description: "Announce's description here, text should be short, but it should be visible" };
-    const CHAT_LIST_EXAMPLE: { title: string, description: string, date: string }[] = [
-        { title: "Chat 1", description: "Chat 1 description here, text should be short, but it should be visible", date: "2026-02-03" },
-        { title: "Chat 2", description: "Chat 2 description here, text should be short, but it should be visible", date: "2026-02-02" },
-        { title: "Chat 3", description: "Chat 3 description here, text should be short, but it should be visible", date: "2026-02-01" },
-        { title: "Chat 4", description: "Chat 4 description here, text should be short, but it should be visible", date: "2026-02-01" },
-        { title: "Chat 5", description: "Chat 5 description here, text should be short, but it should be visible", date: "2026-02-01" },
-        { title: "Chat 6", description: "Chat 6 description here, text should be short, but it should be visible", date: "2026-02-01" },
-        { title: "Chat 7", description: "Chat 7 description here, text should be short, but it should be visible", date: "2026-02-01" },
-        { title: "Chat 8", description: "Chat 8 description here, text should be short, but it should be visible", date: "2026-02-01" },
-        { title: "Chat 9", description: "Chat 9 description here, text should be short, but it should be visible", date: "2026-02-01" },
-        { title: "Chat 10", description: "Chat 10 description here, text should be short, but it should be visible", date: "2026-02-01" },
-    ]
+    const CHAT_LIST_EXAMPLE: ChatType[] = [
+        { title: "Project Phoenix", description: "Discussing the migration strategy for the legacy database.", date: "2024-03-15" },
+        { title: "Design Review", description: "Feedback on the new landing page mockups and user flow.", date: "2025-01-10" },
+        { title: "Bug: Login Loop", description: "Investigating reports of users getting stuck on the auth redirect.", date: "2024-02-28" },
+        { title: "Marketing Sync", description: "Planning the social media rollout for the Q2 product launch.", date: "2026-03-20" },
+        { title: "API Documentation", description: "Drafting the endpoints for the new integration service.", date: "2024-01-12" },
+        { title: "Customer Support", description: "Resolving the ticket regarding workspace permission issues.", date: "2025-03-05" },
+        { title: "Sprint Planning", description: "Defining tasks and estimates for the upcoming development cycle.", date: "2024-03-18" },
+        { title: "Security Patch", description: "Implementing fixes for the identified vulnerability in the middleware.", date: "2023-12-20" },
+        { title: "Team Lunch", description: "Coordinating the location and time for Friday's social gathering.", date: "2024-03-22" },
+        { title: "Performance Audit", description: "Analyzing the bundle size and load times for the mobile app.", date: "2024-02-15" },
+    ];
 
     // show announce
     const [showAnnounce, setShowAnnounce] = useState(true);
@@ -49,6 +55,17 @@ export default function SidebarArea() {
     // area location
     const { areaLocation, setAreaLocation } = useAreaLocation();
     // console.log(areaLocation);
+
+    console.table(
+        CHAT_LIST_EXAMPLE.map(c => ({
+            value: quantifyDate(c.date),
+        }))
+    );
+
+    // Filtered chats state
+    const [filteredChats, setFilteredChats] = useState<ChatType[]>(() =>
+        [...CHAT_LIST_EXAMPLE].sort((a, b) => quantifyDate(b.date) - quantifyDate(a.date))
+    );
 
     return (
         <Sidebar variant="inset" className="bg-background">
@@ -77,13 +94,13 @@ export default function SidebarArea() {
             </Tooltip>
 
             {/* --------------------------- Content --------------------------- */}
-            <SidebarContent className="bg-background mt-2.5 overflow-y-hidden">
+            <SidebarContent className="bg-background mt-[9px] overflow-y-hidden">
                 {/* Slider between tabs */}
                 <div className={cn(
                     "bg-card border border-sidebar-border shadow-lg relative flex items-center justify-between transition-all duration-300 ease-in-out",
                     state === "collapsed"
                         ? "w-10 h-10 rounded-full p-0 gap-0 justify-center mx-auto"
-                        : "w-full h-16 rounded-lg p-1 px-2 gap-2"
+                        : "w-full h-14 rounded-full px-2 gap-2"
                 )}>
                     {Array.from({ length: 3 }).map((_, index) => {
                         const isHidden = state === "collapsed" && activeTab !== index;
@@ -140,20 +157,70 @@ export default function SidebarArea() {
                                 <Search />
                             </InputGroupText>
                         </InputGroupAddon>
-                        <InputGroupInput placeholder="Look for a chat..." className="bg-card group-data-[state=collapsed]:hidden cursor-pointer hover:bg-card/30" />
+                        <InputGroupInput
+                            placeholder="Look for a chat..."
+                            className="bg-card group-data-[state=collapsed]:hidden cursor-pointer hover:bg-card/30"
+                            onChange={(e) => setFilteredChats(handleSearch(e.target.value, CHAT_LIST_EXAMPLE))}
+                        />
                     </InputGroup>
-                    <ScrollArea className="min-h-[20rem] max-h-[calc(100vh-20rem)] h-fit rounded-lg border border-sidebar-border mt-2 p-2 shadow-lg gap-2 bg-card group-data-[state=collapsed]:hidden">
-                        {CHAT_LIST_EXAMPLE.map((chat, index) => (
-                            <div key={index} className="flex items-center justify-between pl-4 pr-2 py-2 border-l border-t border-sidebar-border shadow-lg rounded-md bg-background hover:bg-background/30 cursor-pointer transition-all duration-100 ease-in-out mb-1">
-                                <div className="flex flex-row items-center gap-2 w-full">
-                                    <p>{chat.title}</p>
-                                    <p className="text-xs text-muted-foreground">{chat.description.slice(0, 10) + "..."}</p>
-                                </div>
-                                <Button variant="ghost" className="p-1 h-6 w-6" asChild>
-                                    <MoreVertical size={16} className="text-muted-foreground" />
-                                </Button>
+                    <ScrollArea className=" max-h-[calc(100vh-20rem)] h-fit rounded-lg border border-sidebar-border mt-2 pt-1 px-1 shadow-lg bg-card group-data-[state=collapsed]:hidden">
+                        {filteredChats.length > 0 ? filteredChats.map((chat, index) => (
+                            <div key={index} className="flex items-center justify-between pl-4 pr-2 py-2 rounded-lg hover:bg-background/30 cursor-pointer transition-all duration-100 ease-in-out mb-1">
+                                <Tooltip>
+                                    <TooltipTrigger asChild>
+                                        <div className="flex flex-row items-center gap-2 w-full">
+                                            <p>{chat.title.length > 9 ? chat.title.slice(0, 9).trim() + "..." : chat.title}</p>
+                                            <p className="text-xs text-muted-foreground">{chat.description.length > 9 ? chat.description.slice(0, 9).trim() + "..." : chat.description}</p>
+                                        </div>
+                                    </TooltipTrigger>
+                                    <TooltipContent side="right">
+                                        <p>{chat.title}</p>
+                                        <p className="text-xs text-muted-foreground">{chat.description}</p>
+                                    </TooltipContent>
+                                </Tooltip>
+                                <DropdownMenu>
+                                    <DropdownMenuTrigger>
+                                        <Tooltip>
+                                            <TooltipTrigger asChild>
+                                                <Button variant="ghost" className="p-1 h-6 w-6" asChild>
+                                                    <MoreVertical size={16} className="text-muted-foreground" />
+                                                </Button>
+                                            </TooltipTrigger>
+                                            <TooltipContent side="right">
+                                                <p>Options</p>
+                                            </TooltipContent>
+                                        </Tooltip>
+                                    </DropdownMenuTrigger>
+                                    <DropdownMenuContent className="w-40" align="start">
+                                        <DropdownMenuGroup>
+                                            <div className="flex flex-col p-2">
+                                                <p>{chat.title}</p>
+                                                <p className="text-xs text-muted-foreground/50">{dateConvert(chat.date)}</p>
+                                                <div className="w-full h-[1px] bg-foreground/10 my-1"></div>
+                                                <p className="text-xs text-muted-foreground">{chat.description}</p>
+                                            </div>
+                                            <DropdownMenuItem className="group cursor-pointer">
+                                                <Pencil size={16} className="text-muted-foreground group-hover:text-accent-foreground" />
+                                                Rename Chat
+                                            </DropdownMenuItem >
+                                            <DropdownMenuItem className="group cursor-pointer">
+                                                <FolderDown size={16} className="text-muted-foreground group-hover:text-accent-foreground" />
+                                                Move To
+                                            </DropdownMenuItem >
+                                            <DropdownMenuItem className="text-red-500 focus:text-red-500 focus:bg-red-500/10 cursor-pointer">
+                                                <Trash2 size={16} className="text-red-500" />
+                                                Delete Chat
+                                            </DropdownMenuItem>
+                                        </DropdownMenuGroup>
+                                    </DropdownMenuContent>
+                                </DropdownMenu>
                             </div>
-                        ))}
+                        )) : (
+                            <div className="flex flex-col items-center justify-center h-full gap-2 my-5">
+                                <CircleOff size={48} className="text-muted-foreground" />
+                                <p className="text-muted-foreground">No chats found</p>
+                            </div>
+                        )}
                     </ScrollArea>
                 </div>
             </SidebarContent>
