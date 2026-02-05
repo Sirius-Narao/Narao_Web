@@ -6,7 +6,7 @@ import { InputGroup, InputGroupAddon, InputGroupInput, InputGroupText } from "@/
 import { Kbd, KbdGroup } from "@/components/ui/kbd";
 import { SidebarInset } from "@/components/ui/sidebar";
 import { Tooltip, TooltipContent, TooltipTrigger } from "@/components/ui/tooltip";
-import { FileEdit, FolderEdit, MoreVertical, MoveLeft, MoveRight, Search, Folder as FolderIcon, FileText, FolderPen, Move, Trash2, Trash, Palette } from "lucide-react";
+import { FileEdit, FolderEdit, MoreVertical, MoveLeft, MoveRight, Search, Folder as FolderIcon, FileText, FolderPen, Move, Trash2, Trash, Palette, CircleSlash, CircleOff } from "lucide-react";
 import {
     ContextMenu,
     ContextMenuContent,
@@ -18,12 +18,15 @@ import { Folder, Note } from "@/types/folderStructureTypes";
 import { ScrollArea } from "@/components/ui/scroll-area";
 import { cn } from "@/lib/utils";
 import dateConvert from "@/lib/dateConvert";
+import { Popover, PopoverAnchor, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
 
 export default function MainArea() {
     // Path State
     const [path, setPath] = useState("/");
     const [pathHistory, setPathHistory] = useState<string[]>(["/"])
     const searchInputRef = useRef<HTMLInputElement>(null);
+    const [searchOpen, setSearchOpen] = useState(false);
+    const [searchQuery, setSearchQuery] = useState("");
 
     useEffect(() => {
         setPathHistory([...pathHistory, path])
@@ -180,6 +183,7 @@ export default function MainArea() {
         setPath(newPath);
     }
 
+    // Functions for arrows BACK & FORWARD
     const goBack = useCallback(() => {
         setPath(prev => {
             if (prev === "/") return prev;
@@ -251,7 +255,7 @@ export default function MainArea() {
                         <TooltipContent className="flex items-center gap-2">
                             <p>Go Forward</p>
                             <KbdGroup>
-                                <Kbd className="bg-popover text-foreground">Ctrl + Maj + Z</Kbd>
+                                <Kbd className="bg-popover text-foreground">Ctrl + Shift + Z</Kbd>
                             </KbdGroup>
                         </TooltipContent>
                     </Tooltip>
@@ -259,23 +263,57 @@ export default function MainArea() {
 
                 {/* Middle */}
                 <div className="w-full flex justify-center">
-                    <InputGroup className="w-[40%] bg-card shadow-lg cursor-pointer px-2"
-                        onClick={() => { }}>
-                        <InputGroupAddon align="inline-end" className="cursor-pointer">
-                            <InputGroupText className="bg-transparent cursor-pointer">
-                                <KbdGroup className="">
-                                    <Kbd className="bg-popover text-muted-foreground">Ctrl + Alt + K</Kbd>
-                                </KbdGroup>
-                                <Search />
-                            </InputGroupText>
-                        </InputGroupAddon>
-                        <InputGroupInput
-                            ref={searchInputRef}
-                            placeholder="Look for a folder or a note..."
-                            className="bg-card cursor-pointer "
-                            onChange={(e) => { }}
-                        />
-                    </InputGroup>
+                    <Popover open={searchOpen} onOpenChange={setSearchOpen}>
+                        <PopoverAnchor asChild className="w-[40%]" >
+                            <InputGroup className="w-[40%] bg-card shadow-lg cursor-pointer px-2"
+                                onClick={() => { }}>
+                                <InputGroupAddon align="inline-end" className="cursor-pointer">
+                                    <InputGroupText className="bg-transparent cursor-pointer">
+                                        <KbdGroup className="">
+                                            <Kbd className="bg-popover text-muted-foreground">Ctrl + Alt + K</Kbd>
+                                        </KbdGroup>
+                                        <Search />
+                                    </InputGroupText>
+                                </InputGroupAddon>
+                                <InputGroupInput
+                                    ref={searchInputRef}
+                                    placeholder="Look for a folder or a note..."
+                                    className="bg-card cursor-pointer "
+                                    onChange={(e) => { setSearchOpen(true); setSearchQuery(e.target.value) }}
+                                    onBlur={() => { setSearchOpen(false) }}
+                                    value={searchQuery}
+                                />
+                            </InputGroup>
+                        </PopoverAnchor>
+                        <PopoverContent
+                            className="w-[var(--radix-popover-anchor-width)] py-4"
+                            onOpenAutoFocus={(e) => e.preventDefault()}
+                        >
+                            {searchQuery.length > 0 ? <>
+                                <p className="text-foreground/50 md:w-124 sm:w-64">Folders</p>
+                                {FOLDERS_EXAMPLE.filter((folder) => folder.name.toLowerCase().includes(searchQuery.toLowerCase())).map((folder) => (
+                                    <div key={folder.id} className="cursor-pointer hover:bg-foreground/10 bg-card p-2 flex items-center gap-2">
+                                        <FolderIcon />
+                                        <p>{folder.name}</p>
+                                    </div>
+                                ))}
+                                <div className="w-full h-[1px] bg-foreground/10 my-1"></div>
+                                <p className="text-foreground/50 md:w-124 sm:w-64">Notes</p>
+                                {NOTES_EXAMPLE.filter((note) => note.title.toLowerCase().includes(searchQuery.toLowerCase())).map((note) => (
+                                    <div key={note.id} className="cursor-pointer hover:bg-foreground/10 bg-card p-2 flex items-center gap-2">
+                                        <FileText />
+                                        <p>{note.title}</p>
+                                    </div>
+                                ))}
+                            </> : <div className="flex items-center justify-center h-full md:w-124 sm:w-64 py-4">
+                                <div className="flex flex-col items-center gap-2">
+                                    <CircleOff size={36} className="text-foreground/50" />
+                                    <p className="text-foreground/50">Type something to search...</p>
+                                </div>
+                            </div>
+                            }
+                        </PopoverContent>
+                    </Popover>
                 </div>
 
                 {/* Right Side */}
@@ -378,7 +416,7 @@ export default function MainArea() {
                                         </ContextMenuTrigger>
                                         <ContextMenuContent >
                                             <p className="text-foreground text-md px-2 mt-1">{note.title}</p>
-                                            <p className="text-muted-foreground text-xs px-2 mb-1">{note.description}</p>
+                                            <p className="text-muted-foreground text-xs px-2">{note.description}</p>
                                             <p className="text-muted-foreground text-xs px-2 mb-1">{`Last updated: ${dateConvert(note.updatedAt.toString())}`}</p>
                                             <ContextMenuItem className="cursor-pointer group">
                                                 <FolderPen size={16} className="text-muted-foreground group-hover:text-accent-foreground" />
