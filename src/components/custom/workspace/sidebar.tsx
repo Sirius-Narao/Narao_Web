@@ -287,10 +287,10 @@ export default function SidebarArea() {
                                     "group-data-[state=collapsed]:w-10 group-data-[state=collapsed]:h-10 group-data-[state=collapsed]:items-center group-data-[state=collapsed]:justify-center group-data-[state=collapsed]:gap-0"
                                 )}>
                                     <User size={24} className="w-24 h-24" />
-                                    <span className="text-lg font-bold transition-all duration-200 group-data-[state=collapsed]:hidden">
+                                    <span className="text-lg font-bold transition-all duration-200 group-data-[state=collapsed]:hidden truncate w-full">
                                         {USERNAME_EXAMPLE}
                                     </span>
-                                    <div className="flex items-center justify-end w-full">
+                                    <div className="flex items-center justify-end w-24">
                                         <Settings size={24} className="group-data-[state=collapsed]:hidden w-full transition-all duration-200" />
                                     </div>
                                 </Button>

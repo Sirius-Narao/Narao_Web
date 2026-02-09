@@ -183,6 +183,40 @@ export default function MainArea() {
         setPath(newPath);
     }
 
+    const navigateToFolderAbsolutePath = (path: string) => {
+        const absolutePath = path.startsWith("/") ? path : `/${path}`;
+        setPath(absolutePath);
+        setSearchOpen(false);
+        setSearchQuery("");
+    }
+
+    const getFolderPath = (folderId: string): string => {
+        const findPath = (currentFolders: Folder[], currentPath: string): string | null => {
+            for (const folder of currentFolders) {
+                const folderPath = currentPath === "/" ? `/${folder.name}` : `${currentPath}/${folder.name}`;
+                if (folder.id === folderId) return folderPath;
+
+                const children = (folder.foldersIds || [])
+                    .map(id => getFolderById(id))
+                    .filter((f): f is Folder => !!f);
+
+                const result = findPath(children, folderPath);
+                if (result) return result;
+            }
+            return null;
+        };
+
+        return findPath(rootFolders, "/") || "/";
+    };
+
+    const getNotePath = (noteId: string): string => {
+        const folder = FOLDERS_EXAMPLE.find(f => f.notesIds?.includes(noteId));
+        if (!folder) return "/";
+        return getFolderPath(folder.id);
+    };
+
+
+
     // Functions for arrows BACK & FORWARD
     const goBack = useCallback(() => {
         setPath(prev => {
@@ -280,7 +314,6 @@ export default function MainArea() {
                                     placeholder="Look for a folder or a note..."
                                     className="bg-card cursor-pointer "
                                     onChange={(e) => { setSearchOpen(true); setSearchQuery(e.target.value) }}
-                                    onBlur={() => { setSearchOpen(false) }}
                                     value={searchQuery}
                                 />
                             </InputGroup>
@@ -289,29 +322,58 @@ export default function MainArea() {
                             className="w-[var(--radix-popover-anchor-width)] py-4"
                             onOpenAutoFocus={(e) => e.preventDefault()}
                         >
-                            {searchQuery.length > 0 ? <>
-                                <p className="text-foreground/50 md:w-124 sm:w-64">Folders</p>
-                                {FOLDERS_EXAMPLE.filter((folder) => folder.name.toLowerCase().includes(searchQuery.toLowerCase())).map((folder) => (
-                                    <div key={folder.id} className="cursor-pointer hover:bg-foreground/10 bg-card p-2 flex items-center gap-2">
-                                        <FolderIcon />
-                                        <p>{folder.name}</p>
+                            {searchQuery.length > 0 ? (
+                                (() => {
+                                    const filteredFolders = FOLDERS_EXAMPLE.filter((folder) => folder.name.toLowerCase().includes(searchQuery.toLowerCase()));
+                                    const filteredNotes = NOTES_EXAMPLE.filter((note) => note.title.toLowerCase().includes(searchQuery.toLowerCase()));
+
+                                    if (filteredFolders.length === 0 && filteredNotes.length === 0) {
+                                        return (
+                                            <div className="flex flex-col items-center justify-center py-8 gap-3 text-foreground/50 md:w-124 sm:w-64">
+                                                <CircleSlash size={36} strokeWidth={1.5} />
+                                                <div className="text-center">
+                                                    <p className="font-medium text-foreground">No matches found</p>
+                                                    <p className="text-sm">We couldn't find any folders or notes with that name.</p>
+                                                </div>
+                                            </div>
+                                        );
+                                    }
+
+                                    return (
+                                        <>
+                                            {filteredFolders.length > 0 && (
+                                                <>
+                                                    <p className="text-foreground/50 md:w-124 sm:w-64 mb-1">Folders</p>
+                                                    {filteredFolders.map((folder) => (
+                                                        <div key={folder.id} className="cursor-pointer hover:bg-foreground/10 p-2 px-4 flex items-center gap-2 rounded-lg transition-colors" onClick={() => navigateToFolderAbsolutePath(getFolderPath(folder.id))}>
+                                                            <FolderIcon size={18} className="text-primary" />
+                                                            <p className="text-sm">{folder.name}</p>
+                                                        </div>
+                                                    ))}
+                                                </>
+                                            )}
+                                            {filteredNotes.length > 0 && (
+                                                <>
+                                                    <p className={cn("text-foreground/50 md:w-124 sm:w-64 mb-1", filteredFolders.length > 0 && "mt-4")}>Notes</p>
+                                                    {filteredNotes.map((note) => (
+                                                        <div key={note.id} className="cursor-pointer hover:bg-foreground/10 p-2 px-4 flex items-center gap-2 rounded-lg transition-colors" onClick={() => navigateToFolderAbsolutePath(getNotePath(note.id))}>
+                                                            <FileText size={18} className="text-muted-foreground" />
+                                                            <p className="text-sm">{note.title}</p>
+                                                        </div>
+                                                    ))}
+                                                </>
+                                            )}
+                                        </>
+                                    );
+                                })()
+                            ) : (
+                                <div className="flex items-center justify-center h-full md:w-124 sm:w-64 py-8">
+                                    <div className="flex flex-col items-center gap-3">
+                                        <Search size={36} className="text-foreground/30" strokeWidth={1.5} />
+                                        <p className="text-foreground/50 font-medium">Search for folders and notes</p>
                                     </div>
-                                ))}
-                                <div className="w-full h-[1px] bg-foreground/10 my-1"></div>
-                                <p className="text-foreground/50 md:w-124 sm:w-64">Notes</p>
-                                {NOTES_EXAMPLE.filter((note) => note.title.toLowerCase().includes(searchQuery.toLowerCase())).map((note) => (
-                                    <div key={note.id} className="cursor-pointer hover:bg-foreground/10 bg-card p-2 flex items-center gap-2">
-                                        <FileText />
-                                        <p>{note.title}</p>
-                                    </div>
-                                ))}
-                            </> : <div className="flex items-center justify-center h-full md:w-124 sm:w-64 py-4">
-                                <div className="flex flex-col items-center gap-2">
-                                    <CircleOff size={36} className="text-foreground/50" />
-                                    <p className="text-foreground/50">Type something to search...</p>
                                 </div>
-                            </div>
-                            }
+                            )}
                         </PopoverContent>
                     </Popover>
                 </div>
@@ -361,7 +423,7 @@ export default function MainArea() {
                                     <ContextMenu key={folder.id}>
                                         <ContextMenuTrigger>
                                             <div
-                                                className="group flex flex-col items-center gap-2 p-4 hover:bg-muted/50 rounded-xl cursor-pointer w-28 h-28 justify-center transition-all duration-200 border border-transparent hover:border-sidebar-border"
+                                                className="group flex flex-col items-center gap-2 p-4 hover:bg-muted/50 rounded-xl cursor-pointer w-32 h-28 justify-center transition-all duration-200 border border-transparent hover:border-sidebar-border"
                                                 onClick={() => navigateToFolder(folder.name)}
                                             >
                                                 <FolderIcon className="w-12 h-12 text-primary fill-primary group-hover:scale-110 transition-transform duration-200" />
@@ -408,7 +470,7 @@ export default function MainArea() {
                                     <ContextMenu key={note.id}>
                                         <ContextMenuTrigger>
                                             <div
-                                                className="group flex flex-col items-center gap-2 p-4 hover:bg-muted/50 rounded-xl cursor-pointer w-28 h-28 justify-center transition-all duration-200 border border-transparent hover:border-sidebar-border"
+                                                className="group flex flex-col items-center gap-2 p-4 hover:bg-muted/50 rounded-xl cursor-pointer w-32 h-28 justify-center transition-all duration-200 border border-transparent hover:border-sidebar-border"
                                             >
                                                 <FileText className="w-10 h-10 text-foreground/50 group-hover:text-foreground group-hover:scale-110 transition-all duration-200" />
                                                 <p className="text-xs font-medium text-center truncate w-full px-1 mt-1">{note.title}</p>
@@ -453,8 +515,8 @@ export default function MainArea() {
                                 ))}
                                 {folders.length === 0 && notes.length === 0 && (
                                     <div className="w-full flex flex-col items-center justify-center text-muted-foreground mt-20 gap-2">
-                                        <FolderIcon size={48} className="text-muted-foreground/30" />
-                                        <p>This folder is empty</p>
+                                        <FolderIcon size={64} className="text-muted-foreground/30" />
+                                        <p className="text-center w-1/4 text-lg">This folder is empty or has not yet been created</p>
                                     </div>
                                 )}
                             </div>
