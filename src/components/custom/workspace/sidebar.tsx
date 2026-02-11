@@ -13,7 +13,7 @@ import {
     CardHeader,
     CardTitle,
 } from "@/components/ui/card"
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import {
     Tooltip,
     TooltipContent,

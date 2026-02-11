@@ -19,8 +19,11 @@ import { ScrollArea } from "@/components/ui/scroll-area";
 import { cn } from "@/lib/utils";
 import dateConvert from "@/lib/dateConvert";
 import { Popover, PopoverAnchor, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
+import { useAreaLocation } from "@/context/areaContextLocation";
 
 export default function MainArea() {
+    // Area State
+    const { areaLocation, setAreaLocation } = useAreaLocation()
     // Path State
     const [path, setPath] = useState("/");
     const [pathHistory, setPathHistory] = useState<string[]>(["/"])
@@ -133,7 +136,7 @@ export default function MainArea() {
         },
     ];
 
-    // Helper functions
+    // Helper functions in folders
     const getFolderById = (id: string) => FOLDERS_EXAMPLE.find(f => f.id === id);
     const getNoteById = (id: string) => NOTES_EXAMPLE.find(n => n.id === id);
 
@@ -253,13 +256,24 @@ export default function MainArea() {
                 e.preventDefault();
                 searchInputRef.current?.focus();
             }
+            else if (e.ctrlKey && key === "o" && !e.shiftKey && !e.altKey) {
+                e.preventDefault();
+                setAreaLocation("folders");
+            }
+            if (e.ctrlKey && key === "n" && !e.shiftKey && !e.altKey) {
+                e.preventDefault();
+                setAreaLocation("notes");
+            }
+            if (e.ctrlKey && key === "c" && !e.shiftKey && !e.altKey) {
+                e.preventDefault();
+                setAreaLocation("chats");
+            }
         };
 
         window.addEventListener("keydown", handleKeyDown);
         return () => window.removeEventListener("keydown", handleKeyDown);
-    }, [goBack, goForward]);
+    }, []);
 
-    // The thing is that we at first load the folders and notes in the folders. Then we load the notes in the root since they are the one that are not in any folder.
     return (
         <SidebarInset className="bg-background">
 
@@ -413,151 +427,165 @@ export default function MainArea() {
 
             {/* ------------------ Bottom Part ----------------- */}
             <div className="bg-card text-foreground h-[92vh] w-[calc(100%-0.5rem)] rounded-lg absolute bottom-2 p-4 border border-sidebar-border">
-                <ContextMenu>
-                    <ContextMenuTrigger className="w-full h-full block">
-                        {/* ALL FOLDERS AND NOTES INSIDE THE CONTEXT MENU TRIGGER */}
-                        <ScrollArea className="h-full w-full pb-10">
-                            {/* HERE WE WILL LOAD ALL THE FOLDERS AND NOTES IN THE CURRENT PATH */}
-                            <div className="flex flex-wrap gap-4 p-4 content-start">
-                                {folders.map(folder => (
-                                    <ContextMenu key={folder.id}>
-                                        <ContextMenuTrigger>
-                                            <div
-                                                className="group flex flex-col items-center gap-2 p-4 hover:bg-muted/50 rounded-xl cursor-pointer w-32 h-28 justify-center transition-all duration-200 border border-transparent hover:border-sidebar-border"
-                                                onClick={() => navigateToFolder(folder.name)}
-                                            >
-                                                <FolderIcon className="w-12 h-12 text-primary fill-primary group-hover:scale-110 transition-transform duration-200" />
-                                                <p className="text-xs font-medium text-center truncate w-full px-1">{folder.name}</p>
-                                            </div>
-                                        </ContextMenuTrigger>
-                                        <ContextMenuContent >
-                                            <p className="text-foreground text-md px-2 mt-1">{folder.name}</p>
-                                            <p className="text-muted-foreground text-xs px-2 mb-1">{`Last updated: ${dateConvert(folder.updatedAt.toString())}`}</p>
-                                            <ContextMenuItem className="cursor-pointer group">
-                                                <FolderPen size={16} className="text-muted-foreground group-hover:text-accent-foreground" />
-                                                <p className="text-foreground group-hover:text-accent-foreground">Rename</p>
-                                            </ContextMenuItem>
-                                            <ContextMenuItem className="cursor-pointer group">
-                                                <Palette size={16} className="text-muted-foreground group-hover:text-accent-foreground" />
-                                                <p className="text-foreground group-hover:text-accent-foreground">Change Color</p>
-                                            </ContextMenuItem>
-                                            <ContextMenuItem className="cursor-pointer group">
-                                                <Move size={16} className="text-muted-foreground group-hover:text-accent-foreground" />
-                                                <p className="text-foreground group-hover:text-accent-foreground">Move to...</p>
-                                            </ContextMenuItem>
-                                            <ContextMenuItem className="cursor-pointer group">
-                                                <FolderEdit size={16} className="text-muted-foreground group-hover:text-accent-foreground" />
-                                                <p className="text-foreground group-hover:text-accent-foreground">New Folder</p>
-                                                <KbdGroup>
-                                                    <Kbd className="bg-popover text-muted-foreground">Ctrl + Shift + N</Kbd>
-                                                </KbdGroup>
-                                            </ContextMenuItem>
-                                            <ContextMenuItem className="cursor-pointer group">
-                                                <FileEdit size={16} className="text-muted-foreground group-hover:text-accent-foreground" />
-                                                <p className="text-foreground group-hover:text-accent-foreground">New Note</p>
-                                                <KbdGroup>
-                                                    <Kbd className="bg-popover text-muted-foreground">Ctrl + N</Kbd>
-                                                </KbdGroup>
-                                            </ContextMenuItem>
-                                            <ContextMenuItem className="cursor-pointer group text-destructive focus:text-destructive focus:bg-destructive/10">
-                                                <Trash size={16} className="text-destructive" />
-                                                <p className="text-destructive">Delete</p>
-                                            </ContextMenuItem>
-                                        </ContextMenuContent>
-                                    </ContextMenu>
-                                ))}
-                                {notes.map(note => (
-                                    <ContextMenu key={note.id}>
-                                        <ContextMenuTrigger>
-                                            <div
-                                                className="group flex flex-col items-center gap-2 p-4 hover:bg-muted/50 rounded-xl cursor-pointer w-32 h-28 justify-center transition-all duration-200 border border-transparent hover:border-sidebar-border"
-                                            >
-                                                <FileText className="w-10 h-10 text-foreground/50 group-hover:text-foreground group-hover:scale-110 transition-all duration-200" />
-                                                <p className="text-xs font-medium text-center truncate w-full px-1 mt-1">{note.title}</p>
-                                            </div>
-                                        </ContextMenuTrigger>
-                                        <ContextMenuContent >
-                                            <p className="text-foreground text-md px-2 mt-1">{note.title}</p>
-                                            <p className="text-muted-foreground text-xs px-2">{note.description}</p>
-                                            <p className="text-muted-foreground text-xs px-2 mb-1">{`Last updated: ${dateConvert(note.updatedAt.toString())}`}</p>
-                                            <ContextMenuItem className="cursor-pointer group">
-                                                <FolderPen size={16} className="text-muted-foreground group-hover:text-accent-foreground" />
-                                                <p className="text-foreground group-hover:text-accent-foreground">Rename</p>
-                                            </ContextMenuItem>
-                                            <ContextMenuItem className="cursor-pointer group">
-                                                <Palette size={16} className="text-muted-foreground group-hover:text-accent-foreground" />
-                                                <p className="text-foreground group-hover:text-accent-foreground">Change Color</p>
-                                            </ContextMenuItem>
-                                            <ContextMenuItem className="cursor-pointer group">
-                                                <Move size={16} className="text-muted-foreground group-hover:text-accent-foreground" />
-                                                <p className="text-foreground group-hover:text-accent-foreground">Move to...</p>
-                                            </ContextMenuItem>
-                                            <ContextMenuItem className="cursor-pointer group">
-                                                <FolderEdit size={16} className="text-muted-foreground group-hover:text-accent-foreground" />
-                                                <p className="text-foreground group-hover:text-accent-foreground">New Folder</p>
-                                                <KbdGroup>
-                                                    <Kbd className="bg-popover text-muted-foreground">Ctrl + Shift + N</Kbd>
-                                                </KbdGroup>
-                                            </ContextMenuItem>
-                                            <ContextMenuItem className="cursor-pointer group">
-                                                <FileEdit size={16} className="text-muted-foreground group-hover:text-accent-foreground" />
-                                                <p className="text-foreground group-hover:text-accent-foreground">New Note</p>
-                                                <KbdGroup>
-                                                    <Kbd className="bg-popover text-muted-foreground">Ctrl + N</Kbd>
-                                                </KbdGroup>
-                                            </ContextMenuItem>
-                                            <ContextMenuItem className="cursor-pointer group text-destructive focus:text-destructive focus:bg-destructive/10">
-                                                <Trash size={16} className="text-destructive" />
-                                                <p className="text-destructive">Delete</p>
-                                            </ContextMenuItem>
-                                        </ContextMenuContent>
-                                    </ContextMenu>
-                                ))}
-                                {folders.length === 0 && notes.length === 0 && (
-                                    <div className="w-full flex flex-col items-center justify-center text-muted-foreground mt-20 gap-2">
-                                        <FolderIcon size={64} className="text-muted-foreground/30" />
-                                        <p className="text-center w-1/4 text-lg">This folder is empty or has not yet been created</p>
-                                    </div>
-                                )}
-                            </div>
-                        </ScrollArea>
 
-                        {/* Path Input */}
-                        <div className="w-full bg-card absolute bottom-2 left-0 right-0 px-4 flex justify-center pointer-events-none">
-                            <InputGroup className="w-full max-w-[40%] bg-popover dark:bg-popover shadow-lg cursor-pointer px-2 pointer-events-auto"
-                                onClick={() => { }}>
-                                <InputGroupAddon align="inline-end" className="cursor-pointer">
-                                    <InputGroupText className="bg-transparent cursor-pointer">
-                                    </InputGroupText>
-                                </InputGroupAddon>
-                                <InputGroupInput
-                                    placeholder="No path selected..."
-                                    className="cursor-pointer"
-                                    // if path is none default to "/"
-                                    onChange={(e) => { setPath(e.target.value === "" ? "/" : e.target.value) }}
-                                    value={path}
-                                />
-                            </InputGroup>
-                        </div>
-                    </ContextMenuTrigger>
-                    <ContextMenuContent >
-                        <p className="text-foreground/50 text-xs px-2 my-1">Actions</p>
-                        <ContextMenuItem className="cursor-pointer group">
-                            <FolderEdit size={16} className="text-muted-foreground group-hover:text-accent-foreground" />
-                            <p className="text-foreground group-hover:text-accent-foreground">New Folder</p>
-                            <KbdGroup>
-                                <Kbd className="bg-popover text-muted-foreground">Ctrl + Shift + N</Kbd>
-                            </KbdGroup>
-                        </ContextMenuItem>
-                        <ContextMenuItem className="cursor-pointer group">
-                            <FileEdit size={16} className="text-muted-foreground group-hover:text-accent-foreground" />
-                            <p className="text-foreground group-hover:text-accent-foreground">New Note</p>
-                            <KbdGroup>
-                                <Kbd className="bg-popover text-muted-foreground">Ctrl + N</Kbd>
-                            </KbdGroup>
-                        </ContextMenuItem>
-                    </ContextMenuContent>
-                </ContextMenu>
+                {/* ---------------------------- FOLDERS ---------------------------- */}
+                {areaLocation === "folders" ? (
+                    <ContextMenu>
+                        <ContextMenuTrigger className="w-full h-full block">
+                            {/* ALL FOLDERS AND NOTES INSIDE THE CONTEXT MENU TRIGGER */}
+                            <ScrollArea className="h-full w-full pb-10">
+                                {/* HERE WE WILL LOAD ALL THE FOLDERS AND NOTES IN THE CURRENT PATH */}
+                                <div className="flex flex-wrap gap-4 p-4 content-start">
+                                    {folders.map(folder => (
+                                        <ContextMenu key={folder.id}>
+                                            <ContextMenuTrigger>
+                                                <div
+                                                    className="group flex flex-col items-center gap-2 p-4 hover:bg-muted/50 rounded-xl cursor-pointer w-32 h-28 justify-center transition-all duration-200 border border-transparent hover:border-sidebar-border"
+                                                    onClick={() => navigateToFolder(folder.name)}
+                                                >
+                                                    <FolderIcon className="w-12 h-12 text-primary fill-primary group-hover:scale-110 transition-transform duration-200" />
+                                                    <p className="text-xs font-medium text-center truncate w-full px-1">{folder.name}</p>
+                                                </div>
+                                            </ContextMenuTrigger>
+                                            <ContextMenuContent >
+                                                <p className="text-foreground text-md px-2 mt-1">{folder.name}</p>
+                                                <p className="text-muted-foreground text-xs px-2 mb-1">{`Last updated: ${dateConvert(folder.updatedAt.toString())}`}</p>
+                                                <ContextMenuItem className="cursor-pointer group">
+                                                    <FolderPen size={16} className="text-muted-foreground group-hover:text-accent-foreground" />
+                                                    <p className="text-foreground group-hover:text-accent-foreground">Rename</p>
+                                                </ContextMenuItem>
+                                                <ContextMenuItem className="cursor-pointer group">
+                                                    <Palette size={16} className="text-muted-foreground group-hover:text-accent-foreground" />
+                                                    <p className="text-foreground group-hover:text-accent-foreground">Change Color</p>
+                                                </ContextMenuItem>
+                                                <ContextMenuItem className="cursor-pointer group">
+                                                    <Move size={16} className="text-muted-foreground group-hover:text-accent-foreground" />
+                                                    <p className="text-foreground group-hover:text-accent-foreground">Move to...</p>
+                                                </ContextMenuItem>
+                                                <ContextMenuItem className="cursor-pointer group">
+                                                    <FolderEdit size={16} className="text-muted-foreground group-hover:text-accent-foreground" />
+                                                    <p className="text-foreground group-hover:text-accent-foreground">New Folder</p>
+                                                    <KbdGroup>
+                                                        <Kbd className="bg-popover text-muted-foreground">Ctrl + Shift + N</Kbd>
+                                                    </KbdGroup>
+                                                </ContextMenuItem>
+                                                <ContextMenuItem className="cursor-pointer group">
+                                                    <FileEdit size={16} className="text-muted-foreground group-hover:text-accent-foreground" />
+                                                    <p className="text-foreground group-hover:text-accent-foreground">New Note</p>
+                                                    <KbdGroup>
+                                                        <Kbd className="bg-popover text-muted-foreground">Ctrl + N</Kbd>
+                                                    </KbdGroup>
+                                                </ContextMenuItem>
+                                                <ContextMenuItem className="cursor-pointer group text-destructive focus:text-destructive focus:bg-destructive/10">
+                                                    <Trash size={16} className="text-destructive" />
+                                                    <p className="text-destructive">Delete</p>
+                                                </ContextMenuItem>
+                                            </ContextMenuContent>
+                                        </ContextMenu>
+                                    ))}
+                                    {notes.map(note => (
+                                        <ContextMenu key={note.id}>
+                                            <ContextMenuTrigger>
+                                                <div
+                                                    className="group flex flex-col items-center gap-2 p-4 hover:bg-muted/50 rounded-xl cursor-pointer w-32 h-28 justify-center transition-all duration-200 border border-transparent hover:border-sidebar-border"
+                                                >
+                                                    <FileText className="w-10 h-10 text-foreground/50 group-hover:text-foreground group-hover:scale-110 transition-all duration-200" />
+                                                    <p className="text-xs font-medium text-center truncate w-full px-1 mt-1">{note.title}</p>
+                                                </div>
+                                            </ContextMenuTrigger>
+                                            <ContextMenuContent >
+                                                <p className="text-foreground text-md px-2 mt-1">{note.title}</p>
+                                                <p className="text-muted-foreground text-xs px-2">{note.description}</p>
+                                                <p className="text-muted-foreground text-xs px-2 mb-1">{`Last updated: ${dateConvert(note.updatedAt.toString())}`}</p>
+                                                <ContextMenuItem className="cursor-pointer group">
+                                                    <FolderPen size={16} className="text-muted-foreground group-hover:text-accent-foreground" />
+                                                    <p className="text-foreground group-hover:text-accent-foreground">Rename</p>
+                                                </ContextMenuItem>
+                                                <ContextMenuItem className="cursor-pointer group">
+                                                    <Palette size={16} className="text-muted-foreground group-hover:text-accent-foreground" />
+                                                    <p className="text-foreground group-hover:text-accent-foreground">Change Color</p>
+                                                </ContextMenuItem>
+                                                <ContextMenuItem className="cursor-pointer group">
+                                                    <Move size={16} className="text-muted-foreground group-hover:text-accent-foreground" />
+                                                    <p className="text-foreground group-hover:text-accent-foreground">Move to...</p>
+                                                </ContextMenuItem>
+                                                <ContextMenuItem className="cursor-pointer group">
+                                                    <FolderEdit size={16} className="text-muted-foreground group-hover:text-accent-foreground" />
+                                                    <p className="text-foreground group-hover:text-accent-foreground">New Folder</p>
+                                                    <KbdGroup>
+                                                        <Kbd className="bg-popover text-muted-foreground">Ctrl + Shift + N</Kbd>
+                                                    </KbdGroup>
+                                                </ContextMenuItem>
+                                                <ContextMenuItem className="cursor-pointer group">
+                                                    <FileEdit size={16} className="text-muted-foreground group-hover:text-accent-foreground" />
+                                                    <p className="text-foreground group-hover:text-accent-foreground">New Note</p>
+                                                    <KbdGroup>
+                                                        <Kbd className="bg-popover text-muted-foreground">Ctrl + N</Kbd>
+                                                    </KbdGroup>
+                                                </ContextMenuItem>
+                                                <ContextMenuItem className="cursor-pointer group text-destructive focus:text-destructive focus:bg-destructive/10">
+                                                    <Trash size={16} className="text-destructive" />
+                                                    <p className="text-destructive">Delete</p>
+                                                </ContextMenuItem>
+                                            </ContextMenuContent>
+                                        </ContextMenu>
+                                    ))}
+                                    {folders.length === 0 && notes.length === 0 && (
+                                        <div className="w-full flex flex-col items-center justify-center text-muted-foreground mt-20 gap-2">
+                                            <FolderIcon size={64} className="text-muted-foreground/30" />
+                                            <p className="text-center w-1/4 text-lg">This folder is empty or has not yet been created</p>
+                                        </div>
+                                    )}
+                                </div>
+                            </ScrollArea>
+
+                            {/* Path Input */}
+                            <div className="w-full bg-card absolute bottom-2 left-0 right-0 px-4 flex justify-center pointer-events-none">
+                                <InputGroup className="w-full max-w-[40%] bg-popover dark:bg-popover shadow-lg cursor-pointer px-2 pointer-events-auto"
+                                    onClick={() => { }}>
+                                    <InputGroupAddon align="inline-end" className="cursor-pointer">
+                                        <InputGroupText className="bg-transparent cursor-pointer">
+                                        </InputGroupText>
+                                    </InputGroupAddon>
+                                    <InputGroupInput
+                                        placeholder="No path selected..."
+                                        className="cursor-pointer"
+                                        // if path is none default to "/"
+                                        onChange={(e) => { setPath(e.target.value === "" ? "/" : e.target.value) }}
+                                        value={path}
+                                    />
+                                </InputGroup>
+                            </div>
+                        </ContextMenuTrigger>
+                        <ContextMenuContent >
+                            <p className="text-foreground/50 text-xs px-2 my-1">Actions</p>
+                            <ContextMenuItem className="cursor-pointer group">
+                                <FolderEdit size={16} className="text-muted-foreground group-hover:text-accent-foreground" />
+                                <p className="text-foreground group-hover:text-accent-foreground">New Folder</p>
+                                <KbdGroup>
+                                    <Kbd className="bg-popover text-muted-foreground">Ctrl + Shift + N</Kbd>
+                                </KbdGroup>
+                            </ContextMenuItem>
+                            <ContextMenuItem className="cursor-pointer group">
+                                <FileEdit size={16} className="text-muted-foreground group-hover:text-accent-foreground" />
+                                <p className="text-foreground group-hover:text-accent-foreground">New Note</p>
+                                <KbdGroup>
+                                    <Kbd className="bg-popover text-muted-foreground">Ctrl + N</Kbd>
+                                </KbdGroup>
+                            </ContextMenuItem>
+                        </ContextMenuContent>
+                    </ContextMenu>
+
+                ) : areaLocation === "notes" ? (
+                    <div>
+                        <p>Notes</p>
+                    </div>
+                ) : (
+                    <div>
+                        <p>Chats</p>
+                    </div>
+                )}
+
             </div>
         </SidebarInset>
     );
