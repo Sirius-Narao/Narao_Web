@@ -5,17 +5,17 @@ import { useState, createContext, Dispatch, SetStateAction, useContext } from "r
 export type ActiveTabsType = number;
 
 interface ActiveTabsContextType {
-    activeTabs: ActiveTabsType;
-    setActiveTabs: Dispatch<SetStateAction<ActiveTabsType>>;
+    activeTab: ActiveTabsType;
+    setActiveTab: Dispatch<SetStateAction<ActiveTabsType>>;
 }
 
 const ActiveTabsContext = createContext<ActiveTabsContextType | undefined>(undefined);
 
 function ActiveTabsProvider({ children }: { children: React.ReactNode }) {
-    const [activeTabs, setActiveTabs] = useState<ActiveTabsType>(0);
+    const [activeTab, setActiveTab] = useState<ActiveTabsType>(0);
 
     return (
-        <ActiveTabsContext.Provider value={{ activeTabs, setActiveTabs }}>
+        <ActiveTabsContext.Provider value={{ activeTab, setActiveTab }}>
             {children}
         </ActiveTabsContext.Provider>
     );

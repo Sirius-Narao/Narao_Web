@@ -19,7 +19,6 @@ import {
     TooltipContent,
     TooltipTrigger,
 } from "@/components/ui/tooltip"
-import { useAreaLocation } from "@/context/areaContextLocation";
 import { InputGroup, InputGroupAddon, InputGroupInput, InputGroupText } from "@/components/ui/input-group";
 import { ScrollArea } from "@/components/ui/scroll-area";
 import { DropdownMenu, DropdownMenuContent, DropdownMenuGroup, DropdownMenuItem, DropdownMenuTrigger } from "@/components/ui/dropdown-menu";
@@ -30,6 +29,7 @@ import quantifyDate from "@/lib/quantifyDate";
 import handleSearch from "@/lib/handleSearch";
 import { Dialog, DialogClose, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog";
 import { Kbd, KbdGroup } from "@/components/ui/kbd";
+import { useActiveTabs } from "@/context/activeTabsContext";
 
 export default function SidebarArea() {
     // EXAMPLE DATA
@@ -51,11 +51,9 @@ export default function SidebarArea() {
     // show announce
     const [showAnnounce, setShowAnnounce] = useState(true);
     // active tab
-    const [activeTab, setActiveTab] = useState(0);
+    const { activeTab, setActiveTab } = useActiveTabs();
     // sidebar state
     const { state, setOpen } = useSidebar();
-    // area location
-    const { areaLocation, setAreaLocation } = useAreaLocation();
     // settings tab
     const [settingsTab, setSettingsTab] = useState(0);
 
@@ -119,7 +117,7 @@ export default function SidebarArea() {
                                     state === "collapsed" ? "w-full py-0" : "w-[calc(100%/3)] py-2"
                                 )}
                                 key={index}
-                                onClick={() => { setActiveTab(index); setAreaLocation(index === 0 ? "folders" : index === 1 ? "notes" : "chats") }}
+                                onClick={() => { setActiveTab(index) }}
                             >
                                 {activeTab === index && (
                                     <motion.div
@@ -171,6 +169,7 @@ export default function SidebarArea() {
                         </InputGroupAddon>
                         <InputGroupInput
                             placeholder="Look for a chat..."
+                            aria-placeholder="Look for a chat..."
                             className="bg-card group-data-[state=collapsed]:hidden cursor-pointer hover:bg-card/30"
                             onChange={(e) => setFilteredChats(handleSearch(e.target.value, CHAT_LIST_EXAMPLE))}
                         />

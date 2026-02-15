@@ -1,12 +1,12 @@
 'use client'
 
 import { Button } from "@/components/ui/button";
-import { DropdownMenu, DropdownMenuContent, DropdownMenuLabel, DropdownMenuTrigger } from "@/components/ui/dropdown-menu";
+import { DropdownMenu, DropdownMenuContent, DropdownMenuTrigger } from "@/components/ui/dropdown-menu";
 import { InputGroup, InputGroupAddon, InputGroupInput, InputGroupText } from "@/components/ui/input-group";
 import { Kbd, KbdGroup } from "@/components/ui/kbd";
 import { SidebarInset } from "@/components/ui/sidebar";
 import { Tooltip, TooltipContent, TooltipTrigger } from "@/components/ui/tooltip";
-import { FileEdit, FolderEdit, MoreVertical, MoveLeft, MoveRight, Search, Folder as FolderIcon, FileText, FolderPen, Move, Trash2, Trash, Palette, CircleSlash, CircleOff } from "lucide-react";
+import { FileEdit, FolderEdit, MoreVertical, MoveLeft, MoveRight, Search, Folder as FolderIcon, FileText, FolderPen, Move, Trash, Palette, CircleSlash, AArrowUp, AArrowDown } from "lucide-react";
 import {
     ContextMenu,
     ContextMenuContent,
@@ -19,17 +19,30 @@ import { ScrollArea } from "@/components/ui/scroll-area";
 import { cn } from "@/lib/utils";
 import dateConvert from "@/lib/dateConvert";
 import { Popover, PopoverAnchor, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
-import { useAreaLocation } from "@/context/areaContextLocation";
+import { Toggle } from "@/components/ui/toggle";
+import { useActiveTabs } from "@/context/activeTabsContext";
+import { Input } from "@/components/ui/input";
 
 export default function MainArea() {
-    // Area State
-    const { areaLocation, setAreaLocation } = useAreaLocation()
     // Path State
     const [path, setPath] = useState("/");
     const [pathHistory, setPathHistory] = useState<string[]>(["/"])
     const searchInputRef = useRef<HTMLInputElement>(null);
     const [searchOpen, setSearchOpen] = useState(false);
     const [searchQuery, setSearchQuery] = useState("");
+    const [sortOrder, setSortOrder] = useState<"asc" | "desc">("desc");
+    const { activeTab, setActiveTab } = useActiveTabs();
+
+    // Note Example Structure
+    const NOTE_EXAMPLE: Note = {
+        id: "1",
+        title: "Shopping List",
+        content: "# Shopping List\n\n## Groceries\n- **Milk** (2L)\n- **Eggs** (1 dozen)\n- **Bread** (Whole wheat)\n- **Coffee** (Dark roast)\n\n## Household\n- Paper towels\n- Dish soap\n\n> Don't forget to use the coupons!",
+        description: "Weekly groceries for February",
+        createdAt: new Date("2026-02-01T09:00:00+01:00"),
+        updatedAt: new Date("2026-02-03T18:30:00+01:00"),
+        tags: ["personal", "todo"],
+    }
 
     useEffect(() => {
         setPathHistory([...pathHistory, path])
@@ -146,6 +159,7 @@ export default function MainArea() {
     const rootFolders = FOLDERS_EXAMPLE.filter(f => !allChildFolderIds.has(f.id));
     const rootNotes = NOTES_EXAMPLE.filter(n => !allChildNoteIds.has(n.id));
 
+    // Get content of current path
     const getContent = () => {
         const cleanPath = path.endsWith("/") && path.length > 1 ? path.slice(0, -1) : path;
 
@@ -178,14 +192,13 @@ export default function MainArea() {
 
         return { folders: [], notes: [] };
     }
-
     const { folders, notes } = getContent();
 
+    // Navigate to folder
     const navigateToFolder = (folderName: string) => {
         const newPath = path === "/" ? `/${folderName}` : `${path}/${folderName}`;
         setPath(newPath);
     }
-
     const navigateToFolderAbsolutePath = (path: string) => {
         const absolutePath = path.startsWith("/") ? path : `/${path}`;
         setPath(absolutePath);
@@ -193,6 +206,7 @@ export default function MainArea() {
         setSearchQuery("");
     }
 
+    // Get folder path
     const getFolderPath = (folderId: string): string => {
         const findPath = (currentFolders: Folder[], currentPath: string): string | null => {
             for (const folder of currentFolders) {
@@ -212,13 +226,12 @@ export default function MainArea() {
         return findPath(rootFolders, "/") || "/";
     };
 
+    // Get note path
     const getNotePath = (noteId: string): string => {
         const folder = FOLDERS_EXAMPLE.find(f => f.notesIds?.includes(noteId));
         if (!folder) return "/";
         return getFolderPath(folder.id);
     };
-
-
 
     // Functions for arrows BACK & FORWARD
     const goBack = useCallback(() => {
@@ -227,7 +240,6 @@ export default function MainArea() {
             return prev.split("/").slice(0, -1).join("/") || "/";
         });
     }, []);
-
     const goForward = useCallback(() => {
         setPathHistory(prev => {
             const lastPath = prev[prev.length - 2];
@@ -258,15 +270,15 @@ export default function MainArea() {
             }
             else if (e.ctrlKey && key === "o" && !e.shiftKey && !e.altKey) {
                 e.preventDefault();
-                setAreaLocation("folders");
+                setActiveTab(0);
             }
             if (e.ctrlKey && key === "n" && !e.shiftKey && !e.altKey) {
                 e.preventDefault();
-                setAreaLocation("notes");
+                setActiveTab(1);
             }
             if (e.ctrlKey && key === "c" && !e.shiftKey && !e.altKey) {
                 e.preventDefault();
-                setAreaLocation("chats");
+                setActiveTab(2);
             }
         };
 
@@ -310,7 +322,7 @@ export default function MainArea() {
                 </div>
 
                 {/* Middle */}
-                <div className="w-full flex justify-center">
+                {activeTab === 0 ? <div className="w-full flex justify-center">
                     <Popover open={searchOpen} onOpenChange={setSearchOpen}>
                         <PopoverAnchor asChild className="w-[40%]" >
                             <InputGroup className="w-[40%] bg-card shadow-lg cursor-pointer px-2"
@@ -390,10 +402,25 @@ export default function MainArea() {
                             )}
                         </PopoverContent>
                     </Popover>
-                </div>
+                </div> : activeTab === 1 ?
+                    <div className="w-full flex justify-center">
+                        <Tooltip>
+                            <TooltipTrigger asChild>
+                                <Button variant="ghost" className="w-124 sm:w-64 text-foreground text-lg">{NOTE_EXAMPLE.title}</Button>
+                            </TooltipTrigger>
+                            <TooltipContent>
+                                <p>Change Note's Name</p>
+                            </TooltipContent>
+                        </Tooltip>
+                    </div>
+                    :
+                    <div className="w-full flex justify-center">
+                        <p>Settings</p>
+                    </div>
+                }
 
                 {/* Right Side */}
-                <div className="absolute right-2">
+                {activeTab === 0 && <div className="absolute right-2">
                     <DropdownMenu>
                         <Tooltip>
                             <TooltipTrigger asChild>
@@ -410,33 +437,37 @@ export default function MainArea() {
                                 </KbdGroup> */}
                             </TooltipContent>
                         </Tooltip>
-                        <DropdownMenuContent align="end" className="w-[264px] p-2">
-                            <DropdownMenuLabel>Filters & More</DropdownMenuLabel>
-                            <div className="w-full h-[1px] bg-foreground/10 my-1"></div>
+                        <DropdownMenuContent align="end" className="min-w-[32px] p-2 rounded-full">
+                            {/* <div className="w-full h-[1px] bg-foreground/10 my-1"></div> */}
                             {/* Different types of filters */}
                             <div className="flex items-center gap-2 p-2">
-                                <p>Sort by</p>
-                                <p>Group by</p>
-                                <p>Filter by</p>
+                                <Toggle aria-label="Ascending" size="sm" variant="outline" className="flex items-center gap-1 px-2 hover:bg-sidebar-border" onClick={() => setSortOrder("asc")} pressed={sortOrder === "asc"}>
+                                    <AArrowUp className="group-data-[state=on]/toggle:fill-foreground" />
+                                    <p>Ascending</p>
+                                </Toggle>
+                                <Toggle aria-label="Descending" size="sm" variant="outline" className="flex items-center gap-1 px-2 hover:bg-sidebar-border" onClick={() => setSortOrder("desc")} pressed={sortOrder === "desc"}>
+                                    <AArrowDown className="group-data-[state=on]/toggle:fill-foreground" />
+                                    <p>Descending</p>
+                                </Toggle>
                             </div>
                         </DropdownMenuContent>
 
                     </DropdownMenu>
-                </div>
+                </div>}
             </div>
 
             {/* ------------------ Bottom Part ----------------- */}
             <div className="bg-card text-foreground h-[92vh] w-[calc(100%-0.5rem)] rounded-lg absolute bottom-2 p-4 border border-sidebar-border">
 
                 {/* ---------------------------- FOLDERS ---------------------------- */}
-                {areaLocation === "folders" ? (
+                {activeTab === 0 ? (
                     <ContextMenu>
                         <ContextMenuTrigger className="w-full h-full block">
                             {/* ALL FOLDERS AND NOTES INSIDE THE CONTEXT MENU TRIGGER */}
                             <ScrollArea className="h-full w-full pb-10">
                                 {/* HERE WE WILL LOAD ALL THE FOLDERS AND NOTES IN THE CURRENT PATH */}
                                 <div className="flex flex-wrap gap-4 p-4 content-start">
-                                    {folders.map(folder => (
+                                    {folders.slice().sort((a, b) => sortOrder === "asc" ? a.name.localeCompare(b.name) : b.name.localeCompare(a.name)).map(folder => (
                                         <ContextMenu key={folder.id}>
                                             <ContextMenuTrigger>
                                                 <div
@@ -483,7 +514,7 @@ export default function MainArea() {
                                             </ContextMenuContent>
                                         </ContextMenu>
                                     ))}
-                                    {notes.map(note => (
+                                    {notes.slice().sort((a, b) => sortOrder === "asc" ? a.title.localeCompare(b.title) : b.title.localeCompare(a.title)).map(note => (
                                         <ContextMenu key={note.id}>
                                             <ContextMenuTrigger>
                                                 <div
@@ -576,7 +607,7 @@ export default function MainArea() {
                         </ContextMenuContent>
                     </ContextMenu>
 
-                ) : areaLocation === "notes" ? (
+                ) : activeTab === 1 ? (
                     <div>
                         <p>Notes</p>
                     </div>
