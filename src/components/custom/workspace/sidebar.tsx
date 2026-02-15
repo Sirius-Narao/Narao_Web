@@ -30,24 +30,30 @@ import handleSearch from "@/lib/handleSearch";
 import { Dialog, DialogClose, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog";
 import { Kbd, KbdGroup } from "@/components/ui/kbd";
 import { useActiveTabs } from "@/context/activeTabsContext";
+import { supabase } from "@/lib/supabaseClient";
+import ProfileType from "@/types/profileType";
+import { Skeleton } from "@/components/ui/skeleton";
+import AnnounceType from "@/types/announceType";
+
+const ANNOUNCES_EXAMPLE: { title: string, description: string } = { title: "Announce Example", description: "Announce's description here, text should be short, but it should be visible" };
+// const CHAT_LIST_EXAMPLE: ChatType[] = [
+//     { title: "Project Phoenix", description: "Discussing the migration strategy for the legacy database.", createdAt: new Date("2024-01-01T10:00:00"), updatedAt: new Date("2024-01-01T10:00:00") },
+//     { title: "Design Review", description: "Feedback on the new landing page mockups and user flow.", createdAt: new Date("2024-01-02T11:00:00"), updatedAt: new Date("2024-01-02T11:00:00") },
+//     { title: "Bug: Login Loop", description: "Investigating reports of users getting stuck on the auth redirect.", createdAt: new Date("2024-01-03T09:30:00"), updatedAt: new Date("2024-01-03T09:30:00") },
+//     { title: "Marketing Sync", description: "Planning the social media rollout for the Q2 product launch.", createdAt: new Date("2024-01-04T14:15:00"), updatedAt: new Date("2024-01-04T14:15:00") },
+//     { title: "API Documentation", description: "Drafting the endpoints for the new integration service.", createdAt: new Date("2024-01-05T16:45:00"), updatedAt: new Date("2024-01-05T16:45:00") },
+//     { title: "Customer Support", description: "Resolving the ticket regarding workspace permission issues.", createdAt: new Date("2024-01-06T13:20:00"), updatedAt: new Date("2024-01-06T13:20:00") },
+//     { title: "Sprint Planning", description: "Defining tasks and estimates for the upcoming development cycle.", createdAt: new Date("2024-01-07T09:00:00"), updatedAt: new Date("2024-01-07T09:00:00") },
+//     { title: "Security Patch", description: "Implementing fixes for the identified vulnerability in the middleware.", createdAt: new Date("2024-01-08T15:10:00"), updatedAt: new Date("2024-01-08T15:10:00") },
+//     { title: "Team Lunch", description: "Coordinating the location and time for Friday's social gathering.", createdAt: new Date("2024-01-09T12:00:00"), updatedAt: new Date("2024-01-09T12:00:00") },
+//     { title: "Performance Audit", description: "Analyzing the bundle size and load times for the mobile app.", createdAt: new Date("2024-01-10T10:30:00"), updatedAt: new Date("2024-01-10T10:30:00") },
+// ];
 
 export default function SidebarArea() {
-    // EXAMPLE DATA
-    const USERNAME_EXAMPLE: string = "Bruce Wayne";
-    const ANNOUNCES_EXAMPLE: { title: string, description: string } = { title: "Announce Example", description: "Announce's description here, text should be short, but it should be visible" };
-    const CHAT_LIST_EXAMPLE: ChatType[] = [
-        { title: "Project Phoenix", description: "Discussing the migration strategy for the legacy database.", date: "2024-03-15" },
-        { title: "Design Review", description: "Feedback on the new landing page mockups and user flow.", date: "2025-01-10" },
-        { title: "Bug: Login Loop", description: "Investigating reports of users getting stuck on the auth redirect.", date: "2024-02-28" },
-        { title: "Marketing Sync", description: "Planning the social media rollout for the Q2 product launch.", date: "2026-03-20" },
-        { title: "API Documentation", description: "Drafting the endpoints for the new integration service.", date: "2024-01-12" },
-        { title: "Customer Support", description: "Resolving the ticket regarding workspace permission issues.", date: "2025-03-05" },
-        { title: "Sprint Planning", description: "Defining tasks and estimates for the upcoming development cycle.", date: "2024-03-18" },
-        { title: "Security Patch", description: "Implementing fixes for the identified vulnerability in the middleware.", date: "2023-12-20" },
-        { title: "Team Lunch", description: "Coordinating the location and time for Friday's social gathering.", date: "2024-03-22" },
-        { title: "Performance Audit", description: "Analyzing the bundle size and load times for the mobile app.", date: "2024-02-15" },
-    ];
-
+    // remote data
+    const [user, setUser] = useState<ProfileType | null>(null);
+    const [chats, setChats] = useState<ChatType[]>([]);
+    const [announces, setAnnounces] = useState<AnnounceType[]>([]);
     // show announce
     const [showAnnounce, setShowAnnounce] = useState(true);
     // active tab
@@ -57,16 +63,77 @@ export default function SidebarArea() {
     // settings tab
     const [settingsTab, setSettingsTab] = useState(0);
 
-    console.table(
-        CHAT_LIST_EXAMPLE.map(c => ({
-            value: quantifyDate(c.date),
-        }))
-    );
+
+    // Fetch user data
+    useEffect(() => {
+        const fetchUsers = async () => {
+            const { data: profiles, error } = await supabase
+                .from('profiles')         // your table name
+                .select('*')          // select all columns
+                .limit(1);            // select only the 1rst user
+
+            if (error) {
+                console.error(error);
+            }
+            setUser(profiles?.[0]);
+        };
+        fetchUsers();
+    }, []);
+
+    // Fetch chats data
+    useEffect(() => {
+        if (!user) return;
+
+        const fetchChats = async () => {
+            const { data, error } = await supabase
+                .from('chats')         // your table name
+                .select('*')          // select all columns
+                .eq('user_id', user.id);           // select only those of the user
+
+            if (error) {
+                console.error(error);
+                return;
+            }
+
+            if (data) {
+                // Map the data to ensure correct types (Date objects) and property names
+                const mappedChats: ChatType[] = data.map((item: any) => ({
+                    title: item.title || "Untitled Chat",
+                    description: item.description || "",
+                    // Handle both camelCase (if mapped) and snake_case (raw DB)
+                    createdAt: new Date(item.created_at || item.createdAt || new Date()),
+                    updatedAt: new Date(item.updated_at || item.updatedAt || new Date())
+                }));
+                setChats(mappedChats);
+            }
+        };
+        fetchChats();
+    }, [user]);
+
+    // Update filtered chats when chats change, preserving sort order
+    useEffect(() => {
+        setFilteredChats([...chats].sort((a, b) => b.updatedAt.getTime() - a.updatedAt.getTime()));
+    }, [chats]);
+
+    // Fetch announces data
+    // useEffect(() => {
+    //     const fetchAnnounces = async () => {
+    //         const { data: announces, error } = await supabase
+    //             .from('announces')         // your table name
+    //             .select('*')          // select all columns
+    //             .limit(1);            // select only the 1rst user
+
+    //         if (error) {
+    //             console.error(error);
+    //         }
+    //         setAnnounces(announces);
+    //     };
+    //     fetchAnnounces();
+    // }, []);
 
     // Filtered chats state
-    const [filteredChats, setFilteredChats] = useState<ChatType[]>(() =>
-        [...CHAT_LIST_EXAMPLE].sort((a, b) => quantifyDate(b.date) - quantifyDate(a.date))
-    );
+    // Filtered chats state
+    const [filteredChats, setFilteredChats] = useState<ChatType[]>([]);
 
     return (
         <Sidebar variant="inset" className="bg-background">
@@ -171,20 +238,19 @@ export default function SidebarArea() {
                             placeholder="Look for a chat..."
                             aria-placeholder="Look for a chat..."
                             className="bg-card group-data-[state=collapsed]:hidden cursor-pointer hover:bg-card/30"
-                            onChange={(e) => setFilteredChats(handleSearch(e.target.value, CHAT_LIST_EXAMPLE))}
+                            onChange={(e) => setFilteredChats(handleSearch(e.target.value, chats))}
                         />
                     </InputGroup>
                     <ScrollArea className=" max-h-[calc(100vh-20rem)] h-fit rounded-lg border border-sidebar-border mt-2 pt-1 px-1 shadow-lg bg-card/30s group-data-[state=collapsed]:hidden">
-                        {filteredChats.length > 0 ? filteredChats.map((chat, index) => (
+                        {chats.length > 0 ? filteredChats.length > 0 ? filteredChats.map((chat, index) => (
                             <div key={index} className="flex items-center justify-between pl-4 pr-2 py-2 rounded-lg hover:bg-card/80 cursor-pointer transition-all duration-100 ease-in-out mb-1">
                                 <Tooltip>
                                     <TooltipTrigger asChild>
                                         <div className="flex flex-row items-center gap-2 w-full">
-                                            <p>{chat.title.length > 9 ? chat.title.slice(0, 9).trim() + "..." : chat.title}</p>
-                                            <p className="text-xs text-muted-foreground">{chat.description.length > 9 ? chat.description.slice(0, 9).trim() + "..." : chat.description}</p>
+                                            <p className="text-sm truncate">{chat.title}</p>
                                         </div>
                                     </TooltipTrigger>
-                                    <TooltipContent side="right">
+                                    <TooltipContent side="right" sideOffset={16}>
                                         <p>{chat.title}</p>
                                         <p className="text-xs text-muted-foreground">{chat.description}</p>
                                     </TooltipContent>
@@ -206,7 +272,7 @@ export default function SidebarArea() {
                                         <DropdownMenuGroup>
                                             <div className="flex flex-col p-2">
                                                 <p>{chat.title}</p>
-                                                <p className="text-xs text-muted-foreground/50">{dateConvert(chat.date)}</p>
+                                                <p className="text-xs text-muted-foreground/50">{chat.updatedAt.toLocaleString()}</p>
                                                 <div className="w-full h-[1px] bg-foreground/10 my-1"></div>
                                                 <p className="text-xs text-muted-foreground">{chat.description}</p>
                                             </div>
@@ -230,6 +296,13 @@ export default function SidebarArea() {
                             <div className="flex flex-col items-center justify-center h-full gap-2 my-5">
                                 <CircleOff size={48} className="text-muted-foreground" />
                                 <p className="text-muted-foreground">No chats found</p>
+                            </div>
+                        ) : (
+                            <div className="flex flex-col items-center justify-center h-full gap-2 my-1">
+                                <Skeleton className="w-full h-10 rounded-full" />
+                                <Skeleton className="w-full h-10 rounded-full" />
+                                <Skeleton className="w-full h-10 rounded-full" />
+                                <Skeleton className="w-full h-10 rounded-full" />
                             </div>
                         )}
                     </ScrollArea>
@@ -286,9 +359,9 @@ export default function SidebarArea() {
                                     "group-data-[state=collapsed]:w-10 group-data-[state=collapsed]:h-10 group-data-[state=collapsed]:items-center group-data-[state=collapsed]:justify-center group-data-[state=collapsed]:gap-0"
                                 )}>
                                     <User size={24} className="w-24 h-24" />
-                                    <span className="text-lg font-bold transition-all duration-200 group-data-[state=collapsed]:hidden truncate w-full">
-                                        {USERNAME_EXAMPLE}
-                                    </span>
+                                    {user ? <span className="text-lg font-bold transition-all duration-200 group-data-[state=collapsed]:hidden truncate w-full">
+                                        {user?.username}
+                                    </span> : <Skeleton className="w-full h-full rounded-full" />}
                                     <div className="flex items-center justify-end w-24">
                                         <Settings size={24} className="group-data-[state=collapsed]:hidden w-full transition-all duration-200" />
                                     </div>

@@ -22,8 +22,13 @@ import { Popover, PopoverAnchor, PopoverContent, PopoverTrigger } from "@/compon
 import { Toggle } from "@/components/ui/toggle";
 import { useActiveTabs } from "@/context/activeTabsContext";
 import { Input } from "@/components/ui/input";
+import UserType from "@/types/userType";
+import { supabase } from "@/lib/supabaseClient";
 
 export default function MainArea() {
+    const [user, setUser] = useState<UserType | null>(null);
+    const [fetchedFolders, setFetchedFolders] = useState<Folder[]>([]);
+    const [fetchedNotes, setFetchedNotes] = useState<Note[]>([]);
     // Path State
     const [path, setPath] = useState("/");
     const [pathHistory, setPathHistory] = useState<string[]>(["/"])
@@ -34,136 +39,121 @@ export default function MainArea() {
     const { activeTab, setActiveTab } = useActiveTabs();
 
     // Note Example Structure
-    const NOTE_EXAMPLE: Note = {
-        id: "1",
-        title: "Shopping List",
-        content: "# Shopping List\n\n## Groceries\n- **Milk** (2L)\n- **Eggs** (1 dozen)\n- **Bread** (Whole wheat)\n- **Coffee** (Dark roast)\n\n## Household\n- Paper towels\n- Dish soap\n\n> Don't forget to use the coupons!",
-        description: "Weekly groceries for February",
-        createdAt: new Date("2026-02-01T09:00:00+01:00"),
-        updatedAt: new Date("2026-02-03T18:30:00+01:00"),
-        tags: ["personal", "todo"],
-    }
+    // const NOTE_EXAMPLE: Note = {
+    //     id: "1",
+    //     title: "Shopping List",
+    //     content: "# Shopping List\n\n## Groceries\n- **Milk** (2L)\n- **Eggs** (1 dozen)\n- **Bread** (Whole wheat)\n- **Coffee** (Dark roast)\n\n## Household\n- Paper towels\n- Dish soap\n\n> Don't forget to use the coupons!",
+    //     description: "Weekly groceries for February",
+    //     createdAt: new Date("2026-02-01T09:00:00+01:00"),
+    //     updatedAt: new Date("2026-02-03T18:30:00+01:00"),
+    //     tags: ["personal", "todo"],
+    // }
 
+    // Fetch user data
+    useEffect(() => {
+        const fetchUsers = async () => {
+            const { data: profiles, error } = await supabase
+                .from('profiles')         // your table name
+                .select('*')          // select all columns
+                .limit(1);            // select only the 1rst user
+
+            if (error) {
+                console.error(error);
+            }
+            setUser(profiles?.[0]);
+        };
+        fetchUsers();
+    }, []);
+
+    // Fetch folders data
+    useEffect(() => {
+        if (!user) return;
+
+        const fetchFolders = async () => {
+            const { data, error } = await supabase
+                .from('folders')         // your table name
+                .select('*')          // select all columns
+                .eq('user_id', user.id);           // select only those of the user
+
+            if (error) {
+                console.error(error);
+                return;
+            }
+
+            if (data) {
+                // Map the data to ensure correct types (Date objects) and property names
+                const mappedFolders: Folder[] = data.map((item: any) => ({
+                    name: item.name || "Untitled Chat",
+                    id: String(item.id || ""),
+                    foldersIds: (item.folders_ids || item.foldersIds || []).map(String),
+                    notesIds: (item.notes_ids || item.notesIds || []).map(String),
+                    // Handle both camelCase (if mapped) and snake_case (raw DB)
+                    createdAt: new Date(item.created_at || item.createdAt || new Date()),
+                    updatedAt: new Date(item.updated_at || item.updatedAt || new Date())
+                }));
+                console.log("Mapped Folders:", mappedFolders);
+                setFetchedFolders(mappedFolders);
+            }
+        };
+        fetchFolders();
+    }, [user]);
+
+    // Fetch notes data
+    useEffect(() => {
+        if (!user) return;
+
+        const fetchNotes = async () => {
+            const { data, error } = await supabase
+                .from('notes')         // your table name
+                .select('*')          // select all columns
+                .eq('user_id', user.id);           // select only those of the user
+
+            if (error) {
+                console.error(error);
+                return;
+            }
+
+            if (data) {
+                // Map the data to ensure correct types (Date objects) and property names
+                const mappedNotes: Note[] = data.map((item: any) => ({
+                    title: item.title || "Untitled Chat",
+                    id: String(item.id || ""),
+                    content: item.content || "",
+                    description: item.description || "",
+                    tags: item.tags || [],
+                    // Handle both camelCase (if mapped) and snake_case (raw DB)
+                    createdAt: new Date(item.created_at || item.createdAt || new Date()),
+                    updatedAt: new Date(item.updated_at || item.updatedAt || new Date())
+                }));
+                console.log("Mapped Notes:", mappedNotes);
+                setFetchedNotes(mappedNotes);
+            }
+        };
+        fetchNotes();
+    }, [user]);
+
+    // Path History useEffect
     useEffect(() => {
         setPathHistory([...pathHistory, path])
     }, [path])
 
-    // EXAMPLE DATA
-    const FOLDERS_EXAMPLE: Folder[] = [
-        {
-            name: "Personal",
-            id: "1",
-            createdAt: new Date("2026-01-15T10:00:00+01:00"),
-            updatedAt: new Date("2026-02-01T14:30:00+01:00"),
-            foldersIds: ["3"],
-            notesIds: ["1", "2"],
-        },
-        {
-            name: "Work",
-            id: "2",
-            createdAt: new Date("2026-01-20T09:00:00+01:00"),
-            updatedAt: new Date("2026-02-04T08:15:00+01:00"),
-            foldersIds: ["4"],
-            notesIds: ["3"],
-        },
-        {
-            name: "Travel Plans",
-            id: "3",
-            createdAt: new Date("2026-02-02T16:45:00+01:00"),
-            updatedAt: new Date("2026-02-03T11:20:00+01:00"),
-            foldersIds: [],
-            notesIds: ["4", "5"],
-        },
-        {
-            name: "Active Projects",
-            id: "4",
-            createdAt: new Date("2026-01-25T13:00:00+01:00"),
-            updatedAt: new Date("2026-02-04T10:00:00+01:00"),
-            foldersIds: [],
-            notesIds: ["6"],
-        },
-    ];
-    const NOTES_EXAMPLE: Note[] = [
-        {
-            id: "1",
-            title: "Shopping List",
-            content: "Milk, eggs, bread, coffee",
-            description: "Weekly groceries for February",
-            createdAt: new Date("2026-02-01T09:00:00+01:00"),
-            updatedAt: new Date("2026-02-03T18:30:00+01:00"),
-            tags: ["personal", "todo"],
-        },
-        {
-            id: "2",
-            title: "Journal 2026",
-            content: "Today was a productive day...",
-            description: "Daily reflections and thoughts",
-            createdAt: new Date("2026-01-01T00:00:00+01:00"),
-            updatedAt: new Date("2026-02-04T22:00:00+01:00"),
-            tags: ["personal", "journal"],
-        },
-        {
-            id: "3",
-            title: "Meeting Minutes",
-            content: "Discussed the new UI architecture...",
-            description: "Sync with the design team",
-            createdAt: new Date("2026-02-04T10:00:00+01:00"),
-            updatedAt: new Date("2026-02-04T11:00:00+01:00"),
-            tags: ["work", "meeting"],
-        },
-        {
-            id: "4",
-            title: "Paris Trip Ideas",
-            content: "Visit the Louvre, dinner at Le Jules Verne",
-            description: "Places to see and things to do",
-            createdAt: new Date("2026-02-02T17:00:00+01:00"),
-            updatedAt: new Date("2026-02-03T09:45:00+01:00"),
-            tags: ["travel", "ideas"],
-        },
-        {
-            id: "5",
-            title: "Packing List",
-            content: "Passport, camera, comfortable shoes",
-            description: "Essentials for the trip",
-            createdAt: new Date("2026-02-03T10:00:00+01:00"),
-            updatedAt: new Date("2026-02-03T12:00:00+01:00"),
-            tags: ["travel", "todo"],
-        },
-        {
-            id: "6",
-            title: "Narao Design",
-            content: "Focus on glassmorphism and smooth animations",
-            description: "Core principles of the new app",
-            createdAt: new Date("2026-01-25T14:00:00+01:00"),
-            updatedAt: new Date("2026-02-04T15:30:00+01:00"),
-            tags: ["work", "design"],
-        },
-        {
-            id: "7",
-            title: "Quick Thoughts",
-            content: "AI is moving so fast!",
-            description: "Random brain dump",
-            createdAt: new Date("2026-02-04T22:15:00+01:00"),
-            updatedAt: new Date("2026-02-04T22:15:00+01:00"),
-            tags: ["random"],
-        },
-    ];
-
     // Helper functions in folders
-    const getFolderById = (id: string) => FOLDERS_EXAMPLE.find(f => f.id === id);
-    const getNoteById = (id: string) => NOTES_EXAMPLE.find(n => n.id === id);
+    const getFolderById = (id: string) => fetchedFolders.find(f => String(f.id) === String(id));
+    const getNoteById = (id: string) => fetchedNotes.find(n => String(n.id) === String(id));
 
-    const allChildFolderIds = new Set(FOLDERS_EXAMPLE.flatMap(f => f.foldersIds || []));
-    const allChildNoteIds = new Set(FOLDERS_EXAMPLE.flatMap(f => f.notesIds || []));
+    const allChildFolderIds = new Set(fetchedFolders.flatMap(f => f.foldersIds || []));
+    const allChildNoteIds = new Set(fetchedFolders.flatMap(f => f.notesIds || []));
 
-    const rootFolders = FOLDERS_EXAMPLE.filter(f => !allChildFolderIds.has(f.id));
-    const rootNotes = NOTES_EXAMPLE.filter(n => !allChildNoteIds.has(n.id));
+    const rootFolders = fetchedFolders.filter(f => !allChildFolderIds.has(f.id));
+    const rootNotes = fetchedNotes.filter(n => !allChildNoteIds.has(n.id));
 
     // Get content of current path
     const getContent = () => {
+        console.log("Getting content for path:", path);
         const cleanPath = path.endsWith("/") && path.length > 1 ? path.slice(0, -1) : path;
 
         if (cleanPath === "/" || cleanPath === "") {
+            console.log("Root content:", { folders: rootFolders, notes: rootNotes });
             return { folders: rootFolders, notes: rootNotes };
         }
 
@@ -173,7 +163,10 @@ export default function MainArea() {
 
         for (const segment of segments) {
             currentFolder = currentLevel.find(f => f.name === segment);
-            if (!currentFolder) return { folders: [], notes: [] };
+            if (!currentFolder) {
+                console.log("Folder not found in path segment:", segment);
+                return { folders: [], notes: [] };
+            }
 
             currentLevel = (currentFolder.foldersIds || [])
                 .map(id => getFolderById(id))
@@ -181,12 +174,15 @@ export default function MainArea() {
         }
 
         if (currentFolder) {
+            console.log("Resolved Folder:", currentFolder);
             const f = (currentFolder.foldersIds || [])
                 .map(id => getFolderById(id))
                 .filter((f): f is Folder => !!f);
             const n = (currentFolder.notesIds || [])
                 .map(id => getNoteById(id))
                 .filter((n): n is Note => !!n);
+            console.log("Folder Content - Notes IDs:", currentFolder.notesIds);
+            console.log("Folder Content - Resolved Notes:", n);
             return { folders: f, notes: n };
         }
 
@@ -228,7 +224,7 @@ export default function MainArea() {
 
     // Get note path
     const getNotePath = (noteId: string): string => {
-        const folder = FOLDERS_EXAMPLE.find(f => f.notesIds?.includes(noteId));
+        const folder = fetchedFolders.find(f => f.notesIds?.includes(noteId));
         if (!folder) return "/";
         return getFolderPath(folder.id);
     };
@@ -350,8 +346,8 @@ export default function MainArea() {
                         >
                             {searchQuery.length > 0 ? (
                                 (() => {
-                                    const filteredFolders = FOLDERS_EXAMPLE.filter((folder) => folder.name.toLowerCase().includes(searchQuery.toLowerCase()));
-                                    const filteredNotes = NOTES_EXAMPLE.filter((note) => note.title.toLowerCase().includes(searchQuery.toLowerCase()));
+                                    const filteredFolders = fetchedFolders.filter((folder) => folder.name.toLowerCase().includes(searchQuery.toLowerCase()));
+                                    const filteredNotes = fetchedNotes.filter((note) => note.title.toLowerCase().includes(searchQuery.toLowerCase()));
 
                                     if (filteredFolders.length === 0 && filteredNotes.length === 0) {
                                         return (
@@ -406,7 +402,7 @@ export default function MainArea() {
                     <div className="w-full flex justify-center">
                         <Tooltip>
                             <TooltipTrigger asChild>
-                                <Button variant="ghost" className="w-124 sm:w-64 text-foreground text-lg">{NOTE_EXAMPLE.title}</Button>
+                                <Button variant="ghost" className="w-124 sm:w-64 text-foreground text-lg">{"Title Placeholder"}</Button>
                             </TooltipTrigger>
                             <TooltipContent>
                                 <p>Change Note's Name</p>
