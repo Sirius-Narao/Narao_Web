@@ -6,7 +6,7 @@ import { InputGroup, InputGroupAddon, InputGroupInput, InputGroupText } from "@/
 import { Kbd, KbdGroup } from "@/components/ui/kbd";
 import { SidebarInset } from "@/components/ui/sidebar";
 import { Tooltip, TooltipContent, TooltipTrigger } from "@/components/ui/tooltip";
-import { FileEdit, FolderEdit, MoreVertical, MoveLeft, MoveRight, Search, Folder as FolderIcon, FileText, FolderPen, Move, Trash, Palette, CircleSlash, AArrowUp, AArrowDown } from "lucide-react";
+import { FileEdit, FolderEdit, MoreVertical, MoveLeft, MoveRight, Search, Folder as FolderIcon, FileText, FolderPen, Move, Trash, Palette, CircleSlash, AArrowUp, AArrowDown, Haze } from "lucide-react";
 import {
     ContextMenu,
     ContextMenuContent,
@@ -28,6 +28,7 @@ import { Skeleton } from "@/components/ui/skeleton";
 
 export default function MainArea() {
     // fetched data
+    const [userAuth, setUserAuth] = useState<any>(null);
     const [user, setUser] = useState<UserType | null>(null);
     const [fetchedFolders, setFetchedFolders] = useState<Folder[]>([]);
     const [fetchedNotes, setFetchedNotes] = useState<Note[]>([]);
@@ -46,13 +47,26 @@ export default function MainArea() {
     const [sortOrder, setSortOrder] = useState<"asc" | "desc">("desc");
     const { activeTab, setActiveTab } = useActiveTabs();
 
+    // fetch user auth
+    useEffect(() => {
+        const fetchUserAuth = async () => {
+            const { data } = await supabase.auth.getUser();
+            setUserAuth(data.user);
+        }
+        fetchUserAuth();
+    }, [])
+
     // Fetch user data
     useEffect(() => {
+        if (!userAuth) return;
+
         const fetchUsers = async () => {
+            if (!userAuth?.id) return;
+
             const { data: profiles, error } = await supabase
                 .from('profiles')         // your table name
                 .select('*')          // select all columns
-                .limit(1);            // select only the 1rst user
+                .eq('id', userAuth.id);            // select only the 1rst user
 
             if (error) {
                 console.error(error);
@@ -61,7 +75,7 @@ export default function MainArea() {
             setUserLoaded(true);
         };
         fetchUsers();
-    }, []);
+    }, [userAuth]);
 
     // Fetch folders data
     useEffect(() => {
@@ -95,6 +109,7 @@ export default function MainArea() {
             }
         };
         fetchFolders();
+        console.log("fetchedFolders: ", fetchedFolders);
 
     }, [user]);
 
@@ -131,6 +146,8 @@ export default function MainArea() {
             }
         };
         fetchNotes();
+        console.log("fetchedNotes: ", fetchedNotes);
+
     }, [user]);
 
     // Path History useEffect
@@ -457,7 +474,7 @@ export default function MainArea() {
             <div className="bg-card text-foreground h-[92vh] w-[calc(100%-0.5rem)] rounded-lg absolute bottom-2 p-4 border border-sidebar-border">
 
                 {/* ---------------------------- FOLDERS ---------------------------- */}
-                {activeTab === 0 ? (foldersLoaded && notesLoaded) ? (
+                {activeTab === 0 ? ((folders.length > 0 || notes.length > 0) ? (
                     <ContextMenu>
                         <ContextMenuTrigger className="w-full h-full block">
                             {/* ALL FOLDERS AND NOTES INSIDE THE CONTEXT MENU TRIGGER */}
@@ -604,23 +621,61 @@ export default function MainArea() {
                         </ContextMenuContent>
                     </ContextMenu>
 
-                ) :
-                    <div className="flex flex-wrap gap-4 p-4 content-start">
+                ) : !(foldersLoaded && notesLoaded) ? (
+                    <div className="flex flex-wrap gap-4 p-4 content-start relative h-full">
                         <Skeleton className="w-32 h-28" />
                         <Skeleton className="w-32 h-28" />
                         <Skeleton className="w-32 h-28" />
                         <Skeleton className="w-32 h-28" />
                         <Skeleton className="w-32 h-28" />
+                        <div className="w-full bg-card absolute bottom-2 left-0 right-0 px-4 flex justify-center pointer-events-none">
+                            <InputGroup className="w-full max-w-[40%] bg-popover dark:bg-popover shadow-lg cursor-pointer px-2 pointer-events-auto"
+                                onClick={() => { }}>
+                                <InputGroupAddon align="inline-end" className="cursor-pointer">
+                                    <InputGroupText className="bg-transparent cursor-pointer">
+                                    </InputGroupText>
+                                </InputGroupAddon>
+                                <InputGroupInput
+                                    placeholder="No path selected..."
+                                    className="cursor-pointer"
+                                    // if path is none default to "/"
+                                    onChange={(e) => { setPath(e.target.value === "" ? "/" : e.target.value) }}
+                                    value={path}
+                                />
+                            </InputGroup>
+                        </div>
+                    </div>) : (
+                    <div className="flex flex-col items-center justify-center h-full relative">
+                        <Haze size={64} className="text-muted-foreground/30" />
+                        <p className="text-muted-foreground/30 text-center text-lg mt-2">No folders or notes yet!</p>
+                        <div className="w-full bg-card absolute bottom-2 left-0 right-0 px-4 flex justify-center pointer-events-none">
+                            <InputGroup className="w-full max-w-[40%] bg-popover dark:bg-popover shadow-lg cursor-pointer px-2 pointer-events-auto"
+                                onClick={() => { }}>
+                                <InputGroupAddon align="inline-end" className="cursor-pointer">
+                                    <InputGroupText className="bg-transparent cursor-pointer">
+                                    </InputGroupText>
+                                </InputGroupAddon>
+                                <InputGroupInput
+                                    placeholder="No path selected..."
+                                    className="cursor-pointer"
+                                    // if path is none default to "/"
+                                    onChange={(e) => { setPath(e.target.value === "" ? "/" : e.target.value) }}
+                                    value={path}
+                                />
+                            </InputGroup>
+                        </div>
                     </div>
-                    : activeTab === 1 ? (
-                        <div>
-                            <p>Notes</p>
-                        </div>
-                    ) : (
-                        <div>
-                            <p>Chats</p>
-                        </div>
-                    )}
+
+                )
+                ) : activeTab === 1 ? (
+                    <div>
+                        <p>Notes</p>
+                    </div>
+                ) : (
+                    <div>
+                        <p>Chats</p>
+                    </div>
+                )}
 
             </div>
         </SidebarInset>

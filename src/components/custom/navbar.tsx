@@ -4,6 +4,7 @@ import Image from "next/image";
 import { Button } from "../ui/button";
 import { motion, useScroll, useMotionValueEvent } from "framer-motion";
 import { useState } from "react";
+import Link from "next/link";
 
 export default function Navbar() {
     const { scrollY } = useScroll();
@@ -58,10 +59,14 @@ export default function Navbar() {
             <div className="flex items-center gap-1">
                 <Button variant="ghost" size="sm" className="rounded-full px-4 font-medium transition-all hover:bg-accent/50">Features</Button>
                 <Button variant="ghost" size="sm" className="rounded-full px-4 font-medium transition-all hover:bg-accent/50">Pricing</Button>
-                <Button variant="ghost" size="sm" className="rounded-full px-4 font-medium transition-all hover:bg-accent/50 mr-2">Login</Button>
-                <Button size="sm" className="rounded-full px-6 font-semibold shadow-lg shadow-primary/20 hover:scale-105 transition-all active:scale-95 bg-primary text-primary-foreground">
-                    Sign Up
-                </Button>
+                <Link href="/login">
+                    <Button variant="ghost" size="sm" className="rounded-full px-4 font-medium transition-all hover:bg-accent/50 mr-2">Login</Button>
+                </Link>
+                <Link href="/signup">
+                    <Button size="sm" className="rounded-full px-6 font-semibold shadow-lg shadow-primary/20 hover:scale-105 transition-all active:scale-95 bg-primary text-primary-foreground">
+                        Sign Up
+                    </Button>
+                </Link>
             </div>
         </motion.nav>
     );

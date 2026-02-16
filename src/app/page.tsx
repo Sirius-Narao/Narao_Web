@@ -29,7 +29,9 @@ export default function LandingPage() {
                   Get Started
                 </Button>
               </Link>
-              <Button variant="ghost" size="lg" className="rounded-full px-8 font-medium transition-all hover:bg-accent/50 text-lg">Login</Button>
+              <Link href="/login">
+                <Button variant="ghost" size="lg" className="rounded-full px-8 font-medium transition-all hover:bg-accent/50 text-lg">Login</Button>
+              </Link>
             </div>
           </div>
           {/* Fade out the background image */}

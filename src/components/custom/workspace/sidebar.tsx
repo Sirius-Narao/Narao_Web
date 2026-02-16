@@ -51,6 +51,7 @@ const ANNOUNCES_EXAMPLE: { title: string, description: string } = { title: "Anno
 
 export default function SidebarArea() {
     // fetched data
+    const [userAuth, setUserAuth] = useState<any>(null);
     const [user, setUser] = useState<ProfileType | null>(null);
     const [chats, setChats] = useState<ChatType[]>([]);
     const [announce, setAnnounce] = useState<AnnounceType | null>(null); // latest announce only
@@ -66,14 +67,24 @@ export default function SidebarArea() {
     // settings tab
     const [settingsTab, setSettingsTab] = useState(0);
 
+    useEffect(() => {
+        const fetchUserAuth = async () => {
+            const { data } = await supabase.auth.getUser();
+            setUserAuth(data.user);
+        }
+        fetchUserAuth();
+    }, [])
+
 
     // Fetch user data
     useEffect(() => {
+        if (!userAuth) return;
+
         const fetchUsers = async () => {
             const { data: profiles, error } = await supabase
                 .from('profiles')         // your table name
                 .select('*')          // select all columns
-                .limit(1);            // select only the 1rst user
+                .eq('id', userAuth.id) // select only the user's profile
 
             if (error) {
                 console.error(error);
@@ -81,7 +92,7 @@ export default function SidebarArea() {
             setUser(profiles?.[0]);
         };
         fetchUsers();
-    }, []);
+    }, [userAuth]);
 
     // Fetch chats data
     useEffect(() => {
@@ -108,10 +119,10 @@ export default function SidebarArea() {
                     updatedAt: new Date(item.updated_at || item.updatedAt || new Date())
                 }));
                 setChats(mappedChats);
-                setChatsFetched(true);
             }
         };
         fetchChats();
+        setChatsFetched(true);
     }, [user]);
 
     // Update filtered chats when chats change, preserving sort order
@@ -246,7 +257,7 @@ export default function SidebarArea() {
                         />
                     </InputGroup>
                     <ScrollArea className=" max-h-[calc(100vh-20rem)] h-fit rounded-lg border border-sidebar-border mt-2 pt-1 px-1 shadow-lg bg-card/30s group-data-[state=collapsed]:hidden">
-                        {chats.length > 0 ? chatsFetched ? filteredChats.map((chat, index) => (
+                        {chats.length > 0 && chatsFetched ? filteredChats.map((chat, index) => (
                             <div key={index} className="flex items-center justify-between pl-4 pr-2 py-2 rounded-lg hover:bg-card/80 cursor-pointer transition-all duration-100 ease-in-out mb-1">
                                 <Tooltip>
                                     <TooltipTrigger asChild>
@@ -296,7 +307,7 @@ export default function SidebarArea() {
                                     </DropdownMenuContent>
                                 </DropdownMenu>
                             </div>
-                        )) : (
+                        )) : chatsFetched ? (
                             <div className="flex flex-col items-center justify-center h-full gap-2 my-5">
                                 <CircleOff size={48} className="text-muted-foreground" />
                                 <p className="text-muted-foreground">No chats found</p>
