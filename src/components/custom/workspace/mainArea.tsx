@@ -24,11 +24,19 @@ import { useActiveTabs } from "@/context/activeTabsContext";
 import { Input } from "@/components/ui/input";
 import UserType from "@/types/userType";
 import { supabase } from "@/lib/supabaseClient";
+import { Skeleton } from "@/components/ui/skeleton";
 
 export default function MainArea() {
+    // fetched data
     const [user, setUser] = useState<UserType | null>(null);
     const [fetchedFolders, setFetchedFolders] = useState<Folder[]>([]);
     const [fetchedNotes, setFetchedNotes] = useState<Note[]>([]);
+
+    // fetch states
+    const [userLoaded, setUserLoaded] = useState(false);
+    const [foldersLoaded, setFoldersLoaded] = useState(false);
+    const [notesLoaded, setNotesLoaded] = useState(false);
+
     // Path State
     const [path, setPath] = useState("/");
     const [pathHistory, setPathHistory] = useState<string[]>(["/"])
@@ -37,17 +45,6 @@ export default function MainArea() {
     const [searchQuery, setSearchQuery] = useState("");
     const [sortOrder, setSortOrder] = useState<"asc" | "desc">("desc");
     const { activeTab, setActiveTab } = useActiveTabs();
-
-    // Note Example Structure
-    // const NOTE_EXAMPLE: Note = {
-    //     id: "1",
-    //     title: "Shopping List",
-    //     content: "# Shopping List\n\n## Groceries\n- **Milk** (2L)\n- **Eggs** (1 dozen)\n- **Bread** (Whole wheat)\n- **Coffee** (Dark roast)\n\n## Household\n- Paper towels\n- Dish soap\n\n> Don't forget to use the coupons!",
-    //     description: "Weekly groceries for February",
-    //     createdAt: new Date("2026-02-01T09:00:00+01:00"),
-    //     updatedAt: new Date("2026-02-03T18:30:00+01:00"),
-    //     tags: ["personal", "todo"],
-    // }
 
     // Fetch user data
     useEffect(() => {
@@ -61,6 +58,7 @@ export default function MainArea() {
                 console.error(error);
             }
             setUser(profiles?.[0]);
+            setUserLoaded(true);
         };
         fetchUsers();
     }, []);
@@ -93,9 +91,11 @@ export default function MainArea() {
                 }));
                 console.log("Mapped Folders:", mappedFolders);
                 setFetchedFolders(mappedFolders);
+                setFoldersLoaded(true);
             }
         };
         fetchFolders();
+
     }, [user]);
 
     // Fetch notes data
@@ -127,6 +127,7 @@ export default function MainArea() {
                 }));
                 console.log("Mapped Notes:", mappedNotes);
                 setFetchedNotes(mappedNotes);
+                setNotesLoaded(true);
             }
         };
         fetchNotes();
@@ -456,7 +457,7 @@ export default function MainArea() {
             <div className="bg-card text-foreground h-[92vh] w-[calc(100%-0.5rem)] rounded-lg absolute bottom-2 p-4 border border-sidebar-border">
 
                 {/* ---------------------------- FOLDERS ---------------------------- */}
-                {activeTab === 0 ? (
+                {activeTab === 0 ? (foldersLoaded && notesLoaded) ? (
                     <ContextMenu>
                         <ContextMenuTrigger className="w-full h-full block">
                             {/* ALL FOLDERS AND NOTES INSIDE THE CONTEXT MENU TRIGGER */}
@@ -603,15 +604,23 @@ export default function MainArea() {
                         </ContextMenuContent>
                     </ContextMenu>
 
-                ) : activeTab === 1 ? (
-                    <div>
-                        <p>Notes</p>
+                ) :
+                    <div className="flex flex-wrap gap-4 p-4 content-start">
+                        <Skeleton className="w-32 h-28" />
+                        <Skeleton className="w-32 h-28" />
+                        <Skeleton className="w-32 h-28" />
+                        <Skeleton className="w-32 h-28" />
+                        <Skeleton className="w-32 h-28" />
                     </div>
-                ) : (
-                    <div>
-                        <p>Chats</p>
-                    </div>
-                )}
+                    : activeTab === 1 ? (
+                        <div>
+                            <p>Notes</p>
+                        </div>
+                    ) : (
+                        <div>
+                            <p>Chats</p>
+                        </div>
+                    )}
 
             </div>
         </SidebarInset>
