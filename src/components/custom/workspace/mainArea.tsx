@@ -6,7 +6,7 @@ import { InputGroup, InputGroupAddon, InputGroupInput, InputGroupText } from "@/
 import { Kbd, KbdGroup } from "@/components/ui/kbd";
 import { SidebarInset } from "@/components/ui/sidebar";
 import { Tooltip, TooltipContent, TooltipTrigger } from "@/components/ui/tooltip";
-import { FileEdit, FolderEdit, MoreVertical, MoveLeft, MoveRight, Search, Folder as FolderIcon, FileText, FolderPen, Move, Trash, Palette, CircleSlash, AArrowUp, AArrowDown, Haze } from "lucide-react";
+import { FileEdit, FolderEdit, MoreVertical, MoveLeft, MoveRight, Search, Folder as FolderIcon, FileText, FolderPen, Move, Trash, Palette, CircleSlash, AArrowUp, AArrowDown, Haze, Plus } from "lucide-react";
 import {
     ContextMenu,
     ContextMenuContent,
@@ -25,6 +25,9 @@ import { Input } from "@/components/ui/input";
 import UserType from "@/types/userType";
 import { supabase } from "@/lib/supabaseClient";
 import { Skeleton } from "@/components/ui/skeleton";
+import { useSettingsOpen } from "@/context/settingOpenContext";
+import { useCreateNoteDialogOpen } from "@/context/createNoteDialogOpenContext";
+import { Dialog, DialogClose, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 
 export default function MainArea() {
     // fetched data
@@ -34,7 +37,6 @@ export default function MainArea() {
     const [fetchedNotes, setFetchedNotes] = useState<Note[]>([]);
 
     // fetch states
-    const [userLoaded, setUserLoaded] = useState(false);
     const [foldersLoaded, setFoldersLoaded] = useState(false);
     const [notesLoaded, setNotesLoaded] = useState(false);
 
@@ -46,6 +48,12 @@ export default function MainArea() {
     const [searchQuery, setSearchQuery] = useState("");
     const [sortOrder, setSortOrder] = useState<"asc" | "desc">("desc");
     const { activeTab, setActiveTab } = useActiveTabs();
+
+    // settings open state
+    const { settingsOpen, setSettingsOpen } = useSettingsOpen();
+
+    // create note dialog open state
+    const { createNoteDialogOpen, setCreateNoteDialogOpen } = useCreateNoteDialogOpen();
 
     // fetch user auth
     useEffect(() => {
@@ -72,7 +80,6 @@ export default function MainArea() {
                 console.error(error);
             }
             setUser(profiles?.[0]);
-            setUserLoaded(true);
         };
         fetchUsers();
     }, [userAuth]);
@@ -265,6 +272,8 @@ export default function MainArea() {
         });
     }, []);
 
+    // Create folder function
+
     // Keyboard shortcuts
     useEffect(() => {
         const handleKeyDown = (e: KeyboardEvent) => {
@@ -286,13 +295,22 @@ export default function MainArea() {
                 e.preventDefault();
                 setActiveTab(0);
             }
-            if (e.ctrlKey && key === "n" && !e.shiftKey && !e.altKey) {
+            else if (e.ctrlKey && key === "n" && !e.shiftKey && !e.altKey) {
                 e.preventDefault();
                 setActiveTab(1);
+                setCreateNoteDialogOpen(true);
             }
-            if (e.ctrlKey && key === "c" && !e.shiftKey && !e.altKey) {
+            else if (e.ctrlKey && key === "c" && !e.shiftKey && !e.altKey) {
                 e.preventDefault();
                 setActiveTab(2);
+            }
+            else if (e.ctrlKey && key === "n" && e.shiftKey && !e.altKey) {
+                e.preventDefault();
+                // Create folder function
+            }
+            else if (e.ctrlKey && key === "," && !e.shiftKey && !e.altKey) {
+                e.preventDefault();
+                setSettingsOpen(true);
             }
         };
 
@@ -435,6 +453,39 @@ export default function MainArea() {
 
                 {/* Right Side */}
                 {activeTab === 0 && <div className="absolute right-2">
+                    <DropdownMenu>
+                        <Tooltip>
+                            <TooltipTrigger asChild>
+                                <DropdownMenuTrigger asChild>
+                                    <Button variant="ghost" className="w-10 h-10 p-0 rounded-full mr-1">
+                                        <Plus size={24} color="white" />
+                                    </Button>
+                                </DropdownMenuTrigger>
+                            </TooltipTrigger>
+                            <TooltipContent className="flex items-center gap-2">
+                                <p>Create New</p>
+                            </TooltipContent>
+                        </Tooltip>
+                        <DropdownMenuContent align="end" className="min-w-[32px] p-2 rounded-full">
+                            <div className="flex items-center gap-2 p-2">
+                                <Button variant="outline" className="p-0 rounded-full group">
+                                    <FolderIcon size={24} className="text-foreground group-hover:text-primary transition-all duration-100" />
+                                    Create Folder
+                                    <KbdGroup>
+                                        <Kbd className="bg-popover text-foreground">Ctrl + Shift + N</Kbd>
+                                    </KbdGroup>
+                                </Button>
+                                <Button variant="outline" className="p-0 rounded-full group">
+                                    <FileText size={24} className="text-foreground group-hover:text-primary transition-all duration-100" />
+                                    Create Note
+                                    <KbdGroup>
+                                        <Kbd className="bg-popover text-foreground">Ctrl + N</Kbd>
+                                    </KbdGroup>
+                                </Button>
+                            </div>
+                        </DropdownMenuContent>
+
+                    </DropdownMenu>
                     <DropdownMenu>
                         <Tooltip>
                             <TooltipTrigger asChild>
@@ -678,6 +729,25 @@ export default function MainArea() {
                 )}
 
             </div>
+            <Dialog open={createNoteDialogOpen}>
+                <DialogContent showCloseButton={false} className="w-[50%] h-[50%]">
+                    <DialogHeader>
+                        <DialogTitle>Create Note</DialogTitle>
+                        <DialogDescription>
+                            Create a new note
+                        </DialogDescription>
+                    </DialogHeader>
+                    <DialogFooter className="flex items-center justify-end gap-2 absolute bottom-4 left-1/2 -translate-x-1/2">
+                        <DialogClose asChild>
+                            <Button variant="default" className="hover:bg-primary/70" onClick={() => setCreateNoteDialogOpen(false)}>
+                                Create
+                                <Plus size={16} />
+                            </Button>
+                        </DialogClose>
+
+                    </DialogFooter>
+                </DialogContent>
+            </Dialog>
         </SidebarInset>
     );
 }

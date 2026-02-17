@@ -3,12 +3,40 @@
 import Image from "next/image";
 import { Button } from "../ui/button";
 import { motion, useScroll, useMotionValueEvent } from "framer-motion";
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import Link from "next/link";
+import { User } from "@supabase/supabase-js";
+import { supabase } from "@/lib/supabaseClient";
+import ProfileType from "@/types/profileType";
+import { UserIcon } from "lucide-react";
+import { Tooltip, TooltipContent, TooltipTrigger } from "../ui/tooltip";
+import { Skeleton } from "../ui/skeleton";
 
-export default function Navbar() {
+export default function Navbar({ user }: { user: User | undefined }) {
     const { scrollY } = useScroll();
     const [isScrolled, setIsScrolled] = useState(false);
+    const [userProfile, setUserProfile] = useState<ProfileType | null>(null);
+    const [userLoaded, setUserLoaded] = useState(false);
+
+    useEffect(() => {
+        if (!user) return;
+
+        const fetchUsers = async () => {
+            if (!user?.id) return;
+
+            const { data: profiles, error } = await supabase
+                .from('profiles')         // your table name
+                .select('*')          // select all columns
+                .eq('id', user.id);            // select only the 1rst user
+
+            if (error) {
+                console.error(error);
+            }
+            setUserProfile(profiles?.[0]);
+            setUserLoaded(true);
+        };
+        fetchUsers();
+    }, [user]);
 
     // Update state based on scroll position
     useMotionValueEvent(scrollY, "change", (latest) => {
@@ -59,14 +87,34 @@ export default function Navbar() {
             <div className="flex items-center gap-1">
                 <Button variant="ghost" size="sm" className="rounded-full px-4 font-medium transition-all hover:bg-accent/50">Features</Button>
                 <Button variant="ghost" size="sm" className="rounded-full px-4 font-medium transition-all hover:bg-accent/50">Pricing</Button>
-                <Link href="/login">
-                    <Button variant="ghost" size="sm" className="rounded-full px-4 font-medium transition-all hover:bg-accent/50 mr-2">Login</Button>
-                </Link>
-                <Link href="/signup">
-                    <Button size="sm" className="rounded-full px-6 font-semibold shadow-lg shadow-primary/20 hover:scale-105 transition-all active:scale-95 bg-primary text-primary-foreground">
-                        Sign Up
-                    </Button>
-                </Link>
+                {user ? <>
+                    {userProfile ? (
+                        <Tooltip>
+                            <TooltipTrigger asChild>
+                                <Button variant="outline" size="lg" className="rounded-full font-medium transition-all hover:bg-accent/50 cursor-pointer bg-card ml-2">
+                                    <Link href="/workspace" className="flex gap-2 items-center px-2">
+                                        {userProfile.username}
+                                        <UserIcon className="" size={30} />
+                                    </Link>
+                                </Button>
+                            </TooltipTrigger>
+                            <TooltipContent>
+                                <p>Go to Workspace</p>
+                            </TooltipContent>
+                        </Tooltip>
+                    ) : (<>
+                        <Skeleton className="w-32 h-10 rounded-full" />
+                    </>)}
+                </> : <>
+                    <Link href="/login">
+                        <Button variant="ghost" size="sm" className="rounded-full px-4 font-medium transition-all hover:bg-accent/50 mr-2">Login</Button>
+                    </Link>
+                    <Link href="/signup">
+                        <Button size="sm" className="rounded-full px-6 font-semibold shadow-lg shadow-primary/20 hover:scale-105 transition-all active:scale-95 bg-primary text-primary-foreground">
+                            Sign Up
+                        </Button>
+                    </Link>
+                </>}
             </div>
         </motion.nav>
     );

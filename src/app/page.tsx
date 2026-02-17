@@ -5,11 +5,23 @@ import Image from "next/image";
 import heroBg from "@/gradients/gradient_1.jpg";
 import { Button } from "@/components/ui/button";
 import Link from "next/link";
+import { useEffect, useState } from "react"
+import { supabase } from "@/lib/supabaseClient";
+import { User } from "@supabase/supabase-js";
 
 export default function LandingPage() {
+  const [user, setUser] = useState<User | undefined>(undefined)
+
+  useEffect(() => {
+    const checkLoggedIn = async () => {
+      const { data: { session } } = await supabase.auth.getSession()
+      setUser(session?.user)
+    }
+    checkLoggedIn()
+  }, [])
   return (
     <div className="bg-background text-foreground min-h-[2000px] w-full flex flex-col items-center relative">
-      <Navbar />
+      <Navbar user={user} />
       <div className="w-full">
         <div className="w-full h-screen flex flex-col items-center justify-center relative overflow-hidden">
           <Image
@@ -24,14 +36,22 @@ export default function LandingPage() {
               Write your own notes in your own folders, and let AI manage your workspace as if it were you.
             </p>
             <div className="flex gap-4 mt-8">
-              <Link href="/workspace">
-                <Button size="lg" className="rounded-full px-8 font-semibold shadow-lg shadow-primary/20 hover:scale-105 transition-all active:scale-95 bg-primary text-primary-foreground text-lg">
-                  Get Started
-                </Button>
-              </Link>
-              <Link href="/login">
-                <Button variant="ghost" size="lg" className="rounded-full px-8 font-medium transition-all hover:bg-accent/50 text-lg">Login</Button>
-              </Link>
+              {user ? <>
+                <Link href="/workspace">
+                  <Button size="lg" className="rounded-full px-8 font-semibold shadow-lg shadow-primary/20 hover:scale-105 transition-all active:scale-95 bg-primary text-primary-foreground text-lg">
+                    Open Workspace
+                  </Button>
+                </Link>
+              </> : <>
+                <Link href="/signup">
+                  <Button size="lg" className="rounded-full px-8 font-semibold shadow-lg shadow-primary/20 hover:scale-105 transition-all active:scale-95 bg-primary text-primary-foreground text-lg">
+                    Get Started
+                  </Button>
+                </Link>
+                <Link href="/login">
+                  <Button variant="ghost" size="lg" className="rounded-full px-8 font-medium transition-all hover:bg-accent/50 text-lg">Login</Button>
+                </Link>
+              </>}
             </div>
           </div>
           {/* Fade out the background image */}

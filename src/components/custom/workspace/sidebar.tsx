@@ -34,20 +34,7 @@ import { supabase } from "@/lib/supabaseClient";
 import ProfileType from "@/types/profileType";
 import { Skeleton } from "@/components/ui/skeleton";
 import AnnounceType from "@/types/announceType";
-
-const ANNOUNCES_EXAMPLE: { title: string, description: string } = { title: "Announce Example", description: "Announce's description here, text should be short, but it should be visible" };
-// const CHAT_LIST_EXAMPLE: ChatType[] = [
-//     { title: "Project Phoenix", description: "Discussing the migration strategy for the legacy database.", createdAt: new Date("2024-01-01T10:00:00"), updatedAt: new Date("2024-01-01T10:00:00") },
-//     { title: "Design Review", description: "Feedback on the new landing page mockups and user flow.", createdAt: new Date("2024-01-02T11:00:00"), updatedAt: new Date("2024-01-02T11:00:00") },
-//     { title: "Bug: Login Loop", description: "Investigating reports of users getting stuck on the auth redirect.", createdAt: new Date("2024-01-03T09:30:00"), updatedAt: new Date("2024-01-03T09:30:00") },
-//     { title: "Marketing Sync", description: "Planning the social media rollout for the Q2 product launch.", createdAt: new Date("2024-01-04T14:15:00"), updatedAt: new Date("2024-01-04T14:15:00") },
-//     { title: "API Documentation", description: "Drafting the endpoints for the new integration service.", createdAt: new Date("2024-01-05T16:45:00"), updatedAt: new Date("2024-01-05T16:45:00") },
-//     { title: "Customer Support", description: "Resolving the ticket regarding workspace permission issues.", createdAt: new Date("2024-01-06T13:20:00"), updatedAt: new Date("2024-01-06T13:20:00") },
-//     { title: "Sprint Planning", description: "Defining tasks and estimates for the upcoming development cycle.", createdAt: new Date("2024-01-07T09:00:00"), updatedAt: new Date("2024-01-07T09:00:00") },
-//     { title: "Security Patch", description: "Implementing fixes for the identified vulnerability in the middleware.", createdAt: new Date("2024-01-08T15:10:00"), updatedAt: new Date("2024-01-08T15:10:00") },
-//     { title: "Team Lunch", description: "Coordinating the location and time for Friday's social gathering.", createdAt: new Date("2024-01-09T12:00:00"), updatedAt: new Date("2024-01-09T12:00:00") },
-//     { title: "Performance Audit", description: "Analyzing the bundle size and load times for the mobile app.", createdAt: new Date("2024-01-10T10:30:00"), updatedAt: new Date("2024-01-10T10:30:00") },
-// ];
+import { useSettingsOpen } from "@/context/settingOpenContext";
 
 export default function SidebarArea() {
     // fetched data
@@ -66,7 +53,10 @@ export default function SidebarArea() {
     const { state, setOpen } = useSidebar();
     // settings tab
     const [settingsTab, setSettingsTab] = useState(0);
+    // settings open
+    const { settingsOpen, setSettingsOpen } = useSettingsOpen();
 
+    // auth fetch
     useEffect(() => {
         const fetchUserAuth = async () => {
             const { data } = await supabase.auth.getUser();
@@ -74,7 +64,6 @@ export default function SidebarArea() {
         }
         fetchUserAuth();
     }, [])
-
 
     // Fetch user data
     useEffect(() => {
@@ -327,7 +316,7 @@ export default function SidebarArea() {
             {/* --------------------------- Footer --------------------------- */}
             <SidebarFooter className="bg-background p-0 group-data-[state=collapsed]:pl-1 transition-all duration-200">
                 <AnimatePresence>
-                    {showAnnounce && announceFetched ? announce && (
+                    {announceFetched ? announce && showAnnounce && (
                         <motion.div
                             initial={{ opacity: 0, y: 20 }}
                             animate={{ opacity: 1, y: 0 }}
@@ -369,23 +358,24 @@ export default function SidebarArea() {
                         </div>
                     )}
                 </AnimatePresence>
-                <Dialog>
+                <Dialog open={settingsOpen} onOpenChange={setSettingsOpen}>
                     <Tooltip>
                         <TooltipTrigger asChild>
-                            <DialogTrigger asChild>
-                                <Button variant="ghost" className={cn(
-                                    "flex items-center justify-center z-30 gap-2 w-full h-10 border border-sidebar-border rounded-full px-2 bg-card shadow-lg overflow-hidden",
-                                    "group-data-[state=collapsed]:w-10 group-data-[state=collapsed]:h-10 group-data-[state=collapsed]:items-center group-data-[state=collapsed]:justify-center group-data-[state=collapsed]:gap-0"
-                                )}>
-                                    <User size={24} className="w-24 h-24" />
-                                    {user ? <span className="text-lg font-bold transition-all duration-200 group-data-[state=collapsed]:hidden truncate w-full text-left pl-2">
-                                        {user?.username}
-                                    </span> : <Skeleton className="w-full h-full rounded-full" />}
-                                    <div className="flex items-center justify-end w-24">
-                                        <Settings size={24} className="group-data-[state=collapsed]:hidden w-full transition-all duration-200" />
-                                    </div>
-                                </Button>
-                            </DialogTrigger>
+
+                            <Button variant="ghost" className={cn(
+                                "flex items-center justify-center z-30 gap-2 w-full h-10 border border-sidebar-border rounded-full px-2 bg-card shadow-lg overflow-hidden",
+                                "group-data-[state=collapsed]:w-10 group-data-[state=collapsed]:h-10 group-data-[state=collapsed]:items-center group-data-[state=collapsed]:justify-center group-data-[state=collapsed]:gap-0"
+                            )}
+                                onClick={() => setSettingsOpen(true)}
+                            >
+                                <User size={24} className="w-24 h-24" />
+                                {user ? <span className="text-lg font-bold transition-all duration-200 group-data-[state=collapsed]:hidden truncate w-full text-left pl-2">
+                                    {user?.username}
+                                </span> : <Skeleton className="w-full h-full rounded-full" />}
+                                <div className="flex items-center justify-end w-24">
+                                    <Settings size={24} className="group-data-[state=collapsed]:hidden w-full transition-all duration-200" />
+                                </div>
+                            </Button>
                         </TooltipTrigger>
                         <TooltipContent className="flex items-center gap-2">
                             <p>Settings</p>
@@ -441,9 +431,9 @@ export default function SidebarArea() {
 
                             <DialogFooter className="flex items-center justify-end gap-2 p-2 absolute bottom-0 left-1/2 -translate-x-1/2 bg-card/50 backdrop-blur-sm w-fit rounded-full border">
                                 <DialogClose asChild>
-                                    <Button variant="ghost">Close</Button>
+                                    <Button variant="ghost" onClick={() => setSettingsOpen(false)}>Close</Button>
                                 </DialogClose>
-                                <Button variant="default">Save Changes</Button>
+                                <Button variant="default" onClick={() => setSettingsOpen(false)}>Save Changes</Button>
                             </DialogFooter>
                         </div>
                     </DialogContent>

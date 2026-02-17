@@ -7,9 +7,10 @@ import { Input } from "@/components/ui/input";
 import { Separator } from "@/components/ui/separator";
 import { supabase } from "@/lib/supabaseClient";
 import { cn } from "@/lib/utils";
+import { User } from "@supabase/supabase-js";
 import { Eye, EyeOff, Info, Loader2 } from "lucide-react";
 import { useRouter } from "next/navigation";
-import { useState } from "react";
+import { useEffect, useState } from "react";
 
 export default function SignupPage() {
     const [email, setEmail] = useState("");
@@ -17,6 +18,7 @@ export default function SignupPage() {
     const [showPassword, setShowPassword] = useState(false);
     const router = useRouter();
     const [clicked, setClicked] = useState(false);
+    const [user, setUser] = useState<User | undefined>(undefined)
 
     const signIn = async () => {
         const { error } = await supabase.auth.signInWithPassword({
@@ -33,6 +35,14 @@ export default function SignupPage() {
         setClicked(false);
     };
 
+    useEffect(() => {
+        const checkLoggedIn = async () => {
+            const { data: { session } } = await supabase.auth.getSession()
+            setUser(session?.user)
+        }
+        checkLoggedIn()
+    }, [])
+
     // Check if email is valid
     const emailIsValid = () => {
         // regex for email validation
@@ -48,7 +58,7 @@ export default function SignupPage() {
 
     return (
         <div className="bg-background text-foreground min-h-screen w-full pt-48">
-            <Navbar />
+            <Navbar user={user} />
             <div className="flex flex-col items-center justify-center gap-4">
                 <FieldGroup className="w-full sm:w-[400px] md:w-[524px] mx-auto">
                     <p className="text-2xl font-bold text-center">Sign Up With Google</p>
