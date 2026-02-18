@@ -59,6 +59,24 @@
   --shadow-offset-x: 0;
   --shadow-offset-y: 1px;
   --letter-spacing: 0.025em;
+  --folder-red: oklch(63.02% 0.18419 24.052);
+  --folder-blue: oklch(0.6210 0.1560 261.5530);
+  --folder-green: oklch(64.714% 0.17969 143.63);
+  --folder-yellow: oklch(85.417% 0.17371 95.888);
+  --folder-purple: oklch(68.447% 0.17761 285.648);
+  --folder-orange: oklch(70.406% 0.1359 47.853);
+  --folder-pink: oklch(67.563% 0.23481 331.222);
+  --folder-cyan: oklch(79.851% 0.13043 228.176);
+  --folder-lime: oklch(78% 0.18 115);
+  --folder-teal: oklch(70% 0.14 185);
+  --folder-indigo: oklch(62% 0.16 270);
+  --folder-rose: oklch(64% 0.20 5);
+  --folder-amber: oklch(80% 0.16 75);
+  --folder-brown: oklch(50% 0.08 55);
+  --folder-slate: oklch(55% 0.02 250);
+  --folder-gray: oklch(50% 0 0);
+  --folder-black: oklch(20% 0 0);
+  --folder-white: oklch(90% 0 0);
 }
 
 .dark {
@@ -116,6 +134,24 @@
   --shadow-offset-y: 1px;
   --letter-spacing: 0.025em;
   --spacing: 0.25rem;
+  --folder-red: oklch(63.02% 0.08419 24.052);
+  --folder-blue: oklch(0.8120 0.0940 259.9070);
+  --folder-green: oklch(64.714% 0.07969 143.63);
+  --folder-yellow: oklch(90.417% 0.07371 95.888);
+  --folder-purple: oklch(68.447% 0.17761 285.648);
+  --folder-orange: oklch(70.406% 0.1359 47.853);
+  --folder-pink: oklch(67.563% 0.13481 331.222);
+  --folder-cyan: oklch(79.851% 0.13043 228.176);
+  --folder-lime: oklch(78% 0.08 115);
+  --folder-teal: oklch(70% 0.06 185);
+  --folder-indigo: oklch(62% 0.07 270);
+  --folder-rose: oklch(64% 0.09 5);
+  --folder-amber: oklch(80% 0.07 75);
+  --folder-brown: oklch(50% 0.04 55);
+  --folder-slate: oklch(55% 0.01 250);
+  --folder-gray: oklch(50% 0 0);
+  --folder-black: oklch(20% 0 0);
+  --folder-white: oklch(90% 0 0);
 }
 
 @theme inline {
@@ -151,6 +187,24 @@
   --color-sidebar-accent-foreground: var(--sidebar-accent-foreground);
   --color-sidebar-border: var(--sidebar-border);
   --color-sidebar-ring: var(--sidebar-ring);
+  --color-folder-red: var(--folder-red);
+  --color-folder-blue: var(--folder-blue);
+  --color-folder-green: var(--folder-green);
+  --color-folder-yellow: var(--folder-yellow);
+  --color-folder-purple: var(--folder-purple);
+  --color-folder-orange: var(--folder-orange);
+  --color-folder-pink: var(--folder-pink);
+  --color-folder-cyan: var(--folder-cyan);
+  --color-folder-lime: var(--folder-lime);
+  --color-folder-teal: var(--folder-teal);
+  --color-folder-indigo: var(--folder-indigo);
+  --color-folder-rose: var(--folder-rose);
+  --color-folder-amber: var(--folder-amber);
+  --color-folder-brown: var(--folder-brown);
+  --color-folder-slate: var(--folder-slate);
+  --color-folder-gray: var(--folder-gray);
+  --color-folder-black: var(--folder-black);
+  --color-folder-white: var(--folder-white);
 
   --font-sans: Alan Sans, ui-sans-serif, sans-serif, system-ui;
   --font-mono: Fira Mono, ui-monospace, monospace;
@@ -208,4 +262,30 @@ body {
   body {
     @apply bg-background text-foreground;
   }
+}
+
+@keyframes shake {
+  0% {
+    transform: translateX(0);
+  }
+
+  25% {
+    transform: translateX(5px);
+  }
+
+  50% {
+    transform: translateX(-5px);
+  }
+
+  75% {
+    transform: translateX(5px);
+  }
+
+  100% {
+    transform: translateX(0);
+  }
+}
+
+.animate-shake {
+  animation: shake 0.3s ease-in-out;
 }
