@@ -289,3 +289,26 @@ body {
 .animate-shake {
   animation: shake 0.3s ease-in-out;
 }
+
+@layer utilities {
+  .scrollbar-no-bg::-webkit-scrollbar {
+    width: 8px;
+    height: 8px;
+  }
+
+  .scrollbar-no-bg::-webkit-scrollbar-track {
+    background: transparent;
+  }
+
+  .scrollbar-no-bg::-webkit-scrollbar-thumb {
+    background: var(--muted-foreground);
+    border-radius: 20px;
+    border: 2px solid transparent;
+    background-clip: content-box;
+  }
+
+  .scrollbar-no-bg::-webkit-scrollbar-thumb:hover {
+    background: var(--foreground);
+    background-clip: content-box;
+  }
+}

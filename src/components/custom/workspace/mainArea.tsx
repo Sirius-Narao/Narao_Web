@@ -6,7 +6,7 @@ import { InputGroup, InputGroupAddon, InputGroupInput, InputGroupText } from "@/
 import { Kbd, KbdGroup } from "@/components/ui/kbd";
 import { SidebarInset } from "@/components/ui/sidebar";
 import { Tooltip, TooltipContent, TooltipTrigger } from "@/components/ui/tooltip";
-import { FileEdit, FolderEdit, MoreVertical, MoveLeft, MoveRight, Search, Folder as FolderIcon, FileText, FolderPen, Move, Trash, Palette, CircleSlash, AArrowUp, AArrowDown, Haze, Plus, X, Check } from "lucide-react";
+import { FileEdit, FolderEdit, MoreVertical, MoveLeft, MoveRight, Search, Folder as FolderIcon, FileText, FolderPen, Move, Trash, Palette, CircleSlash, AArrowUp, AArrowDown, Haze, Plus, X, Check, ArrowBigDown, } from "lucide-react";
 import {
     ContextMenu,
     ContextMenuContent,
@@ -99,6 +99,9 @@ export default function MainArea() {
     const [sortOrder, setSortOrder] = useState<"asc" | "desc">("desc");
     const { activeTab, setActiveTab } = useActiveTabs();
 
+    // dropdown create new state
+    const [isDropdownCreateNewOpen, setIsDropdownCreateNewOpen] = useState(false)
+
     // settings open state
     const { settingsOpen, setSettingsOpen } = useSettingsOpen();
 
@@ -112,12 +115,22 @@ export default function MainArea() {
     const [noteTags, setNoteTags] = useState<string[]>([]);
     const [pathError, setPathError] = useState(false);
 
-    // Virtual Folder Creation State
+    // Virtual Folder Creation / Rename State
     const [renamingFolderId, setRenamingFolderId] = useState<string | null>(null);
     const [tempFolderName, setTempFolderName] = useState("");
+    const [isRenamingExistingFolder, setIsRenamingExistingFolder] = useState(false);
+
+    // Note Rename State
+    const [renamingNoteId, setRenamingNoteId] = useState<string | null>(null);
+    const [tempNoteName, setTempNoteName] = useState("");
+
+    // Drag and drop state
+    const [dragItem, setDragItem] = useState<{ type: 'folder' | 'note'; id: string } | null>(null);
+    const [dragOverFolderId, setDragOverFolderId] = useState<string | null>(null);
 
     // accessed note state
     const [accessedNote, setAccessedNote] = useState<Note | null>(null);
+    const [content, setContent] = useState("")
 
     // fetch user auth
     useEffect(() => {
@@ -275,12 +288,12 @@ export default function MainArea() {
                 .filter((n): n is Note => !!n);
             console.log("Folder Content - Notes IDs:", currentFolder.notesIds);
             console.log("Folder Content - Resolved Notes:", n);
-            return { folders: f, notes: n };
+            return { folders: f, notes: n, currentFolder };
         }
 
-        return { folders: [], notes: [] };
+        return { folders: [], notes: [], currentFolder: undefined };
     }
-    const { folders, notes } = getContent();
+    const { folders, notes, currentFolder } = getContent();
 
     // Navigate to folder
     const navigateToFolder = (folderName: string) => {
@@ -313,7 +326,7 @@ export default function MainArea() {
 
         const rootLevel = fetchedFolders.filter(f => !fetchedFolders.some(parent => parent.foldersIds?.includes(f.id)));
         return findPath(rootLevel, "/") || "/";
-    }, [fetchedFolders]);;
+    }, [fetchedFolders]);
 
     const allFolderPaths = useMemo(() => {
         const paths = fetchedFolders.map(f => ({
@@ -352,7 +365,7 @@ export default function MainArea() {
 
     // FOLDER FUNCTIONS
     // Create folder function
-    const createFolder = () => {
+    const createFolder = useCallback(() => {
         // Check if we are already creating a folder
         if (renamingFolderId) return;
 
@@ -384,7 +397,7 @@ export default function MainArea() {
         // Actually, if we are in a subfolder, we need to find the parent folder and add "temp-creation" to its `foldersIds`.
         // Update: `fetchedFolders` state directly to include the relationship?
 
-        const currentPath = path.endsWith("/") && path.length > 1 ? path.slice(0, -1) : path;
+        const currentPath = path;
 
         if (currentPath === "/" || currentPath === "") {
             // Root: Just add it. `rootFolders` filter will pick it up because no one has it in `foldersIds`.
@@ -416,7 +429,7 @@ export default function MainArea() {
 
         setRenamingFolderId(newFolder.id);
         setTempFolderName("");
-    }
+    }, [path, allFolderPaths, renamingFolderId, user]);
     const handleFolderSave = async () => {
         if (!renamingFolderId || !user) return;
 
@@ -578,22 +591,44 @@ export default function MainArea() {
             ));
         }
     }
+    // Folder rename
     const renameFolder = async (folderId: string, newName: string) => {
         if (!user) return;
 
-        const { data, error } = await supabase
+        const { error } = await supabase
             .from("folders")
-            .update({ name: newName })
-            .eq("id", user?.id)
-            .select()
+            .update({ name: newName, updated_at: new Date() })
+            .eq("id", folderId)
 
         if (error) {
-            console.error("Error renaming folder: ", error)
+            console.error("Error renaming folder: ", error);
         } else {
             setFetchedFolders(prev => prev.map(f =>
                 String(f.id) === String(folderId) ? { ...f, name: newName } : f
-            ))
+            ));
         }
+    }
+    const startFolderRename = (folderId: string, currentName: string) => {
+        setIsRenamingExistingFolder(true);
+        setRenamingFolderId(folderId);
+        setTempFolderName(currentName);
+    }
+    const handleFolderRenameSubmit = async () => {
+        if (!renamingFolderId) return;
+        const targetName = tempFolderName.trim();
+        if (!targetName) {
+            cancelFolderRename();
+            return;
+        }
+        await renameFolder(renamingFolderId, targetName);
+        setRenamingFolderId(null);
+        setTempFolderName("");
+        setIsRenamingExistingFolder(false);
+    }
+    const cancelFolderRename = () => {
+        setRenamingFolderId(null);
+        setTempFolderName("");
+        setIsRenamingExistingFolder(false);
     }
 
     // NOTE FUNCTIONS
@@ -627,6 +662,7 @@ export default function MainArea() {
             createdAt: new Date(noteData.created_at),
             updatedAt: new Date(noteData.updated_at)
         };
+        setAccessedNote(newNote);
         setFetchedNotes(prev => [...prev, newNote]);
 
         // Add to folder if needed
@@ -685,6 +721,149 @@ export default function MainArea() {
 
         setFetchedNotes(prev => prev.filter(n => n.id !== noteId));
     }
+    const renameNote = async (noteId: string, newTitle: string) => {
+        if (!user) return;
+
+        const { error } = await supabase
+            .from("notes")
+            .update({ title: newTitle, updated_at: new Date() })
+            .eq("id", noteId);
+
+        if (error) {
+            console.error("Error renaming note: ", error);
+        } else {
+            setFetchedNotes(prev => prev.map(n =>
+                String(n.id) === String(noteId) ? { ...n, title: newTitle } : n
+            ));
+        }
+    }
+    const startNoteRename = (noteId: string, currentTitle: string) => {
+        setRenamingNoteId(noteId);
+        setTempNoteName(currentTitle);
+    }
+    const handleNoteRenameSubmit = async () => {
+        if (!renamingNoteId) return;
+        const targetTitle = tempNoteName.trim();
+        if (!targetTitle) {
+            cancelNoteRename();
+            return;
+        }
+        await renameNote(renamingNoteId, targetTitle);
+        setRenamingNoteId(null);
+        setTempNoteName("");
+    }
+    const cancelNoteRename = () => {
+        setRenamingNoteId(null);
+        setTempNoteName("");
+    }
+    const saveNote = async () => {
+        if (!user) return;
+
+        const { error } = await supabase.from("notes").update({ content: content }).eq("id", accessedNote?.id)
+
+        if (error) {
+            console.error(error)
+            return;
+        }
+    }
+    const openNote = async (note: Note) => {
+        if (!user) return;
+
+        const { data, error } = await supabase.from("notes").select("*").eq("id", note.id).single()
+
+        if (data) {
+            setAccessedNote(data)
+            setActiveTab(1)
+            return;
+        } else if (error) {
+            console.error(error)
+            return;
+        }
+    }
+
+    // ---- DRAG & DROP ----
+    // Move a folder or note into a target folder (or to root if targetFolderId is null)
+    const moveItemToFolder = async (itemType: 'folder' | 'note', itemId: string, targetFolderId: string | null) => {
+        if (!user) return;
+
+        // Prevent moving a folder into itself
+        if (itemType === 'folder' && itemId === targetFolderId) return;
+
+        // Find the current parent folder of the item
+        const currentParent = fetchedFolders.find(f =>
+            itemType === 'folder'
+                ? (f.foldersIds || []).includes(itemId)
+                : (f.notesIds || []).includes(itemId)
+        );
+
+        // If it's already in the target, do nothing
+        if ((currentParent?.id ?? null) === targetFolderId) return;
+
+        try {
+            // 1. Remove from old parent (if it had one)
+            if (currentParent) {
+                if (itemType === 'folder') {
+                    const newIds = (currentParent.foldersIds || []).filter(id => id !== itemId);
+                    const { error } = await supabase
+                        .from('folders')
+                        .update({ folders_ids: newIds })
+                        .eq('id', currentParent.id);
+                    if (error) throw error;
+                    setFetchedFolders(prev => prev.map(f =>
+                        f.id === currentParent.id ? { ...f, foldersIds: newIds } : f
+                    ));
+                } else {
+                    const newIds = (currentParent.notesIds || []).filter(id => id !== itemId);
+                    const { error } = await supabase
+                        .from('folders')
+                        .update({ notes_ids: newIds })
+                        .eq('id', currentParent.id);
+                    if (error) throw error;
+                    setFetchedFolders(prev => prev.map(f =>
+                        f.id === currentParent.id ? { ...f, notesIds: newIds } : f
+                    ));
+                }
+            }
+
+            // 2. Add to new parent (if there is one; null means root)
+            if (targetFolderId) {
+                const targetFolder = getFolderById(targetFolderId);
+                if (targetFolder) {
+                    if (itemType === 'folder') {
+                        const newIds = [...(targetFolder.foldersIds || []), itemId];
+                        const { error } = await supabase
+                            .from('folders')
+                            .update({ folders_ids: newIds })
+                            .eq('id', targetFolderId);
+                        if (error) throw error;
+                        setFetchedFolders(prev => prev.map(f =>
+                            f.id === targetFolderId ? { ...f, foldersIds: newIds } : f
+                        ));
+                    } else {
+                        const newIds = [...(targetFolder.notesIds || []), itemId];
+                        const { error } = await supabase
+                            .from('folders')
+                            .update({ notes_ids: newIds })
+                            .eq('id', targetFolderId);
+                        if (error) throw error;
+                        setFetchedFolders(prev => prev.map(f =>
+                            f.id === targetFolderId ? { ...f, notesIds: newIds } : f
+                        ));
+                    }
+                }
+            }
+        } catch (err) {
+            console.error('Error moving item:', err);
+        }
+    };
+
+    // Determine the parent folder id of the current path (null = root)
+    const getParentFolderIdOfCurrentPath = (): string | null => {
+        const parentPath = path.split('/').slice(0, -1).join('/') || '/';
+        if (parentPath === '/') return null;
+        const found = allFolderPaths.find(p => p.path === parentPath);
+        return found?.id ?? null;
+    };
 
     // Keyboard shortcuts
     useEffect(() => {
@@ -712,7 +891,7 @@ export default function MainArea() {
                 setActiveTab(1);
                 setCreateNoteDialogOpen(true);
             }
-            else if (e.ctrlKey && key === "c" && !e.shiftKey && !e.altKey) {
+            else if (e.ctrlKey && key === "m" && !e.shiftKey && !e.altKey) {
                 e.preventDefault();
                 setActiveTab(2);
             }
@@ -724,11 +903,15 @@ export default function MainArea() {
                 e.preventDefault();
                 setSettingsOpen(true);
             }
+            else if (e.ctrlKey && key === "s" && !e.shiftKey && !e.altKey && activeTab === 1 && accessedNote !== null) {
+                e.preventDefault();
+                saveNote()
+            }
         };
 
         window.addEventListener("keydown", handleKeyDown);
         return () => window.removeEventListener("keydown", handleKeyDown);
-    }, []);
+    }, [createFolder, goBack, goForward, setActiveTab, setCreateNoteDialogOpen, setSettingsOpen]);
 
     return (
         <SidebarInset className="bg-background">
@@ -850,7 +1033,7 @@ export default function MainArea() {
                     <div className="w-full flex justify-center">
                         <Tooltip>
                             <TooltipTrigger asChild>
-                                <Button variant="ghost" className="w-124 sm:w-64 text-foreground text-lg">{"Title Placeholder"}</Button>
+                                <Button variant="ghost" className="w-124 sm:w-64 text-foreground text-lg">{accessedNote?.title ?? (noteName || "New Note")}</Button>
                             </TooltipTrigger>
                             <TooltipContent>
                                 <p>Change Note's Name</p>
@@ -864,12 +1047,12 @@ export default function MainArea() {
                 }
 
                 {/* Right Side */}
-                {activeTab === 0 && <div className="absolute right-2">
-                    <DropdownMenu>
+                {activeTab === 0 ? <div className="absolute right-2">
+                    <DropdownMenu open={isDropdownCreateNewOpen} onOpenChange={() => setIsDropdownCreateNewOpen(false)}>
                         <Tooltip>
                             <TooltipTrigger asChild>
                                 <DropdownMenuTrigger asChild>
-                                    <Button variant="ghost" className="w-10 h-10 p-0 rounded-full mr-1">
+                                    <Button variant="ghost" className="w-10 h-10 p-0 rounded-full mr-1" onClick={() => setIsDropdownCreateNewOpen(!isDropdownCreateNewOpen)}>
                                         <Plus size={24} color="white" />
                                     </Button>
                                 </DropdownMenuTrigger>
@@ -881,14 +1064,14 @@ export default function MainArea() {
                         <DropdownMenuContent align="end" className="min-w-[32px] p-2 rounded-full">
                             <div className="flex items-center gap-2 p-2">
                                 {/* should blur the dropdown when clicked */}
-                                <Button variant="outline" className="p-0 rounded-full group" onClick={createFolder}>
+                                <Button variant="outline" className="p-0 rounded-full group" onClick={() => { setIsDropdownCreateNewOpen(false); createFolder() }}>
                                     <FolderIcon size={24} className="text-foreground group-hover:text-primary transition-all duration-100" />
                                     Create Folder
                                     <KbdGroup>
                                         <Kbd className="bg-popover text-foreground">Ctrl + Shift + N</Kbd>
                                     </KbdGroup>
                                 </Button>
-                                <Button variant="outline" className="p-0 rounded-full group" onClick={() => setCreateNoteDialogOpen(true)}>
+                                <Button variant="outline" className="p-0 rounded-full group" onClick={() => { setIsDropdownCreateNewOpen(false); setCreateNoteDialogOpen(true) }}>
                                     <FileText size={24} className="text-foreground group-hover:text-primary transition-all duration-100" />
                                     Create Note
                                     <KbdGroup>
@@ -931,7 +1114,28 @@ export default function MainArea() {
                         </DropdownMenuContent>
 
                     </DropdownMenu>
-                </div>}
+
+                    {/* NOTES  */}
+                </div> : activeTab === 1 ?
+                    <Tooltip>
+                        <TooltipTrigger asChild>
+
+                            <Button variant="ghost" className="w-10 h-10 p-0 rounded-full mr-1" onClick={() => saveNote()}>
+                                <ArrowBigDown size={24} color="white" />
+                            </Button>
+                        </TooltipTrigger>
+                        <TooltipContent className="flex items-center gap-2">
+                            <p>Save</p>
+                            <KbdGroup>
+                                <Kbd className="bg-popover text-foreground">Ctrl + S</Kbd>
+                            </KbdGroup>
+                        </TooltipContent>
+                    </Tooltip>
+
+                    : <>
+
+                    </>
+                }
             </div>
 
             {/* ------------------ Bottom Part ----------------- */}
@@ -945,6 +1149,29 @@ export default function MainArea() {
                             <ScrollArea className="h-full w-full pb-10">
                                 {/* HERE WE WILL LOAD ALL THE FOLDERS AND NOTES IN THE CURRENT PATH */}
                                 <div className="flex flex-wrap gap-4 p-4 content-start">
+                                    {path !== "/" && (
+                                        <div
+                                            className={cn(
+                                                "group flex flex-col items-center gap-2 p-4 hover:bg-muted/50 rounded-xl cursor-pointer w-32 h-28 justify-center transition-all duration-200 border border-transparent hover:border-sidebar-border",
+                                                dragItem && dragOverFolderId === '__parent__' && "border-primary/60 bg-primary/10 scale-105"
+                                            )}
+                                            onClick={() => goBack()}
+                                            onDragOver={(e) => { e.preventDefault(); setDragOverFolderId('__parent__'); }}
+                                            onDragLeave={() => setDragOverFolderId(null)}
+                                            onDrop={(e) => {
+                                                e.preventDefault();
+                                                setDragOverFolderId(null);
+                                                if (dragItem) {
+                                                    const parentId = getParentFolderIdOfCurrentPath();
+                                                    moveItemToFolder(dragItem.type, dragItem.id, parentId);
+                                                    setDragItem(null);
+                                                }
+                                            }}
+                                        >
+                                            <FolderIcon className={cn("w-12 h-12 group-hover:scale-110 transition-transform duration-200", currentFolder?.color && folderColorClasses[currentFolder.color]?.text, currentFolder?.color && folderColorClasses[currentFolder.color]?.fill)} />
+                                            <p className="text-xs font-medium text-center truncate w-full px-1">...</p>
+                                        </div>
+                                    )}
                                     {folders.slice().sort((a, b) => sortOrder === "asc" ? a.name.localeCompare(b.name) : b.name.localeCompare(a.name)).map(folder => (
                                         <ContextMenu key={folder.id}>
                                             <ContextMenuTrigger>
@@ -958,28 +1185,56 @@ export default function MainArea() {
                                                             value={tempFolderName}
                                                             onChange={(e) => setTempFolderName(e.target.value)}
                                                             autoFocus
-                                                            className="h-6 w-full text-xs text-center px-1"
+                                                            maxLength={24}
+                                                            className="h-6 w-full text-xs text-center px-2 bg-transparent border-none focus-visible:border-transparent focus-visible:ring-transparent focus-visible:ring-[3px]"
                                                             placeholder="Name"
                                                             onBlur={() => {
-                                                                // We need to check if we should save or cancel.
-                                                                // If empty -> cancel.
-                                                                // If duplicate -> refuse to save (keep focus? Hard on blur).
-                                                                // Better: validation in `handleFolderSave`.
-                                                                // If interaction happens outside, we should try to save.
-                                                                handleFolderSave();
+                                                                if (isRenamingExistingFolder) {
+                                                                    handleFolderRenameSubmit();
+                                                                } else {
+                                                                    handleFolderSave();
+                                                                }
                                                             }}
                                                             onKeyDown={(e) => {
                                                                 if (e.key === "Enter") {
-                                                                    handleFolderSave();
+                                                                    if (isRenamingExistingFolder) {
+                                                                        handleFolderRenameSubmit();
+                                                                    } else {
+                                                                        handleFolderSave();
+                                                                    }
                                                                 } else if (e.key === "Escape") {
-                                                                    cancelFolderCreation();
+                                                                    if (isRenamingExistingFolder) {
+                                                                        cancelFolderRename();
+                                                                    } else {
+                                                                        cancelFolderCreation();
+                                                                    }
                                                                 }
                                                             }}
                                                         />
                                                     </div>
                                                 ) : (
                                                     <div
-                                                        className="group flex flex-col items-center gap-2 p-4 hover:bg-muted/50 rounded-xl cursor-pointer w-32 h-28 justify-center transition-all duration-200 border border-transparent hover:border-sidebar-border"
+                                                        className={cn(
+                                                            "group flex flex-col items-center gap-2 p-4 hover:bg-muted/50 rounded-xl cursor-pointer w-32 h-28 justify-center transition-all duration-200 border border-transparent hover:border-sidebar-border overflow-hidden",
+                                                            dragItem && dragOverFolderId === folder.id && dragItem.id !== folder.id && "border-primary/60 bg-transparent scale-105"
+                                                        )}
+                                                        draggable
+                                                        onDragStart={(e) => {
+                                                            e.dataTransfer.effectAllowed = 'move';
+                                                            setDragItem({ type: 'folder', id: folder.id });
+                                                        }}
+                                                        onDragEnd={() => { setDragItem(null); setDragOverFolderId(null); }}
+                                                        onDragOver={(e) => { e.preventDefault(); if (dragItem?.id !== folder.id) setDragOverFolderId(folder.id); }}
+                                                        onDragLeave={() => setDragOverFolderId(null)}
+                                                        onDrop={(e) => {
+                                                            e.preventDefault();
+                                                            setDragOverFolderId(null);
+                                                            if (dragItem && dragItem.id !== folder.id) {
+                                                                moveItemToFolder(dragItem.type, dragItem.id, folder.id);
+                                                                setDragItem(null);
+                                                            }
+                                                        }}
+                                                        onDoubleClick={() => startFolderRename(folder.id, folder.name)}
                                                         onClick={() => navigateToFolder(folder.name)}
                                                     >
                                                         <FolderIcon className={cn("w-12 h-12 group-hover:scale-110 transition-transform duration-200", folder.color && folderColorClasses[folder.color]?.text, folder.color && folderColorClasses[folder.color]?.fill)} />
@@ -990,7 +1245,7 @@ export default function MainArea() {
                                             <ContextMenuContent >
                                                 <p className="text-foreground text-md px-2 mt-1">{folder.name}</p>
                                                 <p className="text-muted-foreground text-xs px-2 mb-1">{`Last updated: ${dateConvert(folder.updatedAt.toString())}`}</p>
-                                                <ContextMenuItem className="cursor-pointer group">
+                                                <ContextMenuItem className="cursor-pointer group" onClick={() => startFolderRename(folder.id, folder.name)}>
                                                     <FolderPen size={16} className="text-muted-foreground group-hover:text-accent-foreground" />
                                                     <p className="text-foreground group-hover:text-accent-foreground">Rename</p>
                                                 </ContextMenuItem>
@@ -1046,18 +1301,48 @@ export default function MainArea() {
                                     {notes.slice().sort((a, b) => sortOrder === "asc" ? a.title.localeCompare(b.title) : b.title.localeCompare(a.title)).map(note => (
                                         <ContextMenu key={note.id}>
                                             <ContextMenuTrigger>
-                                                <div
-                                                    className="group flex flex-col items-center gap-2 p-4 hover:bg-muted/50 rounded-xl cursor-pointer w-32 h-28 justify-center transition-all duration-200 border border-transparent hover:border-sidebar-border"
-                                                >
-                                                    <FileText className="w-10 h-10 text-foreground/50 group-hover:text-foreground group-hover:scale-110 transition-all duration-200" />
-                                                    <p className="text-xs font-medium text-center truncate w-full px-1 mt-1">{note.title}</p>
-                                                </div>
+                                                {renamingNoteId === note.id ? (
+                                                    <div
+                                                        className="group flex flex-col items-center gap-2 p-4 bg-muted/50 rounded-xl cursor-default w-32 h-28 justify-center border border-primary/50"
+                                                        onClick={(e) => e.stopPropagation()}
+                                                    >
+                                                        <FileText className="w-10 h-10 text-foreground/50" />
+                                                        <Input
+                                                            value={tempNoteName}
+                                                            onChange={(e) => setTempNoteName(e.target.value)}
+                                                            autoFocus
+                                                            maxLength={48}
+                                                            className="h-6 w-full text-xs text-center px-2 bg-transparent border-none focus-visible:border-transparent focus-visible:ring-transparent focus-visible:ring-[3px]"
+                                                            placeholder="Title"
+                                                            onBlur={handleNoteRenameSubmit}
+                                                            onKeyDown={(e) => {
+                                                                if (e.key === "Enter") handleNoteRenameSubmit();
+                                                                else if (e.key === "Escape") cancelNoteRename();
+                                                            }}
+                                                        />
+                                                    </div>
+                                                ) : (
+                                                    <div
+                                                        className="group flex flex-col items-center gap-2 p-4 hover:bg-muted/50 rounded-xl cursor-pointer w-32 h-28 justify-center transition-all duration-200 border border-transparent hover:border-sidebar-border"
+                                                        draggable
+                                                        onDragStart={(e) => {
+                                                            e.dataTransfer.effectAllowed = 'move';
+                                                            setDragItem({ type: 'note', id: note.id });
+                                                        }}
+                                                        onDragEnd={() => { setDragItem(null); setDragOverFolderId(null); }}
+                                                        onDoubleClick={() => startNoteRename(note.id, note.title)}
+                                                        onClick={() => openNote(note)}
+                                                    >
+                                                        <FileText className="w-10 h-10 text-foreground/50 group-hover:text-foreground group-hover:scale-110 transition-all duration-200" />
+                                                        <p className="text-xs font-medium text-center truncate w-full px-1 mt-1">{note.title}</p>
+                                                    </div>
+                                                )}
                                             </ContextMenuTrigger>
                                             <ContextMenuContent >
                                                 <p className="text-foreground text-md px-2 mt-1">{note.title}</p>
                                                 <p className="text-muted-foreground text-xs px-2">{note.description}</p>
                                                 <p className="text-muted-foreground text-xs px-2 mb-1">{`Last updated: ${dateConvert(note.updatedAt.toString())}`}</p>
-                                                <ContextMenuItem className="cursor-pointer group">
+                                                <ContextMenuItem className="cursor-pointer group" onClick={() => startNoteRename(note.id, note.title)}>
                                                     <FolderPen size={16} className="text-muted-foreground group-hover:text-accent-foreground" />
                                                     <p className="text-foreground group-hover:text-accent-foreground">Rename</p>
                                                 </ContextMenuItem>
@@ -1160,10 +1445,10 @@ export default function MainArea() {
                             </InputGroup>
                         </div>
                     </div>) : (
-                    <div className="flex flex-col items-center justify-center h-full relative">
+                    <div className="flex flex-col items-center justify-center h-full relative w-full">
                         <Haze size={64} className="text-muted-foreground/30" />
                         <p className="text-muted-foreground/30 text-center text-lg mt-2">No folders or notes yet!</p>
-                        <div className="w-full absolute bottom-2 left-0 right-0 px-4 flex justify-center pointer-events-none">
+                        <div className="w-full absolute bottom-[-0.5rem] left-0 right-0 px-4 flex justify-center pointer-events-none">
                             <InputGroup className="w-full max-w-[40%] bg-popover dark:bg-popover shadow-lg cursor-pointer px-2 pointer-events-auto"
                                 onClick={() => { }}>
                                 <InputGroupAddon align="inline-end" className="cursor-pointer">
@@ -1183,8 +1468,8 @@ export default function MainArea() {
 
                 )
                 ) : activeTab === 1 ? (
-                    <div>
-                        <p>Notes</p>
+                    <div className="bg-transparent w-full h-full">
+                        <textarea value={content} onChange={(e) => setContent(e.target.value)} className="w-full h-full px-24 py-12 focus:outline-none scrollbar-no-bg"></textarea>
                     </div>
                 ) : (
                     <div>
@@ -1238,11 +1523,23 @@ export default function MainArea() {
                             <ComboboxContent>
                                 <ComboboxEmpty>No items found.</ComboboxEmpty>
                                 <ComboboxList>
-                                    {(item) => (
-                                        <ComboboxItem key={item.id} value={item.path}>
-                                            {item.path}
-                                        </ComboboxItem>
-                                    )}
+                                    {(item) => {
+                                        const folderColor = fetchedFolders.find((f) => String(f.id) === String(item.id))?.color;
+                                        return (
+                                            <div className="flex gap-2 px-4 py-1 items-center" key={item.id}>
+                                                <FolderIcon
+                                                    size={24}
+                                                    className={cn(
+                                                        folderColor && folderColorClasses[folderColor]?.text,
+                                                        folderColor && folderColorClasses[folderColor]?.fill
+                                                    )}
+                                                />
+                                                <ComboboxItem value={item.path}>
+                                                    {item.path}
+                                                </ComboboxItem>
+                                            </div>
+                                        );
+                                    }}
                                 </ComboboxList>
                             </ComboboxContent>
                         </Combobox>

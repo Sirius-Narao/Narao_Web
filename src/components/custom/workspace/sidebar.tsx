@@ -217,7 +217,7 @@ export default function SidebarArea() {
                                     <TooltipContent className="flex items-center gap-2">
                                         <p>{index === 0 ? "Open Folders" : index === 1 ? "New Note" : "New Chat"}</p>
                                         <KbdGroup>
-                                            <Kbd className="bg-popover text-foreground">Ctrl + {index === 0 ? "O" : index === 1 ? "N" : "C"}</Kbd>
+                                            <Kbd className="bg-popover text-foreground">Ctrl + {index === 0 ? "O" : index === 1 ? "N" : "M"}</Kbd>
                                         </KbdGroup>
                                     </TooltipContent>
                                 </Tooltip>
