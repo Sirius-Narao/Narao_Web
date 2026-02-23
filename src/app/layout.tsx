@@ -2,6 +2,7 @@ import type { Metadata } from "next";
 import { Alan_Sans, Fira_Mono } from "next/font/google";
 import "./globals.css";
 import { ThemeProvider } from "@/components/theme-provider";
+import { Toaster } from "@/components/ui/sonner";
 
 const alanSans = Alan_Sans({
   variable: "--font-alan-sans",
@@ -59,6 +60,7 @@ export default function RootLayout({
           disableTransitionOnChange
         >
           {children}
+          <Toaster />
         </ThemeProvider>
       </body>
     </html>

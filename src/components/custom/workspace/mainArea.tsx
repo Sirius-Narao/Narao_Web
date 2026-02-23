@@ -31,9 +31,11 @@ import { supabase } from "@/lib/supabaseClient";
 import { Skeleton } from "@/components/ui/skeleton";
 import { useSettingsOpen } from "@/context/settingOpenContext";
 import { useCreateNoteDialogOpen } from "@/context/createNoteDialogOpenContext";
-import { Dialog, DialogClose, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from "@/components/ui/dialog";
+import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { Field, FieldDescription, FieldLabel } from "@/components/ui/field";
 import { Combobox, ComboboxContent, ComboboxEmpty, ComboboxInput, ComboboxItem, ComboboxList } from "@/components/ui/combobox";
+import { Spinner } from "@/components/ui/spinner"
+import { toast } from "sonner"
 
 // colors for folders — full class names so Tailwind can detect them
 const folderColors: { value: FolderColor; label: string; bgClass: string }[] = [
@@ -131,6 +133,7 @@ export default function MainArea() {
     // accessed note state
     const [accessedNote, setAccessedNote] = useState<Note | null>(null);
     const [content, setContent] = useState("")
+    const [isSavedComplete, setIsSavedComplete] = useState(true)
 
     // fetch user auth
     useEffect(() => {
@@ -757,29 +760,74 @@ export default function MainArea() {
         setTempNoteName("");
     }
     const saveNote = async () => {
-        if (!user) return;
+        if (!user || !accessedNote) return;
+        // Only save if there are actual changes
+        if (content === accessedNote.content) return;
 
-        const { error } = await supabase.from("notes").update({ content: content }).eq("id", accessedNote?.id)
+        setIsSavedComplete(false)
+        const { data, error } = await supabase
+            .from("notes")
+            .update({
+                content: content ?? ""
+            })
+            .eq("id", accessedNote.id)
+            .select()
+            .single()
 
+        if (data) {
+            const updatedNote: Note = {
+                id: String(data.id),
+                title: data.title,
+                description: data.description || "",
+                content: data.content || "",
+                tags: data.tags || [],
+                createdAt: new Date(data.created_at),
+                updatedAt: new Date(data.updated_at)
+            };
+            toast.info(`Saved ${updatedNote.title} successfully`, {
+                position: 'bottom-right'
+            })
+            setAccessedNote(updatedNote);
+
+            // Also update the note in the fetchedNotes list to keep it in sync
+            setFetchedNotes(prev => prev.map(n => n.id === updatedNote.id ? updatedNote : n));
+        }
+
+        setIsSavedComplete(true)
         if (error) {
-            console.error(error)
+            console.error("Error saving note:", error)
             return;
         }
     }
     const openNote = async (note: Note) => {
         if (!user) return;
 
-        const { data, error } = await supabase.from("notes").select("*").eq("id", note.id).single()
+        const { data, error } = await supabase
+            .from("notes")
+            .select("*")
+            .eq("id", note.id)
+            .single()
 
         if (data) {
-            setAccessedNote(data)
+            const mappedNote: Note = {
+                id: String(data.id),
+                title: data.title,
+                description: data.description || "",
+                content: data.content || "",
+                tags: data.tags || [],
+                createdAt: new Date(data.created_at),
+                updatedAt: new Date(data.updated_at)
+            };
+            setAccessedNote(mappedNote)
+            setContent(mappedNote.content)
             setActiveTab(1)
             return;
         } else if (error) {
-            console.error(error)
+            console.error("Error opening note:", error)
             return;
         }
     }
+
 
     // ---- DRAG & DROP ----
     // Move a folder or note into a target folder (or to root if targetFolderId is null)
@@ -870,11 +918,11 @@ export default function MainArea() {
         const handleKeyDown = (e: KeyboardEvent) => {
             const key = e.key.toLowerCase();
 
-            if (e.ctrlKey && key === "z" && !e.shiftKey && !e.altKey) {
+            if (e.ctrlKey && key === "z" && !e.shiftKey && !e.altKey && activeTab === 0) {
                 e.preventDefault();
                 goBack();
             }
-            else if (e.ctrlKey && (e.shiftKey || e.altKey) && key === "z") {
+            else if (e.ctrlKey && (e.shiftKey || e.altKey) && key === "z" && activeTab === 0) {
                 e.preventDefault();
                 goForward();
             }
@@ -911,7 +959,7 @@ export default function MainArea() {
 
         window.addEventListener("keydown", handleKeyDown);
         return () => window.removeEventListener("keydown", handleKeyDown);
-    }, [createFolder, goBack, goForward, setActiveTab, setCreateNoteDialogOpen, setSettingsOpen]);
+    }, [createFolder, goBack, goForward, setActiveTab, setCreateNoteDialogOpen, setSettingsOpen, accessedNote, content]);
 
     return (
         <SidebarInset className="bg-background">
@@ -1117,10 +1165,10 @@ export default function MainArea() {
 
                     {/* NOTES  */}
                 </div> : activeTab === 1 ?
-                    <Tooltip>
+                    isSavedComplete ? (<Tooltip>
                         <TooltipTrigger asChild>
 
-                            <Button variant="ghost" className="w-10 h-10 p-0 rounded-full mr-1" onClick={() => saveNote()}>
+                            <Button variant="ghost" className="w-10 h-10 p-0 rounded-full mr-1" onClick={() => saveNote()} disabled={content === accessedNote?.content}>
                                 <ArrowBigDown size={24} color="white" />
                             </Button>
                         </TooltipTrigger>
@@ -1130,7 +1178,10 @@ export default function MainArea() {
                                 <Kbd className="bg-popover text-foreground">Ctrl + S</Kbd>
                             </KbdGroup>
                         </TooltipContent>
-                    </Tooltip>
+                    </Tooltip>) :
+                        <Button variant="ghost" className="w-10 h-10 p-0 rounded-full mr-1" disabled >
+                            <Spinner />
+                        </Button>
 
                     : <>
 
@@ -1469,7 +1520,7 @@ export default function MainArea() {
                 )
                 ) : activeTab === 1 ? (
                     <div className="bg-transparent w-full h-full">
-                        <textarea value={content} onChange={(e) => setContent(e.target.value)} className="w-full h-full px-24 py-12 focus:outline-none scrollbar-no-bg"></textarea>
+                        <textarea value={content} onChange={(e) => setContent(e.target.value)} className="w-full h-full px-24 py-12 focus:outline-none scrollbar-no-bg resize-none"></textarea>
                     </div>
                 ) : (
                     <div>
