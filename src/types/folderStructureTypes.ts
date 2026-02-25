@@ -1,3 +1,10 @@
+// export type MardownElementsType = "plain-text" | "italic"
+
+// export type ContentType = {
+//     text: string;
+//     markdownElement: MardownElementsType;
+// }
+
 export type Note = {
     id: string;
     user_id?: string;

@@ -98,7 +98,7 @@ export default function MainArea() {
     const searchInputRef = useRef<HTMLInputElement>(null);
     const [searchOpen, setSearchOpen] = useState(false);
     const [searchQuery, setSearchQuery] = useState("");
-    const [sortOrder, setSortOrder] = useState<"asc" | "desc">("desc");
+    const [sortOrder, setSortOrder] = useState<"asc" | "desc">("asc");
     const { activeTab, setActiveTab } = useActiveTabs();
 
     // dropdown create new state
@@ -131,6 +131,7 @@ export default function MainArea() {
     const [dragOverFolderId, setDragOverFolderId] = useState<string | null>(null);
 
     // accessed note state
+    const [isNoteOpened, setIsNoteOpened] = useState(false)
     const [accessedNote, setAccessedNote] = useState<Note | null>(null);
     const [content, setContent] = useState("")
     const [isSavedComplete, setIsSavedComplete] = useState(true)
@@ -539,6 +540,10 @@ export default function MainArea() {
                 }));
             }
 
+            toast.info(`Created ${newFolderData.name}`, {
+                position: 'bottom-right'
+            })
+
             setRenamingFolderId(null);
             setTempFolderName("");
 
@@ -562,16 +567,20 @@ export default function MainArea() {
         setRenamingFolderId(null);
         setTempFolderName("");
     }
-    const deleteFolder = async (folderId: string) => {
+    const deleteFolder = async (folderId: string, folderName: string) => {
         if (!user) return;
 
-        const { error } = await supabase.from("folders").delete().eq("id", folderId);
+        const { data: folderData, error } = await supabase.from("folders").delete().select().eq("id", folderId);
 
         if (error) {
             console.error("Error deleting folder:", error);
             return;
             // Don't cancel, let user try again? Or show toast.
         }
+
+        toast.warning(`Deleted ${folderName}`, {
+            position: 'bottom-right'
+        })
 
         setFetchedFolders(prev => prev.filter(f => f.id !== folderId));
     }
@@ -666,6 +675,7 @@ export default function MainArea() {
             updatedAt: new Date(noteData.updated_at)
         };
         setAccessedNote(newNote);
+        setContent("")
         setFetchedNotes(prev => [...prev, newNote]);
 
         // Add to folder if needed
@@ -708,6 +718,9 @@ export default function MainArea() {
                 }
             }
         }
+        toast.info(`Created ${newNote.title}`, {
+            position: 'bottom-right'
+        })
 
         setCreateNoteDialogOpen(false);
     }
@@ -727,10 +740,12 @@ export default function MainArea() {
     const renameNote = async (noteId: string, newTitle: string) => {
         if (!user) return;
 
-        const { error } = await supabase
+        const { data, error } = await supabase
             .from("notes")
             .update({ title: newTitle, updated_at: new Date() })
-            .eq("id", noteId);
+            .select()
+            .eq("id", noteId)
+            .single();
 
         if (error) {
             console.error("Error renaming note: ", error);
@@ -738,6 +753,9 @@ export default function MainArea() {
             setFetchedNotes(prev => prev.map(n =>
                 String(n.id) === String(noteId) ? { ...n, title: newTitle } : n
             ));
+            toast.info(`Renamed ${data.title} successfully`, {
+                position: 'bottom-right'
+            })
         }
     }
     const startNoteRename = (noteId: string, currentTitle: string) => {
@@ -809,6 +827,7 @@ export default function MainArea() {
             .single()
 
         if (data) {
+            setIsNoteOpened(true)
             const mappedNote: Note = {
                 id: String(data.id),
                 title: data.title,
@@ -820,6 +839,7 @@ export default function MainArea() {
             };
             setAccessedNote(mappedNote)
             setContent(mappedNote.content)
+
             setActiveTab(1)
             return;
         } else if (error) {
@@ -904,7 +924,6 @@ export default function MainArea() {
             console.error('Error moving item:', err);
         }
     };
-
     // Determine the parent folder id of the current path (null = root)
     const getParentFolderIdOfCurrentPath = (): string | null => {
         const parentPath = path.split('/').slice(0, -1).join('/') || '/';
@@ -912,6 +931,18 @@ export default function MainArea() {
         const found = allFolderPaths.find(p => p.path === parentPath);
         return found?.id ?? null;
     };
+
+    // UseEffect for accessing the note tab
+    useEffect(() => {
+        if (activeTab === 1 && !isNoteOpened) {
+            setCreateNoteDialogOpen(true);
+            setAccessedNote(null)
+            setContent("")
+        } else if (activeTab !== 1 && accessedNote) {
+            setAccessedNote(null)
+            setIsNoteOpened(false)
+        }
+    }, [activeTab])
 
     // Keyboard shortcuts
     useEffect(() => {
@@ -937,7 +968,6 @@ export default function MainArea() {
             else if (e.ctrlKey && key === "n" && !e.shiftKey && !e.altKey) {
                 e.preventDefault();
                 setActiveTab(1);
-                setCreateNoteDialogOpen(true);
             }
             else if (e.ctrlKey && key === "m" && !e.shiftKey && !e.altKey) {
                 e.preventDefault();
@@ -1081,7 +1111,7 @@ export default function MainArea() {
                     <div className="w-full flex justify-center">
                         <Tooltip>
                             <TooltipTrigger asChild>
-                                <Button variant="ghost" className="w-124 sm:w-64 text-foreground text-lg">{accessedNote?.title ?? (noteName || "New Note")}</Button>
+                                <Button variant="ghost" className="w-64 text-foreground text-lg cursor-pointer" onClick={() => { }}>{accessedNote?.title ?? (noteName || "New Note")}</Button>
                             </TooltipTrigger>
                             <TooltipContent>
                                 <p>Change Note's Name</p>
@@ -1342,7 +1372,7 @@ export default function MainArea() {
                                                         <Kbd className="bg-popover text-muted-foreground">Ctrl + N</Kbd>
                                                     </KbdGroup>
                                                 </ContextMenuItem>
-                                                <ContextMenuItem className="cursor-pointer group text-destructive focus:text-destructive focus:bg-destructive/10" onClick={() => deleteFolder(folder.id)}>
+                                                <ContextMenuItem className="cursor-pointer group text-destructive focus:text-destructive focus:bg-destructive/10" onClick={() => deleteFolder(folder.id, folder.name)}>
                                                     <Trash size={16} className="text-destructive" />
                                                     <p className="text-destructive">Delete</p>
                                                 </ContextMenuItem>
@@ -1519,8 +1549,10 @@ export default function MainArea() {
 
                 )
                 ) : activeTab === 1 ? (
-                    <div className="bg-transparent w-full h-full">
-                        <textarea value={content} onChange={(e) => setContent(e.target.value)} className="w-full h-full px-24 py-12 focus:outline-none scrollbar-no-bg resize-none"></textarea>
+                    <div className="bg-transparent w-full h-full relative">
+                        <div className="absolute top-0 w-full h-12 bg-gradient-to-b from-card to-transparent pointer-events-none z-0" />
+                        <div className="absolute bottom-0 w-full h-12 bg-gradient-to-t from-card to-transparent pointer-events-none z-0" />
+                        <textarea value={content} onChange={(e) => setContent(e.target.value)} className="w-full h-full px-[12%] py-12 focus:outline-none scrollbar-no-bg resize-none leading-loose tracking-wide" />
                     </div>
                 ) : (
                     <div>
@@ -1629,6 +1661,6 @@ export default function MainArea() {
                     </DialogFooter>
                 </DialogContent>
             </Dialog>
-        </SidebarInset>
+        </SidebarInset >
     );
 }
