@@ -7,6 +7,7 @@ import { SidebarProvider } from "@/components/ui/sidebar";
 import { ActiveTabsProvider } from "@/context/activeTabsContext";
 import { SettingsOpenProvider } from "@/context/settingOpenContext";
 import { CreateNoteDialogOpenProvider } from "@/context/createNoteDialogOpenContext";
+import { ContentProvider } from "@/context/contentContext";
 
 export default function Workspace() {
     return (
@@ -15,8 +16,10 @@ export default function Workspace() {
                 <ActiveTabsProvider>
                     <SettingsOpenProvider>
                         <CreateNoteDialogOpenProvider>
-                            <SidebarArea />
-                            <MainArea />
+                            <ContentProvider>
+                                <SidebarArea />
+                                <MainArea />
+                            </ContentProvider>
                         </CreateNoteDialogOpenProvider>
                     </SettingsOpenProvider>
                 </ActiveTabsProvider>

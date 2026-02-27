@@ -36,6 +36,8 @@ import { Field, FieldDescription, FieldLabel } from "@/components/ui/field";
 import { Combobox, ComboboxContent, ComboboxEmpty, ComboboxInput, ComboboxItem, ComboboxList } from "@/components/ui/combobox";
 import { Spinner } from "@/components/ui/spinner"
 import { toast } from "sonner"
+import Editor from "./editor";
+import { useContent } from "@/context/contentContext";
 
 // colors for folders — full class names so Tailwind can detect them
 const folderColors: { value: FolderColor; label: string; bgClass: string }[] = [
@@ -133,7 +135,7 @@ export default function MainArea() {
     // accessed note state
     const [isNoteOpened, setIsNoteOpened] = useState(false)
     const [accessedNote, setAccessedNote] = useState<Note | null>(null);
-    const [content, setContent] = useState("")
+    const { content, setContent } = useContent();
     const [isSavedComplete, setIsSavedComplete] = useState(true)
 
     // fetch user auth
@@ -652,7 +654,7 @@ export default function MainArea() {
             user_id: user.id,
             title: noteName,
             description: noteDescription,
-            content: "",
+            content: "[]", // Initially an empty block array stringified
             tags: [] // soon to be implemented
         };
 
@@ -675,7 +677,7 @@ export default function MainArea() {
             updatedAt: new Date(noteData.updated_at)
         };
         setAccessedNote(newNote);
-        setContent("")
+        setContent({ blocks: [{ id: crypto.randomUUID(), type: 'paragraph', content: "" }] });
         setFetchedNotes(prev => [...prev, newNote]);
 
         // Add to folder if needed
@@ -779,14 +781,16 @@ export default function MainArea() {
     }
     const saveNote = async () => {
         if (!user || !accessedNote) return;
+        // We stringify the blocks array from context to save it in Supabase
+        const contentString = JSON.stringify(content.blocks);
         // Only save if there are actual changes
-        if (content === accessedNote.content) return;
+        if (contentString === accessedNote.content) return;
 
         setIsSavedComplete(false)
         const { data, error } = await supabase
             .from("notes")
             .update({
-                content: content ?? ""
+                content: contentString || null
             })
             .eq("id", accessedNote.id)
             .select()
@@ -797,7 +801,7 @@ export default function MainArea() {
                 id: String(data.id),
                 title: data.title,
                 description: data.description || "",
-                content: data.content || "",
+                content: data.content || null,
                 tags: data.tags || [],
                 createdAt: new Date(data.created_at),
                 updatedAt: new Date(data.updated_at)
@@ -832,13 +836,27 @@ export default function MainArea() {
                 id: String(data.id),
                 title: data.title,
                 description: data.description || "",
-                content: data.content || "",
+                content: data.content || null,
                 tags: data.tags || [],
                 createdAt: new Date(data.created_at),
                 updatedAt: new Date(data.updated_at)
             };
             setAccessedNote(mappedNote)
-            setContent(mappedNote.content)
+
+            // Try rendering as JSON
+            let parsedBlocks = [];
+            if (mappedNote.content) {
+                try {
+                    parsedBlocks = JSON.parse(mappedNote.content);
+                } catch (e) {
+                    // Fallback for older non-JSON notes
+                    parsedBlocks = [{ id: crypto.randomUUID(), type: 'paragraph', content: mappedNote.content }];
+                }
+            } else {
+                parsedBlocks = [{ id: crypto.randomUUID(), type: 'paragraph', content: "" }];
+            }
+
+            setContent({ blocks: parsedBlocks });
 
             setActiveTab(1)
             return;
@@ -937,7 +955,7 @@ export default function MainArea() {
         if (activeTab === 1 && !isNoteOpened) {
             setCreateNoteDialogOpen(true);
             setAccessedNote(null)
-            setContent("")
+            setContent({ blocks: [] })
         } else if (activeTab !== 1 && accessedNote) {
             setAccessedNote(null)
             setIsNoteOpened(false)
@@ -1198,7 +1216,7 @@ export default function MainArea() {
                     isSavedComplete ? (<Tooltip>
                         <TooltipTrigger asChild>
 
-                            <Button variant="ghost" className="w-10 h-10 p-0 rounded-full mr-1" onClick={() => saveNote()} disabled={content === accessedNote?.content}>
+                            <Button variant="ghost" className="w-10 h-10 p-0 rounded-full mr-1" onClick={() => saveNote()} disabled={JSON.stringify(content.blocks) === accessedNote?.content}>
                                 <ArrowBigDown size={24} color="white" />
                             </Button>
                         </TooltipTrigger>
@@ -1549,11 +1567,7 @@ export default function MainArea() {
 
                 )
                 ) : activeTab === 1 ? (
-                    <div className="bg-transparent w-full h-full relative">
-                        <div className="absolute top-0 w-full h-12 bg-gradient-to-b from-card to-transparent pointer-events-none z-0" />
-                        <div className="absolute bottom-0 w-full h-12 bg-gradient-to-t from-card to-transparent pointer-events-none z-0" />
-                        <textarea value={content} onChange={(e) => setContent(e.target.value)} className="w-full h-full px-[12%] py-12 focus:outline-none scrollbar-no-bg resize-none leading-loose tracking-wide" />
-                    </div>
+                    <Editor />
                 ) : (
                     <div>
                         <p>Chats</p>
