@@ -1,15 +1,5 @@
-export type BlockType = 'paragraph' | 'h1' | 'h2' | 'h3' | 'list_bullet' | 'quote';
+export type ContentType = string;
 
-export interface EditorBlock {
-    id: string; // Unique UUID for React keys and focus management
-    type: BlockType;
-    content: string; // The markdown/text content
-    styles?: Record<string, string>; // e.g. { color: 'red' }
-}
-
-export type ContentType = {
-    blocks: EditorBlock[];
-}
 
 export type Note = {
     id: string;

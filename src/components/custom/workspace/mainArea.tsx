@@ -138,6 +138,26 @@ export default function MainArea() {
     const { content, setContent } = useContent();
     const [isSavedComplete, setIsSavedComplete] = useState(true)
 
+    // Migration helper: Convert blocks JSON to plain text if needed
+    const getInitialContent = (rawContent: string) => {
+        try {
+            const parsed = JSON.parse(rawContent);
+            if (Array.isArray(parsed)) {
+                // If it's the old block format, join them with newlines
+                // And strip HTML tags as we are moving to "pure string"
+                return parsed.map((b: any) => {
+                    const tmp = document.createElement('div');
+                    tmp.innerHTML = b.content;
+                    return tmp.textContent || tmp.innerText || "";
+                }).join('\n');
+            }
+            return rawContent;
+        } catch (e) {
+            return rawContent;
+        }
+    };
+
+
     // fetch user auth
     useEffect(() => {
         const fetchUserAuth = async () => {
@@ -677,7 +697,7 @@ export default function MainArea() {
             updatedAt: new Date(noteData.updated_at)
         };
         setAccessedNote(newNote);
-        setContent({ blocks: [{ id: crypto.randomUUID(), type: 'paragraph', content: "" }] });
+        setContent("");
         setFetchedNotes(prev => [...prev, newNote]);
 
         // Add to folder if needed
@@ -781,16 +801,15 @@ export default function MainArea() {
     }
     const saveNote = async () => {
         if (!user || !accessedNote) return;
-        // We stringify the blocks array from context to save it in Supabase
-        const contentString = JSON.stringify(content.blocks);
-        // Only save if there are actual changes
-        if (contentString === accessedNote.content) return;
+
+        // Content is now a pure string
+        if (content === accessedNote.content) return;
 
         setIsSavedComplete(false)
         const { data, error } = await supabase
             .from("notes")
             .update({
-                content: contentString || null
+                content: content || ""
             })
             .eq("id", accessedNote.id)
             .select()
@@ -843,20 +862,7 @@ export default function MainArea() {
             };
             setAccessedNote(mappedNote)
 
-            // Try rendering as JSON
-            let parsedBlocks = [];
-            if (mappedNote.content) {
-                try {
-                    parsedBlocks = JSON.parse(mappedNote.content);
-                } catch (e) {
-                    // Fallback for older non-JSON notes
-                    parsedBlocks = [{ id: crypto.randomUUID(), type: 'paragraph', content: mappedNote.content }];
-                }
-            } else {
-                parsedBlocks = [{ id: crypto.randomUUID(), type: 'paragraph', content: "" }];
-            }
-
-            setContent({ blocks: parsedBlocks });
+            setContent(getInitialContent(mappedNote.content || ""));
 
             setActiveTab(1)
             return;
@@ -955,7 +961,7 @@ export default function MainArea() {
         if (activeTab === 1 && !isNoteOpened) {
             setCreateNoteDialogOpen(true);
             setAccessedNote(null)
-            setContent({ blocks: [] })
+            setContent("")
         } else if (activeTab !== 1 && accessedNote) {
             setAccessedNote(null)
             setIsNoteOpened(false)
@@ -1216,7 +1222,7 @@ export default function MainArea() {
                     isSavedComplete ? (<Tooltip>
                         <TooltipTrigger asChild>
 
-                            <Button variant="ghost" className="w-10 h-10 p-0 rounded-full mr-1" onClick={() => saveNote()} disabled={JSON.stringify(content.blocks) === accessedNote?.content}>
+                            <Button variant="ghost" className="w-10 h-10 p-0 rounded-full mr-1" onClick={() => saveNote()} disabled={content === accessedNote?.content}>
                                 <ArrowBigDown size={24} color="white" />
                             </Button>
                         </TooltipTrigger>

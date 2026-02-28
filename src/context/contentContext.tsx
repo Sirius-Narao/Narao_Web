@@ -10,7 +10,8 @@ interface ContentContextType {
 const ContentContext = createContext<ContentContextType | undefined>(undefined);
 
 function ContentProvider({ children }: { children: ReactNode }) {
-    const [content, setContent] = useState<ContentType>({ blocks: [] });
+    const [content, setContent] = useState<ContentType>("");
+
 
     return (
         <ContentContext.Provider value={{ content, setContent }}>
