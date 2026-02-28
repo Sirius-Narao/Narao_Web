@@ -38,6 +38,7 @@ import { Spinner } from "@/components/ui/spinner"
 import { toast } from "sonner"
 import Editor from "./editor";
 import { useContent } from "@/context/contentContext";
+import Chat from "./chat";
 
 // colors for folders — full class names so Tailwind can detect them
 const folderColors: { value: FolderColor; label: string; bgClass: string }[] = [
@@ -1144,7 +1145,14 @@ export default function MainArea() {
                     </div>
                     :
                     <div className="w-full flex justify-center">
-                        <p>Settings</p>
+                        <Tooltip>
+                            <TooltipTrigger asChild>
+                                <Button variant="ghost" className="w-64 text-foreground text-lg cursor-pointer" onClick={() => { }}>Chat Title Placeholder</Button>
+                            </TooltipTrigger>
+                            <TooltipContent>
+                                <p>Change Chat's title</p>
+                            </TooltipContent>
+                        </Tooltip>
                     </div>
                 }
 
@@ -1237,9 +1245,7 @@ export default function MainArea() {
                             <Spinner />
                         </Button>
 
-                    : <>
-
-                    </>
+                    : <></>
                 }
             </div>
 
@@ -1575,9 +1581,7 @@ export default function MainArea() {
                 ) : activeTab === 1 ? (
                     <Editor />
                 ) : (
-                    <div>
-                        <p>Chats</p>
-                    </div>
+                    <Chat />
                 )}
 
             </div>
