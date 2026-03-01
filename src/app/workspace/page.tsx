@@ -8,6 +8,9 @@ import { ActiveTabsProvider } from "@/context/activeTabsContext";
 import { SettingsOpenProvider } from "@/context/settingOpenContext";
 import { CreateNoteDialogOpenProvider } from "@/context/createNoteDialogOpenContext";
 import { ContentProvider } from "@/context/contentContext";
+import { ChatMessagesProvider } from "@/context/chatMessagesContext";
+import { UserAuthProvider } from "@/context/userAuthContext";
+import { UserProvider } from "@/context/userContext";
 
 export default function Workspace() {
     return (
@@ -17,8 +20,14 @@ export default function Workspace() {
                     <SettingsOpenProvider>
                         <CreateNoteDialogOpenProvider>
                             <ContentProvider>
-                                <SidebarArea />
-                                <MainArea />
+                                <ChatMessagesProvider>
+                                    <UserAuthProvider>
+                                        <UserProvider>
+                                            <SidebarArea />
+                                            <MainArea />
+                                        </UserProvider>
+                                    </UserAuthProvider>
+                                </ChatMessagesProvider>
                             </ContentProvider>
                         </CreateNoteDialogOpenProvider>
                     </SettingsOpenProvider>

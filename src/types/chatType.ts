@@ -5,4 +5,22 @@ interface ChatType {
     updatedAt: Date;
 }
 
-export default ChatType;
+interface ChatAttachment {
+    id: string;
+    messageId?: string;
+    url: string;
+    name: string;
+    type: string;
+    size: number;
+    createdAt: Date;
+}
+
+interface ChatMessage {
+    id: string;
+    content: string;
+    createdAt: Date;
+    role: "user" | "assistant";
+    attachments?: ChatAttachment[];
+}
+
+export type { ChatType, ChatMessage, ChatAttachment };

@@ -39,6 +39,8 @@ import { toast } from "sonner"
 import Editor from "./editor";
 import { useContent } from "@/context/contentContext";
 import Chat from "./chat";
+import { useUserAuth } from "@/context/userAuthContext";
+import { useUser } from "@/context/userContext";
 
 // colors for folders — full class names so Tailwind can detect them
 const folderColors: { value: FolderColor; label: string; bgClass: string }[] = [
@@ -86,8 +88,8 @@ const folderColorClasses: Record<string, { text: string; fill: string }> = {
 
 export default function MainArea() {
     // fetched data
-    const [userAuth, setUserAuth] = useState<any>(null);
-    const [user, setUser] = useState<UserType | null>(null);
+    const { userAuth, setUserAuth } = useUserAuth();
+    const { user, setUser } = useUser();
     const [fetchedFolders, setFetchedFolders] = useState<Folder[]>([]);
     const [fetchedNotes, setFetchedNotes] = useState<Note[]>([]);
 
