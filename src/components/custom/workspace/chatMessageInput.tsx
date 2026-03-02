@@ -2,10 +2,14 @@ import { Button } from "@/components/ui/button"
 import { Tooltip, TooltipContent, TooltipTrigger } from "@/components/ui/tooltip"
 import { ArrowUp, FileImage, FileTypeCorner, Lightbulb, Mic, Plus, X } from "lucide-react"
 import { useState, useRef, useEffect } from "react"
-import { generateGeminiResponse } from "@/app/actions/geminiChat"
 import { useChatMessages } from "@/context/chatMessagesContext"
 import { ChatMessage, ChatAttachment } from "@/types/chatType"
 import { v4 as uuidv4 } from "uuid"
+
+const models = {
+    "gemini-2.5-flash": "gemini-2.5-flash",
+    "gemini-3-flash-preview": "gemini-3-flash-preview"
+}
 
 export default function ChatMessageInput() {
     const [content, setContent] = useState("")
@@ -63,7 +67,8 @@ export default function ChatMessageInput() {
                 role: "user",
                 content: content.trim(),
                 attachments: uiAttachments,
-                createdAt: new Date()
+                createdAt: new Date(),
+                isDone: true
             };
 
             const updatedHistory = [...chatMessages, userMessage];
@@ -84,7 +89,7 @@ export default function ChatMessageInput() {
             setChatMessages(prev => [...prev, assistantMessage]);
 
             // 4. Call Streaming API
-            const response = await fetch("/api/chat/stream", {
+            const response = await fetch("/api/chat/stream_3_preview", {
                 method: "POST",
                 headers: { "Content-Type": "application/json" },
                 body: JSON.stringify({
@@ -99,21 +104,58 @@ export default function ChatMessageInput() {
 
             // 5. Read the stream
             const reader = response.body?.getReader();
-            const decoder = new TextDecoder();
-            let fullContent = "";
+            const textDecoder = new TextDecoder();
+            let accumulatedThought = "";
+            let accumulatedAnswer = "";
+            let buffer = "";
+            let thinkingStartTime = Date.now();
+            let thinkingDuration: number | undefined = undefined;
 
             if (reader) {
                 while (true) {
                     const { done, value } = await reader.read();
-                    if (done) break;
+                    if (done) {
+                        setChatMessages(prev => prev.map(msg =>
+                            msg.id === assistantId ? {
+                                ...msg,
+                                isDone: true
+                            } : msg
+                        ));
+                        break;
+                    }
 
-                    const chunk = decoder.decode(value, { stream: true });
-                    fullContent += chunk;
+                    buffer += textDecoder.decode(value, { stream: true });
+                    const lines = buffer.split("\n");
 
-                    // Update the specific assistant message in the context
-                    setChatMessages(prev => prev.map(msg =>
-                        msg.id === assistantId ? { ...msg, content: fullContent } : msg
-                    ));
+                    // The last element might be a partial line, keep it in buffer
+                    buffer = lines.pop() || "";
+
+                    for (const line of lines) {
+                        if (!line.trim()) continue;
+                        try {
+                            const data = JSON.parse(line);
+                            if (data.type === "thought") {
+                                accumulatedThought += data.content;
+                            } else if (data.type === "answer") {
+                                if (thinkingDuration === undefined) {
+                                    thinkingDuration = (Date.now() - thinkingStartTime) / 1000;
+                                }
+                                accumulatedAnswer += data.content;
+                            }
+
+                            // Update the specific assistant message
+                            setChatMessages(prev => prev.map(msg =>
+                                msg.id === assistantId ? {
+                                    ...msg,
+                                    content: accumulatedAnswer,
+                                    thought: accumulatedThought,
+                                    thinkingTime: thinkingDuration
+                                } : msg
+                            ));
+                        } catch (e) {
+                            console.error("Failed to parse stream line:", line, e);
+                        }
+                    }
                 }
             }
 
@@ -189,7 +231,7 @@ export default function ChatMessageInput() {
                             </Button>
                         </TooltipTrigger>
                         <TooltipContent>
-                            <p>Think Deeper (Gemini 3 Pro +)</p>
+                            <p>Think Deeper</p>
                             <p className="text-xs text-muted-foreground">Improved reasoning, higher latency</p>
                         </TooltipContent>
                     </Tooltip>
@@ -198,7 +240,7 @@ export default function ChatMessageInput() {
                 <textarea
                     ref={textareaRef}
                     className="w-full resize-none bg-transparent py-3 focus:outline-none outline-none scrollbar-no-bg max-h-[156px] overflow-y-auto"
-                    placeholder="Ask Gemini 3 anything..."
+                    placeholder="Ask Orthan AI anything..."
                     maxLength={100000}
                     rows={1}
                     value={content}

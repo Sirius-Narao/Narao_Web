@@ -18,9 +18,12 @@ interface ChatAttachment {
 interface ChatMessage {
     id: string;
     content: string;
+    thought?: string;
+    thinkingTime?: number;
     createdAt: Date;
     role: "user" | "assistant";
     attachments?: ChatAttachment[];
+    isDone?: boolean;
 }
 
 export type { ChatType, ChatMessage, ChatAttachment };
