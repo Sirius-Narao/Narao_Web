@@ -42,6 +42,8 @@ import Chat from "./chat";
 import { useUserAuth } from "@/context/userAuthContext";
 import { useUser } from "@/context/userContext";
 import { useChatMessages } from "@/context/chatMessagesContext";
+import { useFetchedFolders } from "@/context/fetchedFoldersContext";
+import { useFetchedNotes } from "@/context/fetchedNotesContext";
 
 // colors for folders — full class names so Tailwind can detect them
 const folderColors: { value: FolderColor; label: string; bgClass: string }[] = [
@@ -91,8 +93,8 @@ export default function MainArea() {
     // fetched data
     const { userAuth, setUserAuth } = useUserAuth();
     const { user, setUser } = useUser();
-    const [fetchedFolders, setFetchedFolders] = useState<Folder[]>([]);
-    const [fetchedNotes, setFetchedNotes] = useState<Note[]>([]);
+    const { fetchedFolders, setFetchedFolders } = useFetchedFolders()
+    const { fetchedNotes, setFetchedNotes } = useFetchedNotes()
 
     // fetch states
     const [foldersLoaded, setFoldersLoaded] = useState(false);
@@ -111,7 +113,7 @@ export default function MainArea() {
     const [isDropdownCreateNewOpen, setIsDropdownCreateNewOpen] = useState(false)
 
     // settings open state
-    const { settingsOpen, setSettingsOpen } = useSettingsOpen();
+    const { setSettingsOpen } = useSettingsOpen();
 
     // create note dialog open state
     const { createNoteDialogOpen, setCreateNoteDialogOpen } = useCreateNoteDialogOpen();
@@ -143,8 +145,7 @@ export default function MainArea() {
     const [isSavedComplete, setIsSavedComplete] = useState(true)
 
     // chat states
-    const { setCurrentChatId, setChatMessages,
-        chatMessages, currentChatId, chatTitle, setChatTitle } = useChatMessages();
+    const { setCurrentChatId, setChatMessages, chatTitle, setChatTitle } = useChatMessages();
 
     // Migration helper: Convert blocks JSON to plain text if needed
     const getInitialContent = (rawContent: string) => {

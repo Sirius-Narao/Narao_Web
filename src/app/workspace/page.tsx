@@ -11,6 +11,8 @@ import { ContentProvider } from "@/context/contentContext";
 import { ChatMessagesProvider } from "@/context/chatMessagesContext";
 import { UserAuthProvider } from "@/context/userAuthContext";
 import { UserProvider } from "@/context/userContext";
+import { FetchedFoldersProvider } from "@/context/fetchedFoldersContext";
+import { FetchedNotesProvider } from "@/context/fetchedNotesContext";
 
 export default function Workspace() {
     return (
@@ -23,8 +25,12 @@ export default function Workspace() {
                                 <ChatMessagesProvider>
                                     <UserAuthProvider>
                                         <UserProvider>
-                                            <SidebarArea />
-                                            <MainArea />
+                                            <FetchedFoldersProvider>
+                                                <FetchedNotesProvider>
+                                                    <SidebarArea />
+                                                    <MainArea />
+                                                </FetchedNotesProvider>
+                                            </FetchedFoldersProvider>
                                         </UserProvider>
                                     </UserAuthProvider>
                                 </ChatMessagesProvider>

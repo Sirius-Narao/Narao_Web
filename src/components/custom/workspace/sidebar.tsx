@@ -281,83 +281,86 @@ export default function SidebarArea() {
                             onChange={(e) => setFilteredChats(handleSearch(e.target.value, chats))}
                         />
                     </InputGroup>
-                    <ScrollArea className="flex-1 rounded-lg border border-sidebar-border mt-2 pt-1 px-1 shadow-lg bg-card/30 group-data-[state=collapsed]:hidden min-h-0 max-h-[60%]">
-                        {chats.length > 0 && chatsFetched ? filteredChats.map((chat, index) => (
-                            <div
-                                key={index}
-                                className="flex items-center justify-between pl-4 pr-2 py-2 rounded-lg hover:bg-card/80 cursor-pointer transition-all duration-100 ease-in-out mb-1"
-                                onClick={() => {
-                                    setChatMessages([]);
-                                    setCurrentChatId(chat.id || null);
-                                    setActiveTab(2);
-                                    setChatTitle(chat.title);
-                                }}
-                            >
-                                <Tooltip>
-                                    <TooltipTrigger asChild>
-                                        <div className="flex flex-row items-center gap-2 w-full">
-                                            <p className="text-sm">{chat.title.length > 20 ? chat.title.slice(0, 20).trimEnd().concat("...") : chat.title}</p>
-                                        </div>
-                                    </TooltipTrigger>
-                                    <TooltipContent side="right" sideOffset={16}>
-                                        <p>{chat.title}</p>
-                                        <p className="text-xs text-muted-foreground">{chat.description}</p>
-                                    </TooltipContent>
-                                </Tooltip>
-                                <DropdownMenu>
-                                    <DropdownMenuTrigger>
-                                        <Tooltip>
-                                            <TooltipTrigger asChild>
-                                                <Button variant="ghost" className="p-1 h-6 w-6" asChild>
-                                                    <MoreVertical size={16} className="text-muted-foreground" />
-                                                </Button>
-                                            </TooltipTrigger>
-                                            <TooltipContent side="right">
-                                                <p>Options</p>
-                                            </TooltipContent>
-                                        </Tooltip>
-                                    </DropdownMenuTrigger>
-                                    <DropdownMenuContent className="w-40" align="start">
-                                        <DropdownMenuGroup>
-                                            <div className="flex flex-col p-2">
-                                                <p>{chat.title}</p>
-                                                <p className="text-xs text-muted-foreground/50">{chat.updatedAt.toLocaleString()}</p>
-                                                <div className="w-full h-[1px] bg-foreground/10 my-1"></div>
-                                                <p className="text-xs text-muted-foreground">{chat.description}</p>
+                    <div className="rounded-lg min-h-0 max-h-[50vh] mt-2 overflow-y-hidden">
+                        <ScrollArea className="flex-1 rounded-lg border border-sidebar-border px-1 shadow-lg bg-card/30 group-data-[state=collapsed]:hidden h-full">
+                            <div className="h-1" key={"division-scroll"}></div>
+                            {chats.length > 0 && chatsFetched ? filteredChats.map((chat, index) => (
+                                <div
+                                    key={index}
+                                    className="flex items-center justify-between pl-4 pr-2 py-2 rounded-lg hover:bg-card/80 cursor-pointer transition-all duration-100 ease-in-out mb-1"
+                                    onClick={() => {
+                                        setChatMessages([]);
+                                        setCurrentChatId(chat.id || null);
+                                        setActiveTab(2);
+                                        setChatTitle(chat.title);
+                                    }}
+                                >
+                                    <Tooltip>
+                                        <TooltipTrigger asChild>
+                                            <div className="flex flex-row items-center gap-2 w-full">
+                                                <p className="text-sm">{chat.title.length > 20 ? chat.title.slice(0, 20).trimEnd().concat("...") : chat.title}</p>
                                             </div>
-                                            <DropdownMenuItem className="group cursor-pointer">
-                                                <Pencil size={16} className="text-muted-foreground group-hover:text-accent-foreground" />
-                                                Rename Chat
-                                            </DropdownMenuItem >
-                                            <DropdownMenuItem className="group cursor-pointer">
-                                                <FolderDown size={16} className="text-muted-foreground group-hover:text-accent-foreground" />
-                                                Move To
-                                            </DropdownMenuItem >
-                                            <DropdownMenuItem
-                                                className="text-destructive focus:text-destructive focus:bg-destructive/10 cursor-pointer"
-                                                onClick={(e) => handleDeleteChat(e, chat.id!)}
-                                            >
-                                                <Trash2 size={16} className="text-destructive" />
-                                                Delete Chat
-                                            </DropdownMenuItem>
-                                        </DropdownMenuGroup>
-                                    </DropdownMenuContent>
-                                </DropdownMenu>
-                            </div>
-                        )) : chatsFetched ? (
-                            <div className="flex flex-col items-center justify-center h-full gap-2 my-5">
-                                <CircleOff size={48} className="text-muted-foreground" />
-                                <p className="text-muted-foreground">No chats found</p>
-                            </div>
-                        ) : (
-                            <div className="flex flex-col items-center justify-center h-full gap-1 my-1">
-                                <Skeleton className="w-full h-10 rounded-full" />
-                                <Skeleton className="w-full h-10 rounded-full" />
-                                <Skeleton className="w-full h-10 rounded-full" />
-                                <Skeleton className="w-full h-10 rounded-full" />
-                            </div>
-                        )}
-                    </ScrollArea>
+                                        </TooltipTrigger>
+                                        <TooltipContent side="right" sideOffset={16}>
+                                            <p>{chat.title}</p>
+                                            <p className="text-xs text-muted-foreground">{chat.description}</p>
+                                        </TooltipContent>
+                                    </Tooltip>
+                                    <DropdownMenu>
+                                        <DropdownMenuTrigger>
+                                            <Tooltip>
+                                                <TooltipTrigger asChild>
+                                                    <Button variant="ghost" className="p-1 h-6 w-6" asChild>
+                                                        <MoreVertical size={16} className="text-muted-foreground" />
+                                                    </Button>
+                                                </TooltipTrigger>
+                                                <TooltipContent side="right">
+                                                    <p>Options</p>
+                                                </TooltipContent>
+                                            </Tooltip>
+                                        </DropdownMenuTrigger>
+                                        <DropdownMenuContent className="w-40" align="start">
+                                            <DropdownMenuGroup>
+                                                <div className="flex flex-col p-2">
+                                                    <p>{chat.title}</p>
+                                                    <p className="text-xs text-muted-foreground/50">{chat.updatedAt.toLocaleString()}</p>
+                                                    <div className="w-full h-[1px] bg-foreground/10 my-1"></div>
+                                                    <p className="text-xs text-muted-foreground">{chat.description}</p>
+                                                </div>
+                                                <DropdownMenuItem className="group cursor-pointer">
+                                                    <Pencil size={16} className="text-muted-foreground group-hover:text-accent-foreground" />
+                                                    Rename Chat
+                                                </DropdownMenuItem >
+                                                <DropdownMenuItem className="group cursor-pointer">
+                                                    <FolderDown size={16} className="text-muted-foreground group-hover:text-accent-foreground" />
+                                                    Move To
+                                                </DropdownMenuItem >
+                                                <DropdownMenuItem
+                                                    className="text-destructive focus:text-destructive focus:bg-destructive/10 cursor-pointer"
+                                                    onClick={(e) => handleDeleteChat(e, chat.id!)}
+                                                >
+                                                    <Trash2 size={16} className="text-destructive" />
+                                                    Delete Chat
+                                                </DropdownMenuItem>
+                                            </DropdownMenuGroup>
+                                        </DropdownMenuContent>
+                                    </DropdownMenu>
+                                </div>
+                            )) : chatsFetched ? (
+                                <div className="flex flex-col items-center justify-center h-full gap-2 my-5">
+                                    <CircleOff size={48} className="text-muted-foreground" />
+                                    <p className="text-muted-foreground">No chats found</p>
+                                </div>
+                            ) : (
+                                <div className="flex flex-col items-center justify-center h-full gap-1 my-1">
+                                    <Skeleton className="w-full h-10 rounded-full" />
+                                    <Skeleton className="w-full h-10 rounded-full" />
+                                    <Skeleton className="w-full h-10 rounded-full" />
+                                    <Skeleton className="w-full h-10 rounded-full" />
+                                </div>
+                            )}
+                        </ScrollArea>
+                    </div>
                 </div>
             </SidebarContent>
 

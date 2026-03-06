@@ -1,6 +1,6 @@
 import { Button } from "@/components/ui/button"
 import { Tooltip, TooltipContent, TooltipTrigger } from "@/components/ui/tooltip"
-import { ArrowUp, FileImage, FileTypeCorner, Leaf, Lightbulb, Mic, Plus, Settings2, X, Zap } from "lucide-react"
+import { ArrowUp, FileImage, FileTypeCorner, Leaf, Lightbulb, Mic, Plus, Square, X, Zap } from "lucide-react"
 import { useState, useRef, useEffect } from "react"
 import { useChatMessages } from "@/context/chatMessagesContext"
 import { ChatMessage, ChatAttachment, Models } from "@/types/chatType"
@@ -9,6 +9,8 @@ import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover
 import { toast } from "sonner"
 import { supabase } from "@/lib/supabaseClient"
 import { useUser } from "@/context/userContext"
+import { useActiveTabs } from "@/context/activeTabsContext"
+import { Type } from "@google/genai"
 
 const models = {
     "gemini-2.5-flash": "Gemini 2.5 Flash",
@@ -23,6 +25,7 @@ export default function ChatMessageInput() {
     const [attachments, setAttachments] = useState<File[]>([])
     const textareaRef = useRef<HTMLTextAreaElement>(null)
     const fileInputRef = useRef<HTMLInputElement>(null)
+    const abortControllerRef = useRef<AbortController | null>(null)
     const { chatMessages, setChatMessages, currentChatId, setCurrentChatId, refreshChats, setChatTitle } = useChatMessages()
 
     // user context
@@ -35,12 +38,21 @@ export default function ChatMessageInput() {
     // Popover Settings
     const [isSelectingModelPopoverOpen, setIsSelectingModelPopoverOpen] = useState(false)
 
+    // active tab
+    const { activeTab } = useActiveTabs()
+
     useEffect(() => {
         if (textareaRef.current) {
             textareaRef.current.style.height = "auto"
             textareaRef.current.style.height = `${textareaRef.current.scrollHeight}px`
         }
     }, [content])
+
+    useEffect(() => {
+        if (activeTab === 2) {
+            textareaRef.current?.focus()
+        }
+    }, [activeTab])
 
     // update chat name
     const updateChatName = async (chatId: string, firstUserContent: string) => {
@@ -219,11 +231,18 @@ export default function ChatMessageInput() {
     // handle send function of the input
     const handleSend = async () => {
         if ((content.trim() === "" && attachments.length === 0) || isLoading) return;
+        textareaRef.current?.focus()
 
         setIsLoading(true);
+        const controller = new AbortController();
+        abortControllerRef.current = controller;
 
-        // Declared outside try so it's accessible in catch for placeholder cleanup
+        // Declared outside try so it's accessible in catch for placeholder cleanup and partial saving
         const assistantId = uuidv4();
+        let effectiveChatId = currentChatId;
+        let accumulatedThought = "";
+        let accumulatedAnswer = "";
+        let thinkingDuration: number | undefined = undefined;
 
         try {
             // 1. Prepare attachments
@@ -269,7 +288,6 @@ export default function ChatMessageInput() {
             setChatMessages(prev => [...prev, assistantMessage]);
 
             // 4. Create chat instance if it doesn't exist
-            let effectiveChatId = currentChatId;
             if (!effectiveChatId && user?.id) {
                 const { data, error } = await supabase
                     .from("chats")
@@ -308,8 +326,10 @@ export default function ChatMessageInput() {
                     userInput: currentContent,
                     attachments: apiAttachments,
                     isThinking: isThinking,
-                    systemPrompt: systemPromptString
-                })
+                    systemPrompt: systemPromptString,
+                    tools: allTools
+                }),
+                signal: controller.signal
             });
 
             if (!response.ok) {
@@ -326,11 +346,8 @@ export default function ChatMessageInput() {
             // 5. Read the stream
             const reader = response.body?.getReader();
             const textDecoder = new TextDecoder();
-            let accumulatedThought = "";
-            let accumulatedAnswer = "";
             let buffer = "";
             let thinkingStartTime = Date.now();
-            let thinkingDuration: number | undefined = undefined;
 
             if (reader) {
                 while (true) {
@@ -362,6 +379,8 @@ export default function ChatMessageInput() {
                                     thinkingDuration = Date.now() - thinkingStartTime;
                                 }
                                 accumulatedAnswer += data.content;
+                            } else if (data.type === "functionCall") {
+                                console.log("Function call received:", data.content);
                             }
 
                             // Update the specific assistant message
@@ -392,12 +411,45 @@ export default function ChatMessageInput() {
             }
 
         } catch (error: any) {
-            console.error("Failed to get streaming Gemini response:", error);
-            // Remove the empty assistant placeholder on unexpected errors
-            setChatMessages(prev => prev.filter(msg => msg.id !== assistantId));
-            toast.error(error?.message || "Something went wrong. Please try again.", { position: "bottom-right" });
+            if (error.name === 'AbortError') {
+                console.log('Request aborted by user - saving partial response');
+                // Mark as done in UI even if aborted
+                setChatMessages(prev => prev.map(msg =>
+                    msg.id === assistantId ? {
+                        ...msg,
+                        isDone: true
+                    } : msg
+                ));
+                toast.warning("Answer stopped!")
+
+                // Save whatever we have to the database
+                if (effectiveChatId && (accumulatedAnswer.trim() || accumulatedThought.trim())) {
+                    addMessageToChatMessages(effectiveChatId, {
+                        id: assistantId,
+                        role: "assistant",
+                        content: accumulatedAnswer,
+                        thought: accumulatedThought,
+                        thinkingTime: thinkingDuration,
+                        createdAt: new Date()
+                    });
+                }
+            } else {
+                console.error("Failed to get streaming Gemini response:", error);
+                // Remove the empty assistant placeholder on unexpected errors
+                setChatMessages(prev => prev.filter(msg => msg.id !== assistantId));
+                toast.error(error?.message || "Something went wrong. Please try again.", { position: "bottom-right" });
+            }
         } finally {
             setIsLoading(false);
+            abortControllerRef.current = null;
+        }
+    };
+
+    const handleStop = () => {
+        if (abortControllerRef.current) {
+            abortControllerRef.current.abort();
+            setIsLoading(false);
+            abortControllerRef.current = null;
         }
     };
 
@@ -405,14 +457,66 @@ export default function ChatMessageInput() {
         setAttachments(prev => prev.filter((_, i) => i !== index));
     };
 
+    // -------------------------- AI FUNCTIONS --------------------------
+
+    const searchFilesAndFoldersDeclaration = {
+        name: "search_files_and_folders",
+        description: "Gets a list of objects (note_name, note_description, localisation), and a list of objects (folder_name, localisation) given a query. This function is set to gain knowledge from the currently existing workspace architecture.",
+        parameters: {
+            type: Type.OBJECT,
+            properties: {
+                query: {
+                    type: Type.STRING,
+                    description: "Query to search for existing folders and notes (e.g. 'math test functions ai matrices'). That searches by keywords, the more you have the better (MAX 30 keywords)."
+                },
+            },
+            required: ["query"],
+        },
+    }
+    const readNoteDeclaration = {
+        name: "read_note",
+        description: "Gets the content of the accessed note.",
+        parameters: {
+            type: Type.OBJECT,
+            properties: {
+                localisation: {
+                    type: Type.STRING,
+                    description: "Absolute path to the note (e.g. '/maths/introduction')."
+                },
+            },
+            required: ["localisation"],
+        },
+    }
+    const modifyNote = {
+        name: "modify_note",
+        description: "Modify the whole content of the accessed note. Be mindful that it will replace the whole content of the note with the one you provide.",
+        parameters: {
+            type: Type.OBJECT,
+            properties: {
+                localisation: {
+                    type: Type.STRING,
+                    description: "Absolute path to the note (e.g. '/maths/introduction')."
+                },
+                content: {
+                    type: Type.STRING,
+                    description: "Text that will replace the one inside the note (e.g. # Math Exercices \n 1. 2 + 2 = ?...). The use of markdown is recommended."
+                }
+            },
+            required: ["localisation", "content"],
+        },
+    }
+
+    // list of all functions for the AI
+    const allTools = [searchFilesAndFoldersDeclaration, readNoteDeclaration, modifyNote]
+
     return (
-        <div className="absolute flex flex-col w-[60%] bottom-0 left-[20%] right-[20%] gap-2 z-50">
+        <div className="absolute flex flex-col w-[60%] bottom-0 left-[20%] right-[20%] gap-2 z-50" >
             {/* Attachment Previews */}
             {attachments.length > 0 && (
                 <div className="flex flex-row items-center gap-2 px-4 flex-wrap justify-center">
                     {attachments.map((file, index) => (
                         <div key={index} className="flex items-center gap-2 bg-popover border border-border px-3 py-1.5 rounded-xl text-xs group relative animate-in fade-in slide-in-from-bottom-2">
-                            {(file.type.includes("jpeg") || file.type.includes("png") || file.type.includes("gif") || file.type.includes("webp")) && (
+                            {(file.type.includes("jpeg") || file.type.includes("png") || file.type.includes("webp")) && (
                                 <FileImage className="w-4 h-4 text-primary" />
                             )}
                             {file.type.includes("pdf") && (
@@ -428,9 +532,10 @@ export default function ChatMessageInput() {
                         </div>
                     ))}
                 </div>
-            )}
+            )
+            }
 
-            <div className="flex gap-2 items-center">
+            < div className="flex gap-2 items-center" >
                 <div className="bg-popover rounded-[30px] border border-border shadow-lg p-2">
                     <Tooltip>
                         <TooltipTrigger asChild>
@@ -545,22 +650,22 @@ export default function ChatMessageInput() {
                                 <Button
                                     variant="default"
                                     size="icon"
-                                    onClick={handleSend}
-                                    disabled={isLoading || (content.length === 0 && attachments.length === 0)}
+                                    onClick={isLoading ? handleStop : handleSend}
+                                    disabled={!isLoading && content.length === 0 && attachments.length === 0}
                                     className="h-10 w-10 rounded-full p-0 flex items-center justify-center"
                                 >
                                     {isLoading ? (
-                                        <div className="h-4 w-4 border-2 border-primary-foreground border-t-transparent rounded-full animate-spin" />
+                                        <Square size={20} className="fill-current" />
                                     ) : (
                                         <ArrowUp size={20} />
                                     )}
                                 </Button>
                             </TooltipTrigger>
-                            <TooltipContent><p>Send Message</p></TooltipContent>
+                            <TooltipContent><p>{isLoading ? "Stop generating" : "Send Message"}</p></TooltipContent>
                         </Tooltip>
                     </div>
                 </div>
-            </div>
-        </div>
+            </div >
+        </div >
     )
 }

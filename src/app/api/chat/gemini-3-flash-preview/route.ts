@@ -5,7 +5,7 @@ const ai = new GoogleGenAI({ apiKey: process.env.GOOGLE_GENERATIVE_AI_API_KEY! }
 
 export async function POST(req: NextRequest) {
     try {
-        const { history, userInput, attachments, isThinking, systemPrompt } = await req.json();
+        const { history, userInput, attachments, isThinking, systemPrompt, tools } = await req.json();
 
         // Prepare contents for Gemini
         const contents = history.map((msg: any) => ({
@@ -34,6 +34,7 @@ export async function POST(req: NextRequest) {
             model: "gemini-3-flash-preview",
             contents,
             config: {
+                tools: tools ? [{ functionDeclarations: tools }] : undefined,
                 ...(systemPrompt ? { systemInstruction: systemPrompt } : {}),
                 ...(isThinking ? {
                     thinkingConfig: {
@@ -41,6 +42,7 @@ export async function POST(req: NextRequest) {
                         thinkingLevel: "HIGH"
                     }
                 } : {})
+
             } as any
         });
 

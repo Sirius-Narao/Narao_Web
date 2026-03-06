@@ -32,7 +32,7 @@ async function generateWithRetry(params: any, retries = MAX_RETRIES): Promise<an
 
 export async function POST(req: NextRequest) {
     try {
-        const { history, userInput, attachments, isThinking, systemPrompt } = await req.json();
+        const { history, userInput, attachments, isThinking, systemPrompt, tools } = await req.json();
 
         // Prepare contents for Gemini
         const contents = history.slice(0, -1).map((msg: any) => ({
@@ -60,6 +60,7 @@ export async function POST(req: NextRequest) {
         const result = await generateWithRetry({
             model: "gemini-3.1-flash-lite-preview",
             contents,
+            tools: tools ? [{ functionDeclarations: tools }] : undefined,
             config: {
                 ...(systemPrompt ? { systemInstruction: systemPrompt } : {}),
                 ...(isThinking ? {
@@ -85,6 +86,9 @@ export async function POST(req: NextRequest) {
                                     controller.enqueue(encoder.encode(data + "\n"));
                                 } else if (part.text) {
                                     const data = JSON.stringify({ type: "answer", content: part.text });
+                                    controller.enqueue(encoder.encode(data + "\n"));
+                                } else if (part.functionCall) {
+                                    const data = JSON.stringify({ type: "functionCall", content: part.functionCall });
                                     controller.enqueue(encoder.encode(data + "\n"));
                                 }
                             }

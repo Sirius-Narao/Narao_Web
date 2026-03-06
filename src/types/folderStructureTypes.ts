@@ -1,4 +1,7 @@
 export type ContentType = string;
+export type FetchedFolders = Folder[];
+export type FetchedNotes = Note[];
+
 
 
 export type Note = {

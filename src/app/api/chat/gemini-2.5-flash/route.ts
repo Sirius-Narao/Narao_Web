@@ -5,7 +5,7 @@ const ai = new GoogleGenAI({ apiKey: process.env.GOOGLE_GENERATIVE_AI_API_KEY! }
 
 export async function POST(req: NextRequest) {
     try {
-        const { history, userInput, attachments, isThinking, systemPrompt } = await req.json();
+        const { history, userInput, attachments, isThinking, systemPrompt, tools } = await req.json();
 
         // Prepare contents for Gemini
         const contents = history.map((msg: any) => ({
@@ -40,7 +40,8 @@ export async function POST(req: NextRequest) {
                         includeThoughts: true,
                         thinkingLevel: "HIGH"
                     }
-                } : {})
+                } : {}),
+                tools: tools ? [{ functionDeclarations: tools }] : undefined,
             } as any
         });
 
@@ -58,6 +59,9 @@ export async function POST(req: NextRequest) {
                                     controller.enqueue(encoder.encode(data + "\n"));
                                 } else if (part.text) {
                                     const data = JSON.stringify({ type: "answer", content: part.text });
+                                    controller.enqueue(encoder.encode(data + "\n"));
+                                } else if (part.functionCall) {
+                                    const data = JSON.stringify({ type: "functionCall", content: part.functionCall });
                                     controller.enqueue(encoder.encode(data + "\n"));
                                 }
                             }
