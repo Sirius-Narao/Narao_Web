@@ -3,20 +3,64 @@ import ChatMessageInput from "./chatMessageInput";
 import { useState, useEffect } from "react";
 import ChatMessageBlock from "./chatMessageBlock";
 import { useChatMessages } from "@/context/chatMessagesContext";
+import { supabase } from "@/lib/supabaseClient";
+import { useUser } from "@/context/userContext";
+import { ChatMessage } from "@/types/chatType";
 
 
 export default function Chat() {
-    const { chatMessages, setChatMessages } = useChatMessages();
+    const { chatMessages, setChatMessages, currentChatId, setCurrentChatId } = useChatMessages();
+    const { user } = useUser();
 
-    // Initialize with demo messages if empty
+    // Fetch messages when currentChatId changes
     useEffect(() => {
-        if (chatMessages.length === 0) {
+        if (!currentChatId) {
             setChatMessages([]);
+            return;
         }
-    }, []);
+
+        let ignore = false;
+        const fetchMessages = async () => {
+            const { data, error } = await supabase
+                .from("chat_messages")
+                .select("*")
+                .eq("chat_id", currentChatId)
+                .order("created_at", { ascending: true });
+
+            if (error) {
+                console.error("Error fetching messages:", error);
+                return;
+            }
+
+            if (!ignore && data) {
+                const mappedMessages: ChatMessage[] = data.map((msg: any) => ({
+                    id: msg.id,
+                    content: msg.content,
+                    role: msg.role,
+                    thought: msg.thought,
+                    thinkingTime: msg.thinking_time,
+                    createdAt: new Date(msg.created_at),
+                    isDone: true
+                }));
+
+                setChatMessages(prev => {
+                    // Combine mappedMessages from DB with any optimistic/streaming messages from prev array.
+                    const dbIds = new Set(mappedMessages.map(m => m.id));
+                    const missingLocal = prev.filter(m => !dbIds.has(m.id));
+                    return [...mappedMessages, ...missingLocal];
+                });
+            }
+        };
+
+        fetchMessages();
+
+        return () => {
+            ignore = true;
+        };
+    }, [currentChatId, setChatMessages]);
 
     return (
-        <div className="flex flex-col relative w-full h-full overflow-hidden">
+        <div className="flex flex-col.....0 relative w-full h-full overflow-hidden">
             {/* Main scrollable area container */}
             <div className="flex-1 relative w-full h-full overflow-hidden">
                 {/* Fixed fade effects at top and bottom */}

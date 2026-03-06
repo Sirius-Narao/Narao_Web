@@ -5,7 +5,7 @@ const ai = new GoogleGenAI({ apiKey: process.env.GOOGLE_GENERATIVE_AI_API_KEY! }
 
 export async function POST(req: NextRequest) {
     try {
-        const { history, userInput, attachments, isThinking } = await req.json();
+        const { history, userInput, attachments, isThinking, systemPrompt } = await req.json();
 
         // Prepare contents for Gemini
         const contents = history.map((msg: any) => ({
@@ -31,14 +31,17 @@ export async function POST(req: NextRequest) {
         });
 
         const result = await ai.models.generateContentStream({
-            model: "gemini-3-flash-preview",
+            model: "gemini-2.5-flash",
             contents,
             config: {
-                // @ts-ignore
-                thinkingConfig: {
-                    includeThoughts: isThinking,
-                }
-            }
+                ...(systemPrompt ? { systemInstruction: systemPrompt } : {}),
+                ...(isThinking ? {
+                    thinkingConfig: {
+                        includeThoughts: true,
+                        thinkingLevel: "HIGH"
+                    }
+                } : {})
+            } as any
         });
 
         const stream = new ReadableStream({
@@ -77,8 +80,15 @@ export async function POST(req: NextRequest) {
             },
         });
 
-    } catch (error) {
-        console.error("API error:", error);
-        return new Response(JSON.stringify({ error: "Failed to generate content" }), { status: 500 });
+    } catch (error: any) {
+        console.error("API error for Gemini 2.5 Flash:", error);
+        return new Response(JSON.stringify({
+            error: "Failed to generate content",
+            message: error.message,
+            stack: error.stack
+        }), {
+            status: 500,
+            headers: { "Content-Type": "application/json" }
+        });
     }
 }

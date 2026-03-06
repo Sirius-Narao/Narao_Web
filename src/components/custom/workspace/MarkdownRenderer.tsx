@@ -3,7 +3,16 @@ import remarkGfm from "remark-gfm"
 import remarkMath from "remark-math"
 import rehypeKatex from "rehype-katex"
 import rehypeHighlight from "rehype-highlight"
-import { ComponentPropsWithoutRef } from "react"
+import { ComponentPropsWithoutRef, ReactNode, isValidElement } from "react"
+
+const extractText = (node: ReactNode): string => {
+    if (node == null) return '';
+    if (typeof node === 'string') return node;
+    if (typeof node === 'number') return String(node);
+    if (Array.isArray(node)) return node.map(extractText).join('');
+    if (isValidElement(node)) return extractText((node as any).props.children);
+    return '';
+};
 
 import "katex/dist/katex.min.css"
 import "highlight.js/styles/github-dark.css"
@@ -34,11 +43,12 @@ export function MarkdownRenderer({ content, className = "" }: MarkdownRendererPr
                 components={{
                     code({ className, children, ...props }: ComponentPropsWithoutRef<'code'> & { inline?: boolean }) {
                         const match = /language-(\w+)/.exec(className || '')
-                        const isInline = !match && !children?.toString().includes('\n');
+                        const textContent = extractText(children);
+                        const isInline = !match && !textContent.includes('\n');
 
                         return !isInline ? (
                             <div className="relative group w-full max-w-full overflow-hidden">
-                                <pre className="my-4 rounded-xl bg-popover p-4 overflow-x-auto border border-border/50">
+                                <pre className="my-4 rounded-xl bg-popover p-4 overflow-x-auto border border-border/50 w-full">
                                     {match && (
                                         <div className="flex items-center justify-between gap-2 pb-2 px-2 border-b border-foreground/10">
                                             <div className="flex flex-row items-center gap-2">
@@ -52,7 +62,7 @@ export function MarkdownRenderer({ content, className = "" }: MarkdownRendererPr
                                                 size="icon"
                                                 className="h-8 w-8"
                                                 onClick={() => {
-                                                    navigator.clipboard.writeText(children?.toString() || '');
+                                                    navigator.clipboard.writeText(textContent);
                                                     toast.success(`Copied to clipboard`, {
                                                         position: 'bottom-right'
                                                     })
@@ -63,7 +73,7 @@ export function MarkdownRenderer({ content, className = "" }: MarkdownRendererPr
 
                                         </div>
                                     )}
-                                    <code className={cn(className, "rounded-lg bg-popover!")} {...props}>
+                                    <code className={cn(className, "rounded-lg bg-popover! whitespace-pre-wrap break-words")} {...props}>
                                         {children}
                                     </code>
                                 </pre>
@@ -73,6 +83,7 @@ export function MarkdownRenderer({ content, className = "" }: MarkdownRendererPr
                                 {children}
                             </code>
                         )
+
                     },
                     table({ children }) {
                         return (

@@ -6,6 +6,7 @@ import { User, Settings, X, Icon, Folder, NotebookPen, MessageCircle, MessageCir
 import { motion, AnimatePresence } from "framer-motion";
 import { Button } from "@/components/ui/button";
 import { cn } from "@/lib/utils";
+import { toast } from "sonner";
 import {
     Card,
     CardDescription,
@@ -23,7 +24,7 @@ import { InputGroup, InputGroupAddon, InputGroupInput, InputGroupText } from "@/
 import { ScrollArea } from "@/components/ui/scroll-area";
 import { DropdownMenu, DropdownMenuContent, DropdownMenuGroup, DropdownMenuItem, DropdownMenuTrigger } from "@/components/ui/dropdown-menu";
 
-import ChatType from "@/types/chatType";
+import { ChatType } from "@/types/chatType";
 import dateConvert from "@/lib/dateConvert";
 import quantifyDate from "@/lib/quantifyDate";
 import handleSearch from "@/lib/handleSearch";
@@ -35,6 +36,7 @@ import ProfileType from "@/types/profileType";
 import { Skeleton } from "@/components/ui/skeleton";
 import AnnounceType from "@/types/announceType";
 import { useSettingsOpen } from "@/context/settingOpenContext";
+import { useChatMessages } from "@/context/chatMessagesContext";
 
 export default function SidebarArea() {
     // fetched data
@@ -55,6 +57,8 @@ export default function SidebarArea() {
     const [settingsTab, setSettingsTab] = useState(0);
     // settings open
     const { settingsOpen, setSettingsOpen } = useSettingsOpen();
+    // chat title
+    const { chatTitle, setChatTitle } = useChatMessages();
 
     // auth fetch
     useEffect(() => {
@@ -83,6 +87,30 @@ export default function SidebarArea() {
         fetchUsers();
     }, [userAuth]);
 
+    const { setChatMessages, currentChatId, setCurrentChatId, refreshTrigger, refreshChats } = useChatMessages();
+
+    const handleDeleteChat = async (e: React.MouseEvent, chatId: string) => {
+        e.stopPropagation();
+        if (!confirm("Are you sure you want to delete this chat?")) return;
+
+        const { error } = await supabase
+            .from('chats')
+            .delete()
+            .eq('id', chatId);
+
+        if (error) {
+            console.error("Error deleting chat:", error);
+            toast.error("Failed to delete chat");
+        } else {
+            toast.success("Chat deleted");
+            if (currentChatId === chatId) {
+                setCurrentChatId(null);
+                setChatMessages([]);
+            }
+            refreshChats();
+        }
+    };
+
     // Fetch chats data
     useEffect(() => {
         if (!user) return;
@@ -101,6 +129,7 @@ export default function SidebarArea() {
             if (data) {
                 // Map the data to ensure correct types (Date objects) and property names
                 const mappedChats: ChatType[] = data.map((item: any) => ({
+                    id: item.id,
                     title: item.title || "Untitled Chat",
                     description: item.description || "",
                     // Handle both camelCase (if mapped) and snake_case (raw DB)
@@ -112,7 +141,7 @@ export default function SidebarArea() {
         };
         fetchChats();
         setChatsFetched(true);
-    }, [user]);
+    }, [user, refreshTrigger]);
 
     // Update filtered chats when chats change, preserving sort order
     useEffect(() => {
@@ -209,6 +238,13 @@ export default function SidebarArea() {
                                                 activeTab === index ? "text-background hover:bg-transparent" : "text-muted-foreground hover:bg-muted"
                                             )}
                                             variant="ghost"
+                                            onClick={() => {
+                                                if (index === 2) {
+                                                    setChatMessages([]);
+                                                    setCurrentChatId(null);
+                                                    setChatTitle("New Chat");
+                                                }
+                                            }}
                                         >
                                             {/* Tabs */}
                                             {index === 0 ? <Folder /> : index === 1 ? <NotebookPen /> : <MessageCirclePlus />}
@@ -217,7 +253,7 @@ export default function SidebarArea() {
                                     <TooltipContent className="flex items-center gap-2">
                                         <p>{index === 0 ? "Open Folders" : index === 1 ? "New Note" : "New Chat"}</p>
                                         <KbdGroup>
-                                            <Kbd className="bg-popover text-foreground">Ctrl + {index === 0 ? "O" : index === 1 ? "N" : "M"}</Kbd>
+                                            <Kbd className="bg-popover text-foreground">Ctrl + Shift + {index === 0 ? "U" : index === 1 ? "I" : "O"}</Kbd>
                                         </KbdGroup>
                                     </TooltipContent>
                                 </Tooltip>
@@ -227,7 +263,7 @@ export default function SidebarArea() {
                 </div>
 
                 {/* Search Bar & Chat List */}
-                <div className="mt-2">
+                <div className="mt-2 flex-1 flex flex-col min-h-0">
                     <InputGroup className="w-full bg-card shadow-lg transition-all duration-200 ease-in-out group-data-[state=collapsed]:w-10 group-data-[state=collapsed]:h-10 group-data-[state=collapsed]:rounded-full group-data-[state=collapsed]:p-0 group-data-[state=collapsed]:justify-center group-data-[state=collapsed]:mx-auto cursor-pointer hover:bg-card/30 "
                         onClick={() => { if (state === "collapsed") { setOpen(true) } }}>
                         <InputGroupAddon align="inline-end" className="group-data-[state=collapsed]:pr-0 group-data-[state=collapsed]:w-full group-data-[state=collapsed]:h-full group-data-[state=collapsed]:justify-center transition-all duration-200 cursor-pointer hover:bg-card/30">
@@ -245,13 +281,22 @@ export default function SidebarArea() {
                             onChange={(e) => setFilteredChats(handleSearch(e.target.value, chats))}
                         />
                     </InputGroup>
-                    <ScrollArea className=" max-h-[calc(100vh-20rem)] h-fit rounded-lg border border-sidebar-border mt-2 pt-1 px-1 shadow-lg bg-card/30s group-data-[state=collapsed]:hidden">
+                    <ScrollArea className="flex-1 rounded-lg border border-sidebar-border mt-2 pt-1 px-1 shadow-lg bg-card/30 group-data-[state=collapsed]:hidden min-h-0 max-h-[60%]">
                         {chats.length > 0 && chatsFetched ? filteredChats.map((chat, index) => (
-                            <div key={index} className="flex items-center justify-between pl-4 pr-2 py-2 rounded-lg hover:bg-card/80 cursor-pointer transition-all duration-100 ease-in-out mb-1">
+                            <div
+                                key={index}
+                                className="flex items-center justify-between pl-4 pr-2 py-2 rounded-lg hover:bg-card/80 cursor-pointer transition-all duration-100 ease-in-out mb-1"
+                                onClick={() => {
+                                    setChatMessages([]);
+                                    setCurrentChatId(chat.id || null);
+                                    setActiveTab(2);
+                                    setChatTitle(chat.title);
+                                }}
+                            >
                                 <Tooltip>
                                     <TooltipTrigger asChild>
                                         <div className="flex flex-row items-center gap-2 w-full">
-                                            <p className="text-sm truncate">{chat.title}</p>
+                                            <p className="text-sm">{chat.title.length > 20 ? chat.title.slice(0, 20).trimEnd().concat("...") : chat.title}</p>
                                         </div>
                                     </TooltipTrigger>
                                     <TooltipContent side="right" sideOffset={16}>
@@ -288,7 +333,10 @@ export default function SidebarArea() {
                                                 <FolderDown size={16} className="text-muted-foreground group-hover:text-accent-foreground" />
                                                 Move To
                                             </DropdownMenuItem >
-                                            <DropdownMenuItem className="text-destructive focus:text-destructive focus:bg-destructive/10 cursor-pointer">
+                                            <DropdownMenuItem
+                                                className="text-destructive focus:text-destructive focus:bg-destructive/10 cursor-pointer"
+                                                onClick={(e) => handleDeleteChat(e, chat.id!)}
+                                            >
                                                 <Trash2 size={16} className="text-destructive" />
                                                 Delete Chat
                                             </DropdownMenuItem>

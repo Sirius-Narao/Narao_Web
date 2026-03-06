@@ -1,4 +1,5 @@
 interface ChatType {
+    id?: string;
     title: string;
     description: string;
     createdAt: Date;
@@ -26,4 +27,10 @@ interface ChatMessage {
     isDone?: boolean;
 }
 
-export type { ChatType, ChatMessage, ChatAttachment };
+interface Models {
+    "gemini-2.5-flash": "Gemini 2.5 Flash",
+    "gemini-3-flash-preview": "Gemini 3 Flash",
+    "gemini-3.1-flash-lite-preview": "Gemini 3.1 Flash Lite"
+}
+
+export type { ChatType, ChatMessage, ChatAttachment, Models };

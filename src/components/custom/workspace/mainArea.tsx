@@ -41,6 +41,7 @@ import { useContent } from "@/context/contentContext";
 import Chat from "./chat";
 import { useUserAuth } from "@/context/userAuthContext";
 import { useUser } from "@/context/userContext";
+import { useChatMessages } from "@/context/chatMessagesContext";
 
 // colors for folders — full class names so Tailwind can detect them
 const folderColors: { value: FolderColor; label: string; bgClass: string }[] = [
@@ -141,6 +142,10 @@ export default function MainArea() {
     const { content, setContent } = useContent();
     const [isSavedComplete, setIsSavedComplete] = useState(true)
 
+    // chat states
+    const { setCurrentChatId, setChatMessages,
+        chatMessages, currentChatId, chatTitle, setChatTitle } = useChatMessages();
+
     // Migration helper: Convert blocks JSON to plain text if needed
     const getInitialContent = (rawContent: string) => {
         try {
@@ -160,7 +165,6 @@ export default function MainArea() {
         }
     };
 
-
     // fetch user auth
     useEffect(() => {
         const fetchUserAuth = async () => {
@@ -169,7 +173,6 @@ export default function MainArea() {
         }
         fetchUserAuth();
     }, [])
-
     // Fetch user data
     useEffect(() => {
         if (!userAuth) return;
@@ -189,7 +192,6 @@ export default function MainArea() {
         };
         fetchUsers();
     }, [userAuth]);
-
     // Fetch folders data
     useEffect(() => {
         if (!user) return;
@@ -227,7 +229,6 @@ export default function MainArea() {
         console.log("fetchedFolders: ", fetchedFolders);
 
     }, [user]);
-
     // Fetch notes data
     useEffect(() => {
         if (!user) return;
@@ -968,6 +969,10 @@ export default function MainArea() {
         } else if (activeTab !== 1 && accessedNote) {
             setAccessedNote(null)
             setIsNoteOpened(false)
+        } else if (activeTab === 2) {
+            setCurrentChatId(null)
+            setChatMessages([])
+            setChatTitle("New Chat")
         }
     }, [activeTab])
 
@@ -988,17 +993,20 @@ export default function MainArea() {
                 e.preventDefault();
                 searchInputRef.current?.focus();
             }
-            else if (e.ctrlKey && key === "o" && !e.shiftKey && !e.altKey) {
+            else if (e.ctrlKey && key === "u" && e.shiftKey && !e.altKey) {
                 e.preventDefault();
                 setActiveTab(0);
             }
-            else if (e.ctrlKey && key === "n" && !e.shiftKey && !e.altKey) {
+            else if (e.ctrlKey && key === "i" && e.shiftKey && !e.altKey) {
                 e.preventDefault();
                 setActiveTab(1);
             }
-            else if (e.ctrlKey && key === "m" && !e.shiftKey && !e.altKey) {
+            else if (e.ctrlKey && key === "o" && e.shiftKey && !e.altKey) {
                 e.preventDefault();
                 setActiveTab(2);
+                setCurrentChatId(null);
+                setChatMessages([]);
+                setChatTitle("New Chat")
             }
             else if (e.ctrlKey && key === "n" && e.shiftKey && !e.altKey) {
                 e.preventDefault();
@@ -1149,7 +1157,7 @@ export default function MainArea() {
                     <div className="w-full flex justify-center">
                         <Tooltip>
                             <TooltipTrigger asChild>
-                                <Button variant="ghost" className="w-64 text-foreground text-lg cursor-pointer" onClick={() => { }}>Chat Title Placeholder</Button>
+                                <Button variant="ghost" className="w-64 text-foreground text-lg cursor-pointer" onClick={() => { setChatTitle("New Chat") }}>{chatTitle}</Button>
                             </TooltipTrigger>
                             <TooltipContent>
                                 <p>Change Chat's title</p>

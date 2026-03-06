@@ -6,6 +6,7 @@ import { useState } from "react";
 import { cn } from "@/lib/utils";
 import { Spinner } from "@/components/ui/spinner";
 import { Tooltip, TooltipContent, TooltipTrigger } from "@/components/ui/tooltip";
+import { toast } from "sonner";
 
 export default function ChatMessageBlock({ message }: { message: ChatMessage }) {
     const [isThoughtExpanded, setIsThoughtExpanded] = useState(false);
@@ -37,7 +38,7 @@ export default function ChatMessageBlock({ message }: { message: ChatMessage }) 
                             <div className="flex w-full h-fit max-w-[90%] items-center justify-end mt-2 fade-up">
                                 <Tooltip>
                                     <TooltipTrigger asChild>
-                                        <Button size={"icon"} variant={"ghost"}>
+                                        <Button size={"icon"} variant={"ghost"} onClick={() => { navigator.clipboard.writeText(message.content); toast.success("Copied to clipboard!", { position: "bottom-right", duration: 1000 }) }}>
                                             <Copy className="w-4 h-4 text-muted-foreground" />
                                         </Button>
                                     </TooltipTrigger>
@@ -70,7 +71,7 @@ export default function ChatMessageBlock({ message }: { message: ChatMessage }) 
                                                 <p>Thought</p>
                                                 {message.thinkingTime !== undefined && (
                                                     <span className="">
-                                                        {"for " + message.thinkingTime.toFixed(1) + "s"}
+                                                        {"for " + (message.thinkingTime / 1000).toFixed(1) + "s"}
                                                     </span>
                                                 )}
                                             </div>
@@ -87,7 +88,7 @@ export default function ChatMessageBlock({ message }: { message: ChatMessage }) 
                                 </div>
                                 <div className={cn("grid transition-all duration-300 ease-in-out", isThoughtExpanded ? "grid-rows-[1fr] opacity-100 mt-2" : "grid-rows-[0fr] opacity-0")}>
                                     <div className="overflow-hidden">
-                                        <MarkdownRenderer content={message.thought} className="italic opacity-50" />
+                                        <MarkdownRenderer content={message.thought} className="italic opacity-50 text-sm" />
                                     </div>
                                 </div>
 
@@ -103,7 +104,7 @@ export default function ChatMessageBlock({ message }: { message: ChatMessage }) 
                             <div className="flex w-full h-fit max-w-[90%] items-start justify-start mt-2 fade-up">
                                 <Tooltip>
                                     <TooltipTrigger asChild>
-                                        <Button size={"icon"} variant={"ghost"}>
+                                        <Button size={"icon"} variant={"ghost"} onClick={() => { navigator.clipboard.writeText(message.content); toast.success("Copied to clipboard!", { position: "bottom-right", duration: 1000 }) }}>
                                             <Copy className="w-4 h-4 text-muted-foreground" />
                                         </Button>
                                     </TooltipTrigger>

@@ -3,12 +3,39 @@ import { NextRequest } from "next/server";
 
 const ai = new GoogleGenAI({ apiKey: process.env.GOOGLE_GENERATIVE_AI_API_KEY! });
 
+const MAX_RETRIES = 3;
+const RETRY_DELAY_MS = 1500;
+
+function is503(error: any): boolean {
+    return (
+        error?.status === 503 ||
+        error?.code === 503 ||
+        error?.message?.includes("503") ||
+        error?.message?.includes("UNAVAILABLE") ||
+        error?.message?.includes("high demand")
+    );
+}
+
+async function generateWithRetry(params: any, retries = MAX_RETRIES): Promise<any> {
+    try {
+        return await ai.models.generateContentStream(params);
+    } catch (error: any) {
+        if (is503(error) && retries > 0) {
+            const delay = RETRY_DELAY_MS * (MAX_RETRIES - retries + 1);
+            console.warn(`Gemini 3.1 Flash-Lite 503, retrying in ${delay}ms... (${retries} left)`);
+            await new Promise(res => setTimeout(res, delay));
+            return generateWithRetry(params, retries - 1);
+        }
+        throw error;
+    }
+}
+
 export async function POST(req: NextRequest) {
     try {
-        const { history, userInput, attachments, isThinking } = await req.json();
+        const { history, userInput, attachments, isThinking, systemPrompt } = await req.json();
 
         // Prepare contents for Gemini
-        const contents = history.map((msg: any) => ({
+        const contents = history.slice(0, -1).map((msg: any) => ({
             role: msg.role === "user" ? "user" : "model",
             parts: [{ text: msg.content }]
         }));
@@ -30,15 +57,18 @@ export async function POST(req: NextRequest) {
             parts: currentParts
         });
 
-        const result = await ai.models.generateContentStream({
-            model: "gemini-2.5-flash",
+        const result = await generateWithRetry({
+            model: "gemini-3.1-flash-lite-preview",
             contents,
             config: {
-                // @ts-ignore
-                thinkingConfig: {
-                    includeThoughts: isThinking,
-                }
-            }
+                ...(systemPrompt ? { systemInstruction: systemPrompt } : {}),
+                ...(isThinking ? {
+                    thinkingConfig: {
+                        includeThoughts: true,
+                        thinkingLevel: "HIGH"
+                    }
+                } : {})
+            } as any
         });
 
         const stream = new ReadableStream({
@@ -77,8 +107,17 @@ export async function POST(req: NextRequest) {
             },
         });
 
-    } catch (error) {
-        console.error("API error:", error);
-        return new Response(JSON.stringify({ error: "Failed to generate content" }), { status: 500 });
+    } catch (error: any) {
+        console.error("API error for Gemini 3.1 Flash-Lite:", error);
+        const overloaded = is503(error);
+        return new Response(JSON.stringify({
+            error: overloaded ? "model_overloaded" : "generation_failed",
+            message: overloaded
+                ? "Gemini 3.1 Flash-Lite is experiencing high demand. Please try again in a moment."
+                : error.message,
+        }), {
+            status: overloaded ? 503 : 500,
+            headers: { "Content-Type": "application/json" }
+        });
     }
 }
