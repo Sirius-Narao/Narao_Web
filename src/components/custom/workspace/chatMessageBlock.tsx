@@ -1,35 +1,75 @@
 import { ChatMessage } from "@/types/chatType";
 import { MarkdownRenderer } from "./MarkdownRenderer";
-import { ChevronDown, Copy, Edit, FileImage, FileTypeCorner, Lightbulb, RefreshCcw, Sun, ThumbsDown, ThumbsUp } from "lucide-react";
+import { ChevronDown, Copy, Edit, FileImage, FileTypeCorner, Lightbulb, RefreshCcw, Sun, ThumbsDown, ThumbsUp, TriangleAlert } from "lucide-react";
 import { Button } from "@/components/ui/button";
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { cn } from "@/lib/utils";
 import { Spinner } from "@/components/ui/spinner";
 import { Tooltip, TooltipContent, TooltipTrigger } from "@/components/ui/tooltip";
 import { toast } from "sonner";
+import { useIsLoading } from "@/context/isLoadingContext";
+import { useEditMessage } from "@/context/editMessageContext";
+import { useChatMessages } from "@/context/chatMessagesContext";
+
+const THINKING_PHRASES = [
+    "Let me think about it...",
+    "Gathering my thoughts...",
+    "Analyzing your request...",
+    "Almost there...",
+    "Why am I taking so long..."
+];
 
 export default function ChatMessageBlock({ message }: { message: ChatMessage }) {
     const [isThoughtExpanded, setIsThoughtExpanded] = useState(false);
+    const { isLoading } = useIsLoading();
+    const { requestEdit } = useEditMessage();
+    const [phraseIndex, setPhraseIndex] = useState(0);
+    const { chatMessages } = useChatMessages()
+    const [displayText, setDisplayText] = useState("");
+
+    useEffect(() => {
+        if (!isLoading) {
+            setDisplayText("");
+            setPhraseIndex(0);
+            return;
+        }
+
+        let i = 0;
+        setDisplayText("");
+        const phrase = THINKING_PHRASES[phraseIndex];
+        const interval = setInterval(() => {
+            i++;
+            setDisplayText(phrase.slice(0, i));
+            if (i >= phrase.length) {
+                clearInterval(interval);
+                setTimeout(() => {
+                    setPhraseIndex((prev) => (prev + 1) % THINKING_PHRASES.length);
+                }, 1500);
+            }
+        }, 20);
+        return () => clearInterval(interval);
+    }, [isLoading, phraseIndex]);
+
     return (
         <div className={`flex flex-col relative w-full h-fit mb-8 fade-up ${message.role === "user" ? "items-end" : "items-start"}`}>
             {
                 message.role === "user" ? (
                     <div className="flex flex-col relative w-fit h-fit max-w-[80%] items-end">
-                        <div className="flex relative w-fit h-fit rounded-2xl bg-secondary/80 p-4 shadow-sm border border-border/10">
+                        {message.content && <div className="flex relative w-fit h-fit rounded-2xl bg-secondary/80 p-4 px-6 shadow-sm border border-border/10">
                             <MarkdownRenderer content={message.content} className="text-foreground" />
-                        </div>
+                        </div>}
                         {/* Content such as images, pdfs, etc */}
                         {message.attachments && message.attachments.length > 0 && (
                             <div className="flex flex-row relative w-full h-fit mt-2 flex-wrap gap-2 justify-end">
                                 {message.attachments.map((attachment) => (
                                     <div key={attachment.id} className="flex flex-row w-fit h-fit bg-secondary/80 px-4 py-2 rounded-lg shadow-sm border border-border/10 items-center gap-2">
-                                        {attachment.type === "image" && (
+                                        {attachment.file_type === "image" && (
                                             <FileImage className="w-4 h-4 text-primary" />
                                         )}
-                                        {attachment.type === "pdf" && (
+                                        {attachment.file_type === "pdf" && (
                                             <FileTypeCorner className="w-4 h-4 text-destructive" />
                                         )}
-                                        <p>{attachment.name}</p>
+                                        <p>{attachment.file_name}</p>
                                     </div>
                                 ))}
                             </div>
@@ -48,7 +88,7 @@ export default function ChatMessageBlock({ message }: { message: ChatMessage }) 
                                 </Tooltip>
                                 <Tooltip>
                                     <TooltipTrigger asChild>
-                                        <Button size={"icon"} variant={"ghost"}>
+                                        <Button size={"icon"} variant={"ghost"} onClick={() => requestEdit(message.id, message.content)}>
                                             <Edit className="w-4 h-4 text-muted-foreground" />
                                         </Button>
                                     </TooltipTrigger>
@@ -61,6 +101,13 @@ export default function ChatMessageBlock({ message }: { message: ChatMessage }) 
                     </div>
                 ) : (
                     <div className="flex flex-col relative w-full h-fit group">
+                        {isLoading && chatMessages[chatMessages.length - 1]?.id === message.id && (
+                            <div className="flex flex-row items-center gap-2 mb-2">
+                                <p className="text-muted-foreground animate-pulse">
+                                    {displayText}
+                                </p>
+                            </div>
+                        )}
                         {message.thought && (
                             <div className="flex flex-col mb-4 p-4 bg-popover/30 rounded-xl border border-border max-w-[85%] text-xs text-muted-foreground animate-in fade-in slide-in-from-top-1 overflow-hidden transition-all duration-300">
                                 <div className="flex flex-row w-full h-fit items-center justify-between cursor-pointer select-none" onClick={() => setIsThoughtExpanded(!isThoughtExpanded)}>
@@ -100,7 +147,13 @@ export default function ChatMessageBlock({ message }: { message: ChatMessage }) 
                                 className="text-foreground w-full p-2"
                             />
                         </div>
-                        {message.isDone && (
+                        {(message.isDone && !message.content) && (
+                            <div className="flex w-full h-fit max-w-[90%] items-center gap-2 justify-start mt-2 fade-up">
+                                <TriangleAlert className="w-% h-5 text-muted-foreground" />
+                                <p className="text-muted-foreground text-lg">Message stopped.</p>
+                            </div>
+                        )}
+                        {message.isDone && message.content && (
                             <div className="flex w-full h-fit max-w-[90%] items-start justify-start mt-2 fade-up">
                                 <Tooltip>
                                     <TooltipTrigger asChild>

@@ -1,6 +1,6 @@
 import { Button } from "@/components/ui/button"
 import { Tooltip, TooltipContent, TooltipTrigger } from "@/components/ui/tooltip"
-import { ArrowUp, FileImage, FileTypeCorner, Leaf, Lightbulb, Mic, Plus, Square, X, Zap } from "lucide-react"
+import { ArrowUp, Edit, FileImage, FileTypeCorner, Leaf, Lightbulb, Mic, Plus, Square, X, Zap } from "lucide-react"
 import { useState, useRef, useEffect } from "react"
 import { useChatMessages } from "@/context/chatMessagesContext"
 import { ChatMessage, ChatAttachment, Models } from "@/types/chatType"
@@ -11,6 +11,8 @@ import { supabase } from "@/lib/supabaseClient"
 import { useUser } from "@/context/userContext"
 import { useActiveTabs } from "@/context/activeTabsContext"
 import { Type } from "@google/genai"
+import { useIsLoading } from "@/context/isLoadingContext"
+import { useEditMessage } from "@/context/editMessageContext"
 
 const models = {
     "gemini-2.5-flash": "Gemini 2.5 Flash",
@@ -21,7 +23,7 @@ const models = {
 export default function ChatMessageInput() {
     const [content, setContent] = useState("")
     const [isThinking, setIsThinking] = useState(false)
-    const [isLoading, setIsLoading] = useState(false)
+    const { isLoading, setIsLoading } = useIsLoading()
     const [attachments, setAttachments] = useState<File[]>([])
     const textareaRef = useRef<HTMLTextAreaElement>(null)
     const fileInputRef = useRef<HTMLInputElement>(null)
@@ -30,7 +32,7 @@ export default function ChatMessageInput() {
 
     // user context
     const { user } = useUser();
-    const systemPromptString = `You are "Orthan AI", Narao's integrated assistant. You help in order to learn and to work mainly. You are expert in creating but also managing notes and folders. Narao is a note-taking app that uses AI to help users to learn and to work more efficiently. I am ${user?.username || "the user"}, and my preferences are: I like coding, AI, and technology. I am a student and I am learning about AI. Don't talk about yourself, only talk about the user and the task except if explicitely asked.`;
+    const systemPromptString = `You are "Orthan AI", Narao's integrated assistant. You help in order to learn and to work mainly, so you use much markdown to highlight things. Narao is a note-taking app that uses AI to help users to learn and to work more efficiently. I am ${user?.username || "the user"}, and my preferences are: I like coding, AI, and technology. I am a student and I am learning about AI. Do not talk about yourself, only talk about the task except if explicitly asked.`;
 
     // Model Settings
     const [currentModel, setCurrentModel] = useState<keyof Models>("gemini-3.1-flash-lite-preview")
@@ -40,6 +42,9 @@ export default function ChatMessageInput() {
 
     // active tab
     const { activeTab } = useActiveTabs()
+
+    // edit message context
+    const { pendingEdit, clearEdit } = useEditMessage()
 
     useEffect(() => {
         if (textareaRef.current) {
@@ -53,6 +58,14 @@ export default function ChatMessageInput() {
             textareaRef.current?.focus()
         }
     }, [activeTab])
+
+    // When an edit is requested: just populate the input and focus.
+    // Deletion happens only when the user actually sends.
+    useEffect(() => {
+        if (!pendingEdit) return;
+        setContent(pendingEdit.content);
+        setTimeout(() => textareaRef.current?.focus(), 50);
+    }, [pendingEdit]); // intentionally narrow dep — only fires when a new edit is requested
 
     // update chat name
     const updateChatName = async (chatId: string, firstUserContent: string) => {
@@ -116,7 +129,7 @@ export default function ChatMessageInput() {
         }
     };
 
-    // convert file to base64 for attachments
+    // convert file to base64 for the AI API call
     const fileToBase64 = (file: File): Promise<string> => {
         return new Promise((resolve, reject) => {
             const reader = new FileReader();
@@ -127,6 +140,24 @@ export default function ChatMessageInput() {
             };
             reader.onerror = error => reject(error);
         });
+    };
+
+    // Upload a file to Supabase Storage and return its persistent public URL
+    const uploadAttachment = async (file: File, userId: string): Promise<string> => {
+        const ext = file.name.split('.').pop();
+        const path = `${userId}/${uuidv4()}.${ext}`;
+
+        const { error } = await supabase.storage
+            .from('chat-attachments')
+            .upload(path, file, { contentType: file.type });
+
+        if (error) throw new Error(`Upload failed: ${error.message}`);
+
+        const { data } = supabase.storage
+            .from('chat-attachments')
+            .getPublicUrl(path);
+
+        return data.publicUrl;
     };
 
     // update chat description
@@ -227,6 +258,43 @@ export default function ChatMessageInput() {
             console.error("Failed to add message to chat_messages:", e);
         }
     };
+    const addAttachmentsToChatAttachments = async (messageId: string, attachments: ChatAttachment[]) => {
+        if (!user) return;
+        try {
+            for (const attachment of attachments) {
+                const payload: Record<string, any> = {
+                    id: attachment.id,
+                    message_id: messageId,
+                    user_id: user?.id,
+                    file_name: attachment.file_name,
+                    file_type: attachment.file_type,
+                    mime_type: attachment.mime_type,
+                    file_url: attachment.file_url,
+                    file_size: attachment.file_size,
+                    created_at: attachment.created_at.toISOString()
+                };
+
+                const { error } = await supabase
+                    .from("chat_attachments")
+                    .insert(payload);
+
+                if (error) {
+                    // Supabase PostgrestError fields must be logged individually — the object itself shows as {}
+                    console.error(`Error adding attachment ${attachment.file_name} to chat_attachments:`, {
+                        message: error.message,
+                        code: error.code,
+                        details: error.details,
+                        hint: error.hint,
+                        raw: String(error),
+                        rawObj: error
+                    });
+                    toast.error(`Failed to save attachment ${attachment.file_name}: ${error.message || error.code || "Unknown Supabase error"}`, { position: "bottom-right" });
+                }
+            }
+        } catch (e) {
+            console.error("Failed to add attachments to chat_attachments:", e);
+        }
+    };
 
     // handle send function of the input
     const handleSend = async () => {
@@ -245,21 +313,43 @@ export default function ChatMessageInput() {
         let thinkingDuration: number | undefined = undefined;
 
         try {
-            // 1. Prepare attachments
-            const uiAttachments: ChatAttachment[] = attachments.map(file => ({
-                id: uuidv4(),
-                name: file.name,
-                type: file.type.includes("pdf") ? "pdf" : "image",
-                url: URL.createObjectURL(file),
-                size: file.size,
-                createdAt: new Date()
-            }));
-
-            const apiAttachments = await Promise.all(attachments.map(async file => ({
-                name: file.name,
-                type: file.type,
-                data: await fileToBase64(file)
-            })));
+            // 0. If this send is completing an edit: remove the original message
+            //    and everything after it (the AI reply) from UI + DB first.
+            if (pendingEdit) {
+                const editedIndex = chatMessages.findIndex(m => m.id === pendingEdit.messageId);
+                if (editedIndex !== -1) {
+                    const idsToDelete = chatMessages.slice(editedIndex).map(m => m.id);
+                    setChatMessages(prev => prev.slice(0, editedIndex));
+                    if (currentChatId && idsToDelete.length > 0) {
+                        supabase
+                            .from("chat_messages")
+                            .delete()
+                            .in("id", idsToDelete)
+                            .then(({ error }) => {
+                                if (error) console.error("Error deleting messages for edit:", error);
+                            });
+                    }
+                }
+                clearEdit();
+            }
+            // 1. Prepare attachments — upload to Supabase Storage for persistence,
+            //    and convert to base64 separately for the AI API call
+            const [uiAttachments, apiAttachments] = await Promise.all([
+                Promise.all(attachments.map(async file => ({
+                    id: uuidv4(),
+                    file_name: file.name,
+                    file_type: file.type.includes("pdf") ? "pdf" : "image",
+                    mime_type: file.type, // real MIME type, e.g. "image/png", "application/pdf"
+                    file_url: await uploadAttachment(file, user!.id), // persistent URL
+                    file_size: file.size,
+                    created_at: new Date()
+                } as ChatAttachment))),
+                Promise.all(attachments.map(async file => ({
+                    name: file.name,
+                    type: file.type,
+                    data: await fileToBase64(file)
+                })))
+            ]);
 
             // 2. Create and add user message
             const userMessage: ChatMessage = {
@@ -306,15 +396,18 @@ export default function ChatMessageInput() {
                     const newChatId = data.id as string;
                     effectiveChatId = newChatId;
                     setCurrentChatId(newChatId);
-                    // Save user message for the new chat
-                    addMessageToChatMessages(newChatId, userMessage);
+                    // Save user message for the new chat (must be awaited before attachments)
+                    await addMessageToChatMessages(newChatId, userMessage);
+                    // Save attachments linked to the user message
+                    addAttachmentsToChatAttachments(userMessage.id, uiAttachments);
                     // Rename and describe the chat in the background
                     updateChatName(newChatId, currentContent);
                     updateChatDescription(newChatId, currentContent);
                 }
             } else if (effectiveChatId) {
-                // Save user message for existing chat
-                addMessageToChatMessages(effectiveChatId, userMessage);
+                // Save user message for existing chat (must be awaited before attachments)
+                await addMessageToChatMessages(effectiveChatId, userMessage);
+                addAttachmentsToChatAttachments(userMessage.id, uiAttachments);
             }
 
             // 4. Call Streaming API
@@ -423,15 +516,16 @@ export default function ChatMessageInput() {
                 toast.warning("Answer stopped!")
 
                 // Save whatever we have to the database
-                if (effectiveChatId && (accumulatedAnswer.trim() || accumulatedThought.trim())) {
+                if (effectiveChatId) {
                     addMessageToChatMessages(effectiveChatId, {
                         id: assistantId,
                         role: "assistant",
-                        content: accumulatedAnswer,
-                        thought: accumulatedThought,
+                        content: accumulatedAnswer.trim(),
+                        thought: accumulatedThought.trim(),
                         thinkingTime: thinkingDuration,
                         createdAt: new Date()
                     });
+
                 }
             } else {
                 console.error("Failed to get streaming Gemini response:", error);
@@ -509,8 +603,39 @@ export default function ChatMessageInput() {
     // list of all functions for the AI
     const allTools = [searchFilesAndFoldersDeclaration, readNoteDeclaration, modifyNote]
 
+    // Keyboard shortcuts
+    useEffect(() => {
+        const handleKeyDown = (e: KeyboardEvent) => {
+            const key = e.key.toLowerCase();
+
+            if (e.ctrlKey && key === "o" && e.shiftKey && !e.altKey) {
+                e.preventDefault();
+                textareaRef.current?.focus();
+            }
+        };
+
+        window.addEventListener("keydown", handleKeyDown);
+        return () => window.removeEventListener("keydown", handleKeyDown);
+    }, [activeTab, content]);
+
     return (
         <div className="absolute flex flex-col w-[60%] bottom-0 left-[20%] right-[20%] gap-2 z-50" >
+            {/* Edit mode cancel pill */}
+            {pendingEdit && (
+                <div className="flex items-center justify-center animate-in fade-in slide-in-from-bottom-2">
+                    <div className="flex items-center gap-2 bg-popover/80 backdrop-blur-md border border-border px-3 py-1.5 rounded-full text-xs text-muted-foreground shadow-sm">
+                        <Edit size={12} className="text-primary" />
+                        <span>Editing message</span>
+                        <button
+                            onClick={() => { clearEdit(); setContent(""); }}
+                            className="ml-1 flex items-center justify-center rounded-full hover:text-foreground transition-colors"
+                            aria-label="Cancel edit"
+                        >
+                            <X size={12} />
+                        </button>
+                    </div>
+                </div>
+            )}
             {/* Attachment Previews */}
             {attachments.length > 0 && (
                 <div className="flex flex-row items-center gap-2 px-4 flex-wrap justify-center">
@@ -535,8 +660,8 @@ export default function ChatMessageInput() {
             )
             }
 
-            < div className="flex gap-2 items-center" >
-                <div className="bg-popover rounded-[30px] border border-border shadow-lg p-2">
+            < div className="flex gap-2 items-center items-end pb-1" >
+                <div className="rounded-[30px] p-2 border-1 border-border bg-popover/60 backdrop-blur-md shadow-lg">
                     <Tooltip>
                         <TooltipTrigger asChild>
                             <Button
@@ -552,7 +677,7 @@ export default function ChatMessageInput() {
                         <TooltipContent><p>Attach Image or PDF</p><p className="text-xs text-muted-foreground">Maximum 3 attachments allowed</p></TooltipContent>
                     </Tooltip>
                 </div>
-                <div className="flex w-full bg-popover rounded-[30px] border border-border shadow-lg px-2 py-1 items-end justify-center gap-2">
+                <div className="flex w-full rounded-[30px] border-1 border-border bg-popover/60 backdrop-blur-md shadow-lg px-2 py-1 items-end justify-center gap-2">
                     <input
                         type="file"
                         ref={fileInputRef}
@@ -590,7 +715,6 @@ export default function ChatMessageInput() {
                         maxLength={100000}
                         rows={1}
                         value={content}
-                        disabled={isLoading}
                         onChange={(e) => setContent(e.target.value)}
                         onKeyDown={(e) => {
                             if (e.key === "Enter" && !e.shiftKey) {

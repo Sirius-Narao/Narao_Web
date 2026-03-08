@@ -1086,7 +1086,7 @@ export default function MainArea() {
                             </InputGroup>
                         </PopoverAnchor>
                         <PopoverContent
-                            className="w-[var(--radix-popover-anchor-width)] py-4"
+                            className="w-[var(--radix-popover-anchor-width)] py-4 border-1 border-border bg-card/80 backdrop-blur-md shadow-lg"
                             onOpenAutoFocus={(e) => e.preventDefault()}
                         >
                             {searchQuery.length > 0 ? (

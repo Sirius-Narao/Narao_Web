@@ -8,12 +8,13 @@ interface ChatType {
 
 interface ChatAttachment {
     id: string;
-    messageId?: string;
-    url: string;
-    name: string;
-    type: string;
-    size: number;
-    createdAt: Date;
+    message_id?: string;
+    file_url: string;
+    file_name: string;
+    file_type: string;    // generic label: "image" | "pdf"
+    mime_type: string;    // actual MIME type, e.g. "image/png", "application/pdf"
+    file_size: number;
+    created_at: Date;
 }
 
 interface ChatMessage {

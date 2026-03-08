@@ -7,21 +7,35 @@ export async function POST(req: NextRequest) {
     try {
         const { history, userInput, attachments, isThinking, systemPrompt, tools } = await req.json();
 
-        // Prepare contents for Gemini
-        const contents = history.map((msg: any) => ({
-            role: msg.role === "user" ? "user" : "model",
-            parts: [{ text: msg.content }]
-        }));
+        // Helper: fetch a file from a public URL and return base64
+        const urlToBase64 = async (url: string): Promise<string> => {
+            const res = await fetch(url);
+            const buffer = await res.arrayBuffer();
+            return Buffer.from(buffer).toString("base64");
+        };
+
+        // Build history, re-fetching past attachments from their stored Supabase URLs
+        const contents = await Promise.all(
+            history.map(async (msg: any) => {
+                const parts: any[] = [{ text: msg.content }];
+                if (msg.role === "user" && msg.attachments?.length > 0) {
+                    await Promise.all(msg.attachments.map(async (att: any) => {
+                        try {
+                            const data = await urlToBase64(att.file_url);
+                            parts.push({ inlineData: { data, mimeType: att.mime_type } });
+                        } catch (e) {
+                            console.warn(`Could not re-fetch attachment ${att.file_name}:`, e);
+                        }
+                    }));
+                }
+                return { role: msg.role === "user" ? "user" : "model", parts };
+            })
+        );
 
         const currentParts: any[] = [{ text: userInput }];
         if (attachments && attachments.length > 0) {
             attachments.forEach((att: any) => {
-                currentParts.push({
-                    inlineData: {
-                        data: att.data,
-                        mimeType: att.type
-                    }
-                });
+                currentParts.push({ inlineData: { data: att.data, mimeType: att.type } });
             });
         }
 
@@ -29,6 +43,7 @@ export async function POST(req: NextRequest) {
             role: "user",
             parts: currentParts
         });
+
 
         const result = await ai.models.generateContentStream({
             model: "gemini-2.5-flash",
@@ -38,7 +53,7 @@ export async function POST(req: NextRequest) {
                 ...(isThinking ? {
                     thinkingConfig: {
                         includeThoughts: true,
-                        thinkingLevel: "HIGH"
+                        thinkingBudget: -1
                     }
                 } : {}),
                 tools: tools ? [{ functionDeclarations: tools }] : undefined,

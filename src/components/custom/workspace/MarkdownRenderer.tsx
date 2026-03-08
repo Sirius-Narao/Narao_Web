@@ -120,7 +120,7 @@ export function MarkdownRenderer({ content, className = "" }: MarkdownRendererPr
                         return <li className="leading-relaxed pl-1">{children}</li>
                     },
                     h1({ children }) {
-                        return <h1 className="my-6 text-2xl font-bold border-b border-border pb-2 text-foreground tracking-tight">{children}</h1>
+                        return <h1 className="my-6 text-2xl font-bold border-b border-border pb-6 text-foreground/90 tracking-tight">{children}</h1>
                     },
                     h2({ children }) {
                         return <h2 className="my-5 text-xl font-semibold text-foreground/90 tracking-tight">{children}</h2>

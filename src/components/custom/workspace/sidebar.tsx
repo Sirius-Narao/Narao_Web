@@ -2,7 +2,7 @@
 
 import { Sidebar, SidebarContent, SidebarHeader, SidebarTrigger, SidebarFooter, useSidebar } from "@/components/ui/sidebar";
 import Image from "next/image";
-import { User, Settings, X, Icon, Folder, NotebookPen, MessageCircle, MessageCirclePlus, Search, MoreHorizontal, MoreVertical, Pencil, Trash2, FolderDown, CircleOff, Sun, Bot, Bell, Tags, Star, MoveUpLeft, ArrowUpLeft } from "lucide-react";
+import { User, Settings, X, Icon, Folder, NotebookPen, MessageCircle, MessageCirclePlus, Search, MoreHorizontal, MoreVertical, Pencil, Trash2, FolderDown, CircleOff, Sun, Bot, Bell, Tags, Star, MoveUpLeft, ArrowUpLeft, CircleSlash } from "lucide-react";
 import { motion, AnimatePresence } from "framer-motion";
 import { Button } from "@/components/ui/button";
 import { cn } from "@/lib/utils";
@@ -100,9 +100,9 @@ export default function SidebarArea() {
 
         if (error) {
             console.error("Error deleting chat:", error);
-            toast.error("Failed to delete chat");
+            toast.error("Failed to delete chat", { duration: 1000 });
         } else {
-            toast.success("Chat deleted");
+            toast.success("Chat deleted", { duration: 1000 });
             if (currentChatId === chatId) {
                 setCurrentChatId(null);
                 setChatMessages([]);
@@ -347,9 +347,9 @@ export default function SidebarArea() {
                                     </DropdownMenu>
                                 </div>
                             )) : chatsFetched ? (
-                                <div className="flex flex-col items-center justify-center h-full gap-2 my-5">
-                                    <CircleOff size={48} className="text-muted-foreground" />
-                                    <p className="text-muted-foreground">No chats found</p>
+                                <div className="flex flex-col items-center justify-center h-full2 my-5 text-center">
+                                    <CircleSlash size={48} className="text-muted-foreground mb-2" />
+                                    <p className="font-medium text-muted-foreground">No chats found</p>
                                 </div>
                             ) : (
                                 <div className="flex flex-col items-center justify-center h-full gap-1 my-1">
