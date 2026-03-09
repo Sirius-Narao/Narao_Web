@@ -10,12 +10,16 @@ interface EditMessageContextType {
     pendingEdit: PendingEdit | null;
     requestEdit: (messageId: string, content: string) => void;
     clearEdit: () => void;
+    pendingRegenerate: string | null; // assistantMessageId to regenerate
+    requestRegenerate: (assistantMessageId: string) => void;
+    clearRegenerate: () => void;
 }
 
 const EditMessageContext = createContext<EditMessageContextType | undefined>(undefined);
 
 function EditMessageProvider({ children }: { children: ReactNode }) {
     const [pendingEdit, setPendingEdit] = useState<PendingEdit | null>(null);
+    const [pendingRegenerate, setPendingRegenerate] = useState<string | null>(null);
 
     const requestEdit = (messageId: string, content: string) => {
         setPendingEdit({ messageId, content });
@@ -25,8 +29,16 @@ function EditMessageProvider({ children }: { children: ReactNode }) {
         setPendingEdit(null);
     };
 
+    const requestRegenerate = (assistantMessageId: string) => {
+        setPendingRegenerate(assistantMessageId);
+    };
+
+    const clearRegenerate = () => {
+        setPendingRegenerate(null);
+    };
+
     return (
-        <EditMessageContext.Provider value={{ pendingEdit, requestEdit, clearEdit }}>
+        <EditMessageContext.Provider value={{ pendingEdit, requestEdit, clearEdit, pendingRegenerate, requestRegenerate, clearRegenerate }}>
             {children}
         </EditMessageContext.Provider>
     );

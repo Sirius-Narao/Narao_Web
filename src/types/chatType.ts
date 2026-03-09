@@ -1,3 +1,10 @@
+interface ToolCall {
+    name: string;
+    args: Record<string, any>;
+    status: 'loading' | 'done' | 'error';
+    result?: string;
+}
+
 interface ChatType {
     id?: string;
     title: string;
@@ -25,6 +32,7 @@ interface ChatMessage {
     createdAt: Date;
     role: "user" | "assistant";
     attachments?: ChatAttachment[];
+    toolCalls?: ToolCall[];
     isDone?: boolean;
 }
 
@@ -34,4 +42,4 @@ interface Models {
     "gemini-3.1-flash-lite-preview": "Gemini 3.1 Flash Lite"
 }
 
-export type { ChatType, ChatMessage, ChatAttachment, Models };
+export type { ChatType, ChatMessage, ChatAttachment, Models, ToolCall };

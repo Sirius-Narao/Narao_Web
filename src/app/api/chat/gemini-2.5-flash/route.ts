@@ -5,7 +5,42 @@ const ai = new GoogleGenAI({ apiKey: process.env.GOOGLE_GENERATIVE_AI_API_KEY! }
 
 export async function POST(req: NextRequest) {
     try {
-        const { history, userInput, attachments, isThinking, systemPrompt, tools } = await req.json();
+        const { history, userInput, attachments, isThinking, systemPrompt, tools, _rawContents } = await req.json();
+
+        // If raw Gemini contents are provided (multi-turn tool calling), use them directly
+        if (_rawContents) {
+            const result = await ai.models.generateContentStream({
+                model: "gemini-2.5-flash",
+                contents: _rawContents,
+                config: {
+                    ...(systemPrompt ? { systemInstruction: systemPrompt } : {}),
+                    ...(isThinking ? { thinkingConfig: { includeThoughts: true, thinkingBudget: -1 } } : {}),
+                    tools: tools ? [{ functionDeclarations: tools }] : undefined,
+                } as any
+            });
+            const stream = new ReadableStream({
+                async start(controller) {
+                    const encoder = new TextEncoder();
+                    try {
+                        for await (const chunk of result) {
+                            const candidate = chunk.candidates?.[0];
+                            if (candidate?.content?.parts) {
+                                for (const part of candidate.content.parts) {
+                                    if ((part as any).thought) {
+                                        controller.enqueue(encoder.encode(JSON.stringify({ type: "thought", content: part.text }) + "\n"));
+                                    } else if (part.text) {
+                                        controller.enqueue(encoder.encode(JSON.stringify({ type: "answer", content: part.text }) + "\n"));
+                                    } else if (part.functionCall) {
+                                        controller.enqueue(encoder.encode(JSON.stringify({ type: "functionCall", content: { ...part.functionCall, thoughtSignature: (part as any).thoughtSignature ?? null } }) + "\n"));
+                                    }
+                                }
+                            }
+                        }
+                    } catch (e) { controller.error(e); } finally { controller.close(); }
+                }
+            });
+            return new Response(stream, { headers: { "Content-Type": "text/event-stream", "Cache-Control": "no-cache", "Connection": "keep-alive" } });
+        }
 
         // Helper: fetch a file from a public URL and return base64
         const urlToBase64 = async (url: string): Promise<string> => {
@@ -76,7 +111,13 @@ export async function POST(req: NextRequest) {
                                     const data = JSON.stringify({ type: "answer", content: part.text });
                                     controller.enqueue(encoder.encode(data + "\n"));
                                 } else if (part.functionCall) {
-                                    const data = JSON.stringify({ type: "functionCall", content: part.functionCall });
+                                    const data = JSON.stringify({
+                                        type: "functionCall",
+                                        content: {
+                                            ...part.functionCall,
+                                            thoughtSignature: (part as any).thoughtSignature ?? null
+                                        }
+                                    });
                                     controller.enqueue(encoder.encode(data + "\n"));
                                 }
                             }

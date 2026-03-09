@@ -1204,14 +1204,18 @@ export default function MainArea() {
                                 className="text-foreground text-lg font-medium cursor-pointer bg-transparent dark:bg-transparent focus-visible:ring-0 focus-visible:border-none shadow-none w-64 text-center p-0 md:text-lg"
                             />
                             :
-                            <Tooltip>
-                                <TooltipTrigger asChild>
-                                    <Button variant="ghost" className="text-foreground text-lg cursor-pointer" onClick={() => { handleRenameChat() }}>{chatTitle}</Button>
-                                </TooltipTrigger>
-                                <TooltipContent>
-                                    <p>Change Chat's title</p>
-                                </TooltipContent>
-                            </Tooltip>}
+                            currentChatId ? (
+                                <Tooltip>
+                                    <TooltipTrigger asChild>
+                                        <Button variant="ghost" className="text-foreground text-lg cursor-pointer" onClick={() => { handleRenameChat() }}>{chatTitle}</Button>
+                                    </TooltipTrigger>
+                                    <TooltipContent>
+                                        <p>Change Chat's title</p>
+                                    </TooltipContent>
+                                </Tooltip>) : (
+                                <Button variant="ghost" className="text-foreground text-lg cursor-pointer">New Chat</Button>
+                            )
+                        }
                     </div>
                 }
 

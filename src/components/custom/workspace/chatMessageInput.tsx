@@ -3,16 +3,19 @@ import { Tooltip, TooltipContent, TooltipTrigger } from "@/components/ui/tooltip
 import { ArrowUp, Edit, FileImage, FileTypeCorner, Leaf, Lightbulb, Mic, Plus, Square, X, Zap } from "lucide-react"
 import { useState, useRef, useEffect, Dispatch, SetStateAction } from "react"
 import { useChatMessages } from "@/context/chatMessagesContext"
-import { ChatMessage, ChatAttachment, Models } from "@/types/chatType"
+import { ChatMessage, ChatAttachment, Models, ToolCall } from "@/types/chatType"
 import { v4 as uuidv4 } from "uuid"
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover"
 import { toast } from "sonner"
 import { supabase } from "@/lib/supabaseClient"
 import { useUser } from "@/context/userContext"
 import { useActiveTabs } from "@/context/activeTabsContext"
-import { Type } from "@google/genai"
 import { useIsLoading } from "@/context/isLoadingContext"
 import { useEditMessage } from "@/context/editMessageContext"
+import { cn } from "@/lib/utils"
+import { WORKSPACE_TOOL_DECLARATIONS, executeToolCall } from "@/lib/workspaceTools"
+import { useFetchedNotes } from "@/context/fetchedNotesContext"
+import { useFetchedFolders } from "@/context/fetchedFoldersContext"
 
 const models = {
     "gemini-2.5-flash": "Gemini 2.5 Flash",
@@ -37,7 +40,16 @@ export default function ChatMessageInput({ attachments, setAttachments }: ChatMe
 
     // user context
     const { user } = useUser();
-    const systemPromptString = `You are "Orthan AI", Narao's integrated assistant. You help in order to learn and to work mainly, so you use much markdown to highlight things. Narao is a note-taking app that uses AI to help users to learn and to work more efficiently. I am ${user?.username || "the user"}, and my preferences are: I like coding, AI, and technology. I am a student and I am learning about AI. Do not talk about yourself, only talk about the task except if explicitly asked.`;
+    const systemPromptString = `You are "Orthan AI", Narao's integrated assistant. You help in order to learn and to work mainly, so you use much markdown to highlight things. Narao is a note-taking app that uses AI to help users to learn and to work more efficiently. I am ${user?.username || "the user"}, and my preferences are: I like coding, AI, and technology. I am a student and I am learning about AI. Do not talk about yourself, only talk about the task except if explicitly asked.
+
+When you use tools:
+- Before calling a tool, briefly explain in natural language what you are about to do (e.g. "Let me search your workspace for notes about math...").
+- After getting a tool result, briefly acknowledge what you found before proceeding or calling another tool (e.g. "I found 3 notes. Let me now read the one about algebra.").
+- At the end, give a complete, helpful answer based on all the information you gathered.`;
+
+    // Workspace contexts for tool execution
+    const { fetchedNotes, setFetchedNotes } = useFetchedNotes();
+    const { fetchedFolders, setFetchedFolders } = useFetchedFolders();
 
     // Model Settings
     const [currentModel, setCurrentModel] = useState<keyof Models>("gemini-3.1-flash-lite-preview")
@@ -49,7 +61,7 @@ export default function ChatMessageInput({ attachments, setAttachments }: ChatMe
     const { activeTab } = useActiveTabs()
 
     // edit message context
-    const { pendingEdit, clearEdit } = useEditMessage()
+    const { pendingEdit, clearEdit, pendingRegenerate, clearRegenerate } = useEditMessage()
 
     useEffect(() => {
         if (textareaRef.current) {
@@ -320,11 +332,14 @@ export default function ChatMessageInput({ attachments, setAttachments }: ChatMe
         try {
             // 0. If this send is completing an edit: remove the original message
             //    and everything after it (the AI reply) from UI + DB first.
+            // Compute the base history synchronously so we can use it below.
+            let baseMessages = chatMessages;
             if (pendingEdit) {
                 const editedIndex = chatMessages.findIndex(m => m.id === pendingEdit.messageId);
                 if (editedIndex !== -1) {
+                    baseMessages = chatMessages.slice(0, editedIndex);
                     const idsToDelete = chatMessages.slice(editedIndex).map(m => m.id);
-                    setChatMessages(prev => prev.slice(0, editedIndex));
+                    setChatMessages(baseMessages);
                     if (currentChatId && idsToDelete.length > 0) {
                         supabase
                             .from("chat_messages")
@@ -366,7 +381,8 @@ export default function ChatMessageInput({ attachments, setAttachments }: ChatMe
                 isDone: true
             };
 
-            const updatedHistory = [...chatMessages, userMessage];
+            // Use baseMessages (already sliced if editing) to avoid including stale old messages
+            const updatedHistory = [...baseMessages, userMessage];
             setChatMessages(updatedHistory);
 
             const currentContent = content;
@@ -425,7 +441,7 @@ export default function ChatMessageInput({ attachments, setAttachments }: ChatMe
                     attachments: apiAttachments,
                     isThinking: isThinking,
                     systemPrompt: systemPromptString,
-                    tools: allTools
+                    tools: WORKSPACE_TOOL_DECLARATIONS
                 }),
                 signal: controller.signal
             });
@@ -455,30 +471,39 @@ export default function ChatMessageInput({ attachments, setAttachments }: ChatMe
                 return;
             }
 
-            // 5. Read the stream
+            // 5. Read the stream — inline per-chunk processing for real-time UI updates
             const reader = response.body?.getReader();
             const textDecoder = new TextDecoder();
-            let buffer = "";
             let thinkingStartTime = Date.now();
 
-            if (reader) {
+            // Accumulated Gemini conversation contents for multi-turn tool calling
+            let geminiContents: any[] = [
+                ...updatedHistory.map((msg: ChatMessage) => ({
+                    role: msg.role === "user" ? "user" : "model",
+                    parts: [{ text: msg.content || "" }]
+                }))
+            ];
+
+            /**
+             * Reads a stream chunk-by-chunk, updates UI in real-time, and returns
+             * any functionCall parts that were emitted (so we can chain tool calls).
+             */
+            const processStreamInline = async (
+                streamReader: ReadableStreamDefaultReader<Uint8Array>,
+                msgId: string,
+                signal: AbortSignal
+            ): Promise<Array<{ name: string; args: Record<string, any>; thoughtSignature: string | null }>> => {
+                const functionCalls: Array<{ name: string; args: Record<string, any>; thoughtSignature: string | null }> = [];
+                let buf = "";
+
                 while (true) {
-                    const { done, value } = await reader.read();
-                    if (done) {
-                        setChatMessages(prev => prev.map(msg =>
-                            msg.id === assistantId ? {
-                                ...msg,
-                                isDone: true
-                            } : msg
-                        ));
-                        break;
-                    }
+                    if (signal.aborted) break;
+                    const { done, value } = await streamReader.read();
+                    if (done) break;
 
-                    buffer += textDecoder.decode(value, { stream: true });
-                    const lines = buffer.split("\n");
-
-                    // The last element might be a partial line, keep it in buffer
-                    buffer = lines.pop() || "";
+                    buf += textDecoder.decode(value, { stream: true });
+                    const lines = buf.split("\n");
+                    buf = lines.pop() || "";
 
                     for (const line of lines) {
                         if (!line.trim()) continue;
@@ -486,29 +511,126 @@ export default function ChatMessageInput({ attachments, setAttachments }: ChatMe
                             const data = JSON.parse(line);
                             if (data.type === "thought") {
                                 accumulatedThought += data.content;
+                                setChatMessages(prev => prev.map(msg =>
+                                    msg.id === msgId ? { ...msg, thought: accumulatedThought } : msg
+                                ));
                             } else if (data.type === "answer") {
-                                if (thinkingDuration === undefined) {
+                                if (thinkingDuration === undefined && accumulatedThought) {
                                     thinkingDuration = Date.now() - thinkingStartTime;
                                 }
                                 accumulatedAnswer += data.content;
+                                // ← Real-time streaming: update UI on every text chunk
+                                setChatMessages(prev => prev.map(msg =>
+                                    msg.id === msgId ? {
+                                        ...msg,
+                                        content: accumulatedAnswer,
+                                        thought: accumulatedThought,
+                                        thinkingTime: thinkingDuration
+                                    } : msg
+                                ));
                             } else if (data.type === "functionCall") {
-                                console.log("Function call received:", data.content);
+                                const fc = {
+                                    name: data.content.name,
+                                    args: data.content.args ?? {},
+                                    thoughtSignature: data.content.thoughtSignature ?? null
+                                };
+                                functionCalls.push(fc);
+                                // ← Tool card appears immediately when chunk arrives
+                                setChatMessages(prev => prev.map(msg =>
+                                    msg.id === msgId ? {
+                                        ...msg,
+                                        toolCalls: [...(msg.toolCalls || []), {
+                                            name: fc.name,
+                                            args: fc.args,
+                                            status: 'loading' as const
+                                        }]
+                                    } : msg
+                                ));
                             }
-
-                            // Update the specific assistant message
-                            setChatMessages(prev => prev.map(msg =>
-                                msg.id === assistantId ? {
-                                    ...msg,
-                                    content: accumulatedAnswer,
-                                    thought: accumulatedThought,
-                                    thinkingTime: thinkingDuration
-                                } : msg
-                            ));
                         } catch (e) {
                             console.error("Failed to parse stream line:", line, e);
                         }
                     }
                 }
+                return functionCalls;
+            };
+
+            if (reader) {
+                let currentReader = reader;
+                let continueToolLoop = true;
+
+                while (continueToolLoop) {
+                    const functionCalls = await processStreamInline(currentReader, assistantId, controller.signal);
+
+                    if (functionCalls.length > 0) {
+                        // Build model turn with thoughtSignatures
+                        const modelFcParts: any[] = functionCalls.map(fc => ({
+                            functionCall: { name: fc.name, args: fc.args },
+                            ...(fc.thoughtSignature ? { thoughtSignature: fc.thoughtSignature } : {})
+                        }));
+                        geminiContents.push({ role: "model", parts: modelFcParts });
+
+                        // Execute each tool, update card status as they complete
+                        const functionResponses: any[] = [];
+                        for (const fc of functionCalls) {
+                            let result: string;
+                            let status: 'done' | 'error' = 'done';
+                            try {
+                                result = await executeToolCall(fc.name, fc.args, {
+                                    userId: user!.id,
+                                    fetchedNotes,
+                                    fetchedFolders,
+                                    setFetchedNotes,
+                                    setFetchedFolders
+                                });
+                            } catch (err: any) {
+                                result = `Error: ${err?.message || "unknown error"}`;
+                                status = 'error';
+                            }
+                            functionResponses.push({
+                                functionResponse: { name: fc.name, response: { result } }
+                            });
+                            setChatMessages(prev => prev.map(msg => {
+                                if (msg.id !== assistantId) return msg;
+                                const updated = [...(msg.toolCalls || [])];
+                                const loadingIdx = updated.map((t, j) => ({ t, j })).reverse()
+                                    .find(({ t }) => t.name === fc.name && t.status === 'loading')?.j ?? -1;
+                                if (loadingIdx !== -1) updated[loadingIdx] = { ...updated[loadingIdx], status, result };
+                                return { ...msg, toolCalls: updated };
+                            }));
+                        }
+
+                        geminiContents.push({ role: "user", parts: functionResponses });
+
+                        const followUpResponse = await fetch(`/api/chat/${currentModel}`, {
+                            method: "POST",
+                            headers: { "Content-Type": "application/json" },
+                            body: JSON.stringify({
+                                _rawContents: geminiContents,
+                                attachments: [],
+                                isThinking,
+                                systemPrompt: systemPromptString,
+                                tools: WORKSPACE_TOOL_DECLARATIONS
+                            }),
+                            signal: controller.signal
+                        });
+
+                        if (!followUpResponse.ok || !followUpResponse.body) {
+                            accumulatedAnswer += "\n\n*(An error occurred while processing tool results.)*";
+                            continueToolLoop = false;
+                            break;
+                        }
+                        currentReader = followUpResponse.body.getReader();
+
+                    } else {
+                        // No function calls — stream is done
+                        continueToolLoop = false;
+                    }
+                }
+
+                setChatMessages(prev => prev.map(msg =>
+                    msg.id === assistantId ? { ...msg, isDone: true } : msg
+                ));
             }
 
             if (effectiveChatId) {
@@ -573,6 +695,281 @@ export default function ChatMessageInput({ attachments, setAttachments }: ChatMe
         }
     };
 
+    // Handle regenerating an assistant answer
+    const handleRegenerate = async (assistantMessageId: string) => {
+        if (isLoading) return;
+
+        // Find the assistant message and the user message before it
+        const assistantIndex = chatMessages.findIndex(m => m.id === assistantMessageId);
+        if (assistantIndex === -1) return;
+
+        // The user message is the one right before the assistant message
+        const userMessage = chatMessages.slice(0, assistantIndex).reverse().find(m => m.role === "user");
+        if (!userMessage) return;
+
+        const userMessageIndex = chatMessages.findIndex(m => m.id === userMessage.id);
+
+        // Keep messages up to and including the user message; remove the assistant answer + anything after
+        const baseMessages = chatMessages.slice(0, userMessageIndex + 1);
+        const idsToDelete = chatMessages.slice(userMessageIndex + 1).map(m => m.id);
+
+        setChatMessages(baseMessages);
+
+        if (currentChatId && idsToDelete.length > 0) {
+            supabase
+                .from("chat_messages")
+                .delete()
+                .in("id", idsToDelete)
+                .then(({ error }) => {
+                    if (error) console.error("Error deleting messages for regeneration:", error);
+                });
+        }
+
+        clearRegenerate();
+
+        // Re-run the streaming API with the same user message content
+        setIsLoading(true);
+        const controller = new AbortController();
+        abortControllerRef.current = controller;
+
+        const newAssistantId = uuidv4();
+        let effectiveChatId = currentChatId;
+        let accumulatedThought = "";
+        let accumulatedAnswer = "";
+        let thinkingDuration: number | undefined = undefined;
+
+        // Add new assistant placeholder
+        const assistantPlaceholder: ChatMessage = {
+            id: newAssistantId,
+            role: "assistant",
+            content: "",
+            createdAt: new Date()
+        };
+        setChatMessages(prev => [...prev, assistantPlaceholder]);
+
+        try {
+            const response = await fetch(`/api/chat/${currentModel}`, {
+                method: "POST",
+                headers: { "Content-Type": "application/json" },
+                body: JSON.stringify({
+                    history: baseMessages,
+                    userInput: userMessage.content,
+                    attachments: [],
+                    isThinking: isThinking,
+                    systemPrompt: systemPromptString,
+                    tools: WORKSPACE_TOOL_DECLARATIONS
+                }),
+                signal: controller.signal
+            });
+
+            if (!response.ok) {
+                const fallbackContent = "We are unable to satisfy the request at the moment, please try again later or consider using another model.";
+                setChatMessages(prev => prev.map(msg =>
+                    msg.id === newAssistantId ? { ...msg, content: fallbackContent, isDone: true } : msg
+                ));
+                if (effectiveChatId) {
+                    addMessageToChatMessages(effectiveChatId, {
+                        id: newAssistantId,
+                        role: "assistant",
+                        content: fallbackContent,
+                        createdAt: new Date()
+                    });
+                }
+                setIsLoading(false);
+                return;
+            }
+
+            const reader = response.body?.getReader();
+            const textDecoder = new TextDecoder();
+            const thinkingStartTime = Date.now();
+
+            // Gemini contents for multi-turn tool calling in regenerate
+            let geminiContents: any[] = [
+                ...baseMessages.map((msg: ChatMessage) => ({
+                    role: msg.role === "user" ? "user" : "model",
+                    parts: [{ text: msg.content || "" }]
+                }))
+            ];
+
+            const processStreamInlineRegen = async (
+                streamReader: ReadableStreamDefaultReader<Uint8Array>,
+                msgId: string,
+                signal: AbortSignal
+            ): Promise<Array<{ name: string; args: Record<string, any>; thoughtSignature: string | null }>> => {
+                const functionCalls: Array<{ name: string; args: Record<string, any>; thoughtSignature: string | null }> = [];
+                let buf = "";
+
+                while (true) {
+                    if (signal.aborted) break;
+                    const { done, value } = await streamReader.read();
+                    if (done) break;
+
+                    buf += textDecoder.decode(value, { stream: true });
+                    const lines = buf.split("\n");
+                    buf = lines.pop() || "";
+
+                    for (const line of lines) {
+                        if (!line.trim()) continue;
+                        try {
+                            const data = JSON.parse(line);
+                            if (data.type === "thought") {
+                                accumulatedThought += data.content;
+                                setChatMessages(prev => prev.map(msg =>
+                                    msg.id === msgId ? { ...msg, thought: accumulatedThought } : msg
+                                ));
+                            } else if (data.type === "answer") {
+                                if (thinkingDuration === undefined && accumulatedThought) {
+                                    thinkingDuration = Date.now() - thinkingStartTime;
+                                }
+                                accumulatedAnswer += data.content;
+                                setChatMessages(prev => prev.map(msg =>
+                                    msg.id === msgId ? {
+                                        ...msg,
+                                        content: accumulatedAnswer,
+                                        thought: accumulatedThought,
+                                        thinkingTime: thinkingDuration
+                                    } : msg
+                                ));
+                            } else if (data.type === "functionCall") {
+                                const fc = {
+                                    name: data.content.name,
+                                    args: data.content.args ?? {},
+                                    thoughtSignature: data.content.thoughtSignature ?? null
+                                };
+                                functionCalls.push(fc);
+                                setChatMessages(prev => prev.map(msg =>
+                                    msg.id === msgId ? {
+                                        ...msg,
+                                        toolCalls: [...(msg.toolCalls || []), {
+                                            name: fc.name, args: fc.args, status: 'loading' as const
+                                        }]
+                                    } : msg
+                                ));
+                            }
+                        } catch (e) { console.error("Failed to parse stream line:", line, e); }
+                    }
+                }
+                return functionCalls;
+            };
+
+            if (reader) {
+                let currentReader = reader;
+                let continueLoop = true;
+
+                while (continueLoop) {
+                    const functionCalls = await processStreamInlineRegen(currentReader, newAssistantId, controller.signal);
+
+                    if (functionCalls.length > 0) {
+                        const modelFcParts: any[] = functionCalls.map(fc => ({
+                            functionCall: { name: fc.name, args: fc.args },
+                            ...(fc.thoughtSignature ? { thoughtSignature: fc.thoughtSignature } : {})
+                        }));
+                        geminiContents.push({ role: "model", parts: modelFcParts });
+
+                        const functionResponses: any[] = [];
+                        for (const fc of functionCalls) {
+                            let result: string;
+                            let status: 'done' | 'error' = 'done';
+                            try {
+                                result = await executeToolCall(fc.name, fc.args, {
+                                    userId: user!.id, fetchedNotes, fetchedFolders, setFetchedNotes, setFetchedFolders
+                                });
+                            } catch (err: any) {
+                                result = `Error: ${err?.message}`;
+                                status = 'error';
+                            }
+                            functionResponses.push({ functionResponse: { name: fc.name, response: { result } } });
+                            setChatMessages(prev => prev.map(msg => {
+                                if (msg.id !== newAssistantId) return msg;
+                                const updated = [...(msg.toolCalls || [])];
+                                const loadingIdx = updated.map((t, j) => ({ t, j })).reverse()
+                                    .find(({ t }) => t.name === fc.name && t.status === 'loading')?.j ?? -1;
+                                if (loadingIdx !== -1) updated[loadingIdx] = { ...updated[loadingIdx], status, result };
+                                return { ...msg, toolCalls: updated };
+                            }));
+                        }
+
+                        geminiContents.push({ role: "user", parts: functionResponses });
+
+                        const followUp = await fetch(`/api/chat/${currentModel}`, {
+                            method: "POST",
+                            headers: { "Content-Type": "application/json" },
+                            body: JSON.stringify({
+                                _rawContents: geminiContents,
+                                attachments: [],
+                                isThinking,
+                                systemPrompt: systemPromptString,
+                                tools: WORKSPACE_TOOL_DECLARATIONS
+                            }),
+                            signal: controller.signal
+                        });
+
+                        if (!followUp.ok || !followUp.body) { continueLoop = false; break; }
+                        currentReader = followUp.body.getReader();
+
+                    } else {
+                        continueLoop = false;
+                    }
+                }
+                setChatMessages(prev => prev.map(msg =>
+                    msg.id === newAssistantId ? { ...msg, isDone: true } : msg
+                ));
+            }
+
+            if (effectiveChatId) {
+                addMessageToChatMessages(effectiveChatId, {
+                    id: newAssistantId,
+                    role: "assistant",
+                    content: accumulatedAnswer,
+                    thought: accumulatedThought,
+                    thinkingTime: thinkingDuration,
+                    createdAt: new Date()
+                });
+            }
+        } catch (error: any) {
+            if (error.name === 'AbortError') {
+                setChatMessages(prev => prev.map(msg =>
+                    msg.id === newAssistantId ? { ...msg, isDone: true } : msg
+                ));
+                toast.warning("Answer stopped!");
+                if (effectiveChatId) {
+                    addMessageToChatMessages(effectiveChatId, {
+                        id: newAssistantId,
+                        role: "assistant",
+                        content: accumulatedAnswer.trim(),
+                        thought: accumulatedThought.trim(),
+                        thinkingTime: thinkingDuration,
+                        createdAt: new Date()
+                    });
+                }
+            } else {
+                console.error("Failed to get regenerated response:", error);
+                const fallbackContent = "We are unable to satisfy the request at the moment, please try again later or consider using another model.";
+                setChatMessages(prev => prev.map(msg =>
+                    msg.id === newAssistantId ? { ...msg, content: fallbackContent, isDone: true } : msg
+                ));
+                if (effectiveChatId) {
+                    addMessageToChatMessages(effectiveChatId, {
+                        id: newAssistantId,
+                        role: "assistant",
+                        content: fallbackContent,
+                        createdAt: new Date()
+                    });
+                }
+            }
+        } finally {
+            setIsLoading(false);
+            abortControllerRef.current = null;
+        }
+    };
+
+    // Trigger regeneration when pendingRegenerate is set
+    useEffect(() => {
+        if (!pendingRegenerate) return;
+        handleRegenerate(pendingRegenerate);
+        // eslint-disable-next-line react-hooks/exhaustive-deps
+    }, [pendingRegenerate]);
+
     const handleStop = () => {
         if (abortControllerRef.current) {
             abortControllerRef.current.abort();
@@ -584,58 +981,6 @@ export default function ChatMessageInput({ attachments, setAttachments }: ChatMe
     const removeAttachment = (index: number) => {
         setAttachments(prev => prev.filter((_, i) => i !== index));
     };
-
-    // -------------------------- AI FUNCTIONS --------------------------
-
-    const searchFilesAndFoldersDeclaration = {
-        name: "search_files_and_folders",
-        description: "Gets a list of objects (note_name, note_description, localisation), and a list of objects (folder_name, localisation) given a query. This function is set to gain knowledge from the currently existing workspace architecture.",
-        parameters: {
-            type: Type.OBJECT,
-            properties: {
-                query: {
-                    type: Type.STRING,
-                    description: "Query to search for existing folders and notes (e.g. 'math test functions ai matrices'). That searches by keywords, the more you have the better (MAX 30 keywords)."
-                },
-            },
-            required: ["query"],
-        },
-    }
-    const readNoteDeclaration = {
-        name: "read_note",
-        description: "Gets the content of the accessed note.",
-        parameters: {
-            type: Type.OBJECT,
-            properties: {
-                localisation: {
-                    type: Type.STRING,
-                    description: "Absolute path to the note (e.g. '/maths/introduction')."
-                },
-            },
-            required: ["localisation"],
-        },
-    }
-    const modifyNote = {
-        name: "modify_note",
-        description: "Modify the whole content of the accessed note. Be mindful that it will replace the whole content of the note with the one you provide.",
-        parameters: {
-            type: Type.OBJECT,
-            properties: {
-                localisation: {
-                    type: Type.STRING,
-                    description: "Absolute path to the note (e.g. '/maths/introduction')."
-                },
-                content: {
-                    type: Type.STRING,
-                    description: "Text that will replace the one inside the note (e.g. # Math Exercices \n 1. 2 + 2 = ?...). The use of markdown is recommended."
-                }
-            },
-            required: ["localisation", "content"],
-        },
-    }
-
-    // list of all functions for the AI
-    const allTools = [searchFilesAndFoldersDeclaration, readNoteDeclaration, modifyNote]
 
     // Keyboard shortcuts
     useEffect(() => {
@@ -656,8 +1001,8 @@ export default function ChatMessageInput({ attachments, setAttachments }: ChatMe
         <div className="absolute flex flex-col w-[60%] bottom-0 left-[20%] right-[20%] gap-2 z-50" >
             {/* Edit mode cancel pill */}
             {pendingEdit && (
-                <div className="flex items-center justify-center animate-in fade-in slide-in-from-bottom-2">
-                    <div className="flex items-center gap-2 bg-popover/40 backdrop-blur-md border border-border px-3 py-1.5 rounded-full text-xs text-muted-foreground shadow-sm">
+                <div className="flex items-center justify-center animate-in fade-in">
+                    <div className={cn("flex items-center gap-2 bg-popover/60 backdrop-blur-md border border-border px-3 py-1.5 rounded-xl text-xs group relative animate-in fade-in shadow-lg", pendingEdit && "bg-primary/10 border-primary/20")}>
                         <Edit size={12} className="text-primary" />
                         <span>Editing message</span>
                         <button
@@ -674,7 +1019,7 @@ export default function ChatMessageInput({ attachments, setAttachments }: ChatMe
             {attachments.length > 0 && (
                 <div className="flex flex-row items-center gap-2 px-4 flex-wrap justify-center">
                     {attachments.map((file, index) => (
-                        <div key={index} className="flex items-center gap-2 bg-popover/60 backdrop-blur-md border border-border px-3 py-1.5 rounded-xl text-xs group relative animate-in fade-in slide-in-from-bottom-2 shadow-lg">
+                        <div key={index} className={cn("flex items-center gap-2 bg-popover/60 backdrop-blur-md border border-border px-3 py-1.5 rounded-xl text-xs group relative animate-in fade-in slide-in-from-bottom-2 shadow-lg", pendingEdit && "bg-primary/10 border-primary/20")}>
                             {(file.type.includes("jpeg") || file.type.includes("png") || file.type.includes("webp")) && (
                                 <FileImage className="w-4 h-4 text-primary" />
                             )}
@@ -695,7 +1040,7 @@ export default function ChatMessageInput({ attachments, setAttachments }: ChatMe
             }
 
             < div className="flex gap-2 items-center items-end pb-1" >
-                <div className="rounded-[30px] p-2 border-1 border-border bg-popover/40 backdrop-blur-md shadow-lg">
+                <div className={cn("rounded-[30px] p-2 border-1 border-border transition-all duration-200 bg-popover/40 backdrop-blur-md shadow-lg", pendingEdit && "bg-primary/10 border-primary/20")}>
                     <Tooltip>
                         <TooltipTrigger asChild>
                             <Button
@@ -711,7 +1056,7 @@ export default function ChatMessageInput({ attachments, setAttachments }: ChatMe
                         <TooltipContent><p>Attach Image or PDF</p><p className="text-xs text-muted-foreground">Maximum 3 attachments allowed</p></TooltipContent>
                     </Tooltip>
                 </div>
-                <div className="flex w-full rounded-[30px] border-1 border-border bg-popover/60 backdrop-blur-md shadow-lg px-2 py-1 items-end justify-center gap-2">
+                <div className={cn("flex w-full rounded-[30px] border-1 border-border bg-popover/60 backdrop-blur-md shadow-lg px-2 py-1 items-end justify-center gap-2 transition-all duration-200", pendingEdit && "bg-primary/10 border-primary/20")}>
                     <input
                         type="file"
                         ref={fileInputRef}
