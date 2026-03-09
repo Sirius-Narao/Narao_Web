@@ -12,11 +12,11 @@ import { useEditMessage } from "@/context/editMessageContext";
 import { useChatMessages } from "@/context/chatMessagesContext";
 
 const THINKING_PHRASES = [
-    "Let me think about it...",
-    "Gathering my thoughts...",
-    "Analyzing your request...",
-    "Almost there...",
-    "Why am I taking so long..."
+    "Let me think about it... ",
+    "Gathering my thoughts... ",
+    "Analyzing your request... ",
+    "Almost there... ",
+    "Why am I taking so long... "
 ];
 
 export default function ChatMessageBlock({ message }: { message: ChatMessage }) {
@@ -34,12 +34,12 @@ export default function ChatMessageBlock({ message }: { message: ChatMessage }) 
             return;
         }
 
-        let i = 0;
-        setDisplayText("");
+        let i = -1;
         const phrase = THINKING_PHRASES[phraseIndex];
+        setDisplayText(phrase.slice(0, 1));
         const interval = setInterval(() => {
             i++;
-            setDisplayText(phrase.slice(0, i));
+            setDisplayText(phrase.slice(0, i + 1));
             if (i >= phrase.length) {
                 clearInterval(interval);
                 setTimeout(() => {
@@ -101,10 +101,13 @@ export default function ChatMessageBlock({ message }: { message: ChatMessage }) 
                     </div>
                 ) : (
                     <div className="flex flex-col relative w-full h-fit group">
-                        {isLoading && chatMessages[chatMessages.length - 1]?.id === message.id && (
-                            <div className="flex flex-row items-center gap-2 mb-2">
+                        {isLoading && chatMessages[chatMessages.length - 1]?.id === message.id && !message.content && (
+                            <div className="flex flex-row items-center mb-2 p-2">
                                 <p className="text-muted-foreground animate-pulse">
-                                    {displayText}
+                                    {displayText.slice(0, displayText.length - 1)}
+                                </p>
+                                <p className="text-primary">
+                                    {displayText.slice(displayText.length - 1, displayText.length)}
                                 </p>
                             </div>
                         )}

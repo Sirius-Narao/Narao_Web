@@ -11,13 +11,25 @@ import { ArrowDown } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { useIsLoading } from "@/context/isLoadingContext";
 import { EditMessageProvider } from "@/context/editMessageContext";
+import { Spinner } from "@/components/ui/spinner";
 
+const LOADING_PHRASES = [
+    "Loading... ",
+    "Almost there... ",
+    "You might be facing connection issues... "
+];
 
 export default function Chat() {
     const { chatMessages, setChatMessages, currentChatId, setCurrentChatId } = useChatMessages();
     const bottomRef = useRef<HTMLDivElement>(null);
     const scrollAreaRef = useRef<HTMLDivElement>(null);
     const [isAtBottom, setIsAtBottom] = useState(true);
+    const [attachments, setAttachments] = useState<File[]>([])
+    // for typing animation
+    const [isLoadingChats, setIsLoadingChats] = useState(false)
+    const [displayText, setDisplayText] = useState("");
+    const [phraseIndex, setPhraseIndex] = useState(0);
+
     const { user } = useUser();
 
     // Fetch messages when currentChatId changes
@@ -29,6 +41,7 @@ export default function Chat() {
 
         let ignore = false;
         const fetchMessages = async () => {
+            setIsLoadingChats(true);
             const { data: messages, error } = await supabase
                 .from("chat_messages")
                 .select("*")
@@ -66,6 +79,7 @@ export default function Chat() {
                     return [...mappedMessages, ...missingLocal];
                 });
             }
+            setIsLoadingChats(false);
         };
 
         fetchMessages();
@@ -98,6 +112,30 @@ export default function Chat() {
         return () => viewport.removeEventListener("scroll", handleScroll);
     }, []);
 
+    // animation for typing loading
+    useEffect(() => {
+        if (!isLoadingChats) {
+            setDisplayText("");
+            setPhraseIndex(0);
+            return;
+        }
+
+        let i = -1;
+        const phrase = LOADING_PHRASES[phraseIndex];
+        setDisplayText(phrase.slice(0, 1));
+        const interval = setInterval(() => {
+            i++;
+            setDisplayText(phrase.slice(0, i + 1));
+            if (i >= phrase.length) {
+                clearInterval(interval);
+                setTimeout(() => {
+                    setPhraseIndex((prev) => (prev + 1) % LOADING_PHRASES.length);
+                }, 1500);
+            }
+        }, 20);
+        return () => clearInterval(interval);
+    }, [isLoadingChats, phraseIndex]);
+
     return (
         <EditMessageProvider>
             <div className="flex flex-col.....0 relative w-full h-full overflow-hidden">
@@ -106,34 +144,50 @@ export default function Chat() {
                     {/* Fixed fade effects at top and bottom */}
                     <div className="absolute top-0 left-0 w-[calc(100%-12px)] h-16 bg-gradient-to-b from-card to-transparent pointer-events-none z-20" key={"fade-top"} />
 
-                    <div ref={scrollAreaRef} className="h-full w-full">
-                        <ScrollArea className="h-full w-full px-[12%]">
-                            <div className="h-20 " key={"padding-top"}></div>
+                    {isLoadingChats ? (
+                        <div className="flex items-center justify-center h-[60vh]">
+                            <p className="text-muted-foreground animate-pulse text-3xl font-medium">
+                                {displayText.slice(0, displayText.length - 1)}
+                            </p>
+                            <p className="text-primary animate-pulse text-3xl font-medium">
+                                {displayText.slice(displayText.length - 1, displayText.length)}
+                            </p>
+                        </div>
+                    ) : (
+                        <div ref={scrollAreaRef} className="h-full w-full">
+                            <ScrollArea className="h-full w-full px-[12%]">
+                                <div className="h-20 " key={"padding-top"}></div>
 
-                            {chatMessages.map((message) => (
-                                message.role === "user" ? (
-                                    <div className="flex flex-row relative w-full h-fit justify-end" key={message.id}>
-                                        <ChatMessageBlock message={message} />
+                                {chatMessages.map((message) => (
+                                    message.role === "user" ? (
+                                        <div className="flex flex-row relative w-full h-fit justify-end" key={message.id}>
+                                            <ChatMessageBlock message={message} />
+                                        </div>
+                                    ) : (
+                                        <ChatMessageBlock key={message.id} message={message} />
+                                    )
+                                ))}
+                                {chatMessages.length === 0 && (
+                                    <div className="flex flex-col items-center justify-center h-[50vh]">
+                                        <p className="text-3xl font-medium text-muted-foreground fade-up fade-up-delay-1">Hi, I'm Orthan AI.</p>
+                                        <p className="text-4xl font-medium fade-up fade-up-delay-2">How can I help you today?</p>
                                     </div>
-                                ) : (
-                                    <ChatMessageBlock key={message.id} message={message} />
-                                )
-                            ))}
-                            {chatMessages.length === 0 && (
-                                <div className="flex flex-col items-center justify-center h-[50vh]">
-                                    <p className="text-3xl font-medium text-muted-foreground fade-up fade-up-delay-1">Hi, I'm Orthan AI.</p>
-                                    <p className="text-4xl font-medium fade-up fade-up-delay-2">How can I help you today?</p>
-                                </div>
-                            )}
+                                )}
 
-                            <div ref={bottomRef} className="h-32 " key={"padding-bottom"}></div>
-                        </ScrollArea>
-                    </div>
+                                <div ref={bottomRef} className="h-32 " key={"padding-bottom"}></div>
+                            </ScrollArea>
+                        </div>
+                    )}
 
                     <Button
                         variant={"outline"}
                         size={"icon"}
-                        className={cn("absolute bottom-20 right-0 left-0 mx-auto z-30 transition-opacity duration-300 border-1 dark:border-border bg-popover/60 dark:bg-popover/60 backdrop-blur-md shadow-lg", isAtBottom ? "opacity-0 pointer-events-none" : "opacity-100")}
+                        className={
+                            cn(
+                                "absolute right-0 left-0 mx-auto z-30 transition-all duration-300 border-1 dark:border-border bg-popover/60 dark:bg-popover/60 backdrop-blur-md shadow-lg",
+                                isAtBottom ? "opacity-0 pointer-events-none" : "opacity-100",
+                                attachments.length > 0 ? "bottom-28" : "bottom-20"
+                            )}
                         onClick={() => {
                             const viewport = scrollAreaRef.current?.querySelector<HTMLElement>("[data-radix-scroll-area-viewport]");
                             if (viewport) viewport.scrollTo({ top: viewport.scrollHeight, behavior: "smooth" });
@@ -144,7 +198,7 @@ export default function Chat() {
                     <div className="absolute bottom-0 left-0 w-[calc(100%-12px)] h-32 bg-gradient-to-t from-card to-transparent pointer-events-none z-20" key={"fade-bottom"} />
                 </div>
 
-                <ChatMessageInput />
+                <ChatMessageInput attachments={attachments} setAttachments={setAttachments} />
             </div>
         </EditMessageProvider>
     )

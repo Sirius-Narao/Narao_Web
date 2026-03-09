@@ -1,7 +1,7 @@
 import { Button } from "@/components/ui/button"
 import { Tooltip, TooltipContent, TooltipTrigger } from "@/components/ui/tooltip"
 import { ArrowUp, Edit, FileImage, FileTypeCorner, Leaf, Lightbulb, Mic, Plus, Square, X, Zap } from "lucide-react"
-import { useState, useRef, useEffect } from "react"
+import { useState, useRef, useEffect, Dispatch, SetStateAction } from "react"
 import { useChatMessages } from "@/context/chatMessagesContext"
 import { ChatMessage, ChatAttachment, Models } from "@/types/chatType"
 import { v4 as uuidv4 } from "uuid"
@@ -20,11 +20,16 @@ const models = {
     "gemini-3.1-flash-lite-preview": "Gemini 3.1 Flash Lite"
 }
 
-export default function ChatMessageInput() {
+interface ChatMessageInputProps {
+    attachments: File[];
+    setAttachments: Dispatch<SetStateAction<File[]>>;
+}
+
+export default function ChatMessageInput({ attachments, setAttachments }: ChatMessageInputProps) {
     const [content, setContent] = useState("")
     const [isThinking, setIsThinking] = useState(false)
     const { isLoading, setIsLoading } = useIsLoading()
-    const [attachments, setAttachments] = useState<File[]>([])
+
     const textareaRef = useRef<HTMLTextAreaElement>(null)
     const fileInputRef = useRef<HTMLInputElement>(null)
     const abortControllerRef = useRef<AbortController | null>(null)
@@ -428,10 +433,24 @@ export default function ChatMessageInput() {
             if (!response.ok) {
                 const errorData = await response.json().catch(() => ({}));
                 console.error("Chat API error:", errorData);
-                // Remove the empty assistant placeholder
-                setChatMessages(prev => prev.filter(msg => msg.id !== assistantId));
-                const userMessage = errorData.message || "Something went wrong. Please try again.";
-                toast.error(userMessage, { position: "bottom-right" });
+                const fallbackContent = "We are unable to satisfy the request at the moment, please try again later or consider using another model.";
+                // Update the assistant placeholder with the fallback message and mark as done
+                setChatMessages(prev => prev.map(msg =>
+                    msg.id === assistantId ? {
+                        ...msg,
+                        content: fallbackContent,
+                        isDone: true
+                    } : msg
+                ));
+                // Persist the fallback message to the database
+                if (effectiveChatId) {
+                    addMessageToChatMessages(effectiveChatId, {
+                        id: assistantId,
+                        role: "assistant",
+                        content: fallbackContent,
+                        createdAt: new Date()
+                    });
+                }
                 setIsLoading(false);
                 return;
             }
@@ -529,9 +548,24 @@ export default function ChatMessageInput() {
                 }
             } else {
                 console.error("Failed to get streaming Gemini response:", error);
-                // Remove the empty assistant placeholder on unexpected errors
-                setChatMessages(prev => prev.filter(msg => msg.id !== assistantId));
-                toast.error(error?.message || "Something went wrong. Please try again.", { position: "bottom-right" });
+                const fallbackContent = "We are unable to satisfy the request at the moment, please try again later or consider using another model.";
+                // Update the assistant placeholder with the fallback message and mark as done
+                setChatMessages(prev => prev.map(msg =>
+                    msg.id === assistantId ? {
+                        ...msg,
+                        content: fallbackContent,
+                        isDone: true
+                    } : msg
+                ));
+                // Persist the fallback message to the database
+                if (effectiveChatId) {
+                    addMessageToChatMessages(effectiveChatId, {
+                        id: assistantId,
+                        role: "assistant",
+                        content: fallbackContent,
+                        createdAt: new Date()
+                    });
+                }
             }
         } finally {
             setIsLoading(false);
@@ -623,7 +657,7 @@ export default function ChatMessageInput() {
             {/* Edit mode cancel pill */}
             {pendingEdit && (
                 <div className="flex items-center justify-center animate-in fade-in slide-in-from-bottom-2">
-                    <div className="flex items-center gap-2 bg-popover/80 backdrop-blur-md border border-border px-3 py-1.5 rounded-full text-xs text-muted-foreground shadow-sm">
+                    <div className="flex items-center gap-2 bg-popover/40 backdrop-blur-md border border-border px-3 py-1.5 rounded-full text-xs text-muted-foreground shadow-sm">
                         <Edit size={12} className="text-primary" />
                         <span>Editing message</span>
                         <button
@@ -640,7 +674,7 @@ export default function ChatMessageInput() {
             {attachments.length > 0 && (
                 <div className="flex flex-row items-center gap-2 px-4 flex-wrap justify-center">
                     {attachments.map((file, index) => (
-                        <div key={index} className="flex items-center gap-2 bg-popover border border-border px-3 py-1.5 rounded-xl text-xs group relative animate-in fade-in slide-in-from-bottom-2">
+                        <div key={index} className="flex items-center gap-2 bg-popover/60 backdrop-blur-md border border-border px-3 py-1.5 rounded-xl text-xs group relative animate-in fade-in slide-in-from-bottom-2 shadow-lg">
                             {(file.type.includes("jpeg") || file.type.includes("png") || file.type.includes("webp")) && (
                                 <FileImage className="w-4 h-4 text-primary" />
                             )}
@@ -661,7 +695,7 @@ export default function ChatMessageInput() {
             }
 
             < div className="flex gap-2 items-center items-end pb-1" >
-                <div className="rounded-[30px] p-2 border-1 border-border bg-popover/60 backdrop-blur-md shadow-lg">
+                <div className="rounded-[30px] p-2 border-1 border-border bg-popover/40 backdrop-blur-md shadow-lg">
                     <Tooltip>
                         <TooltipTrigger asChild>
                             <Button

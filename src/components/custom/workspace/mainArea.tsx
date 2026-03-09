@@ -134,6 +134,9 @@ export default function MainArea() {
     const [renamingNoteId, setRenamingNoteId] = useState<string | null>(null);
     const [tempNoteName, setTempNoteName] = useState("");
 
+    // Chat rename State
+    const [isRenamingChat, setIsRenamingChat] = useState(true)
+
     // Drag and drop state
     const [dragItem, setDragItem] = useState<{ type: 'folder' | 'note'; id: string } | null>(null);
     const [dragOverFolderId, setDragOverFolderId] = useState<string | null>(null);
@@ -145,7 +148,8 @@ export default function MainArea() {
     const [isSavedComplete, setIsSavedComplete] = useState(true)
 
     // chat states
-    const { setCurrentChatId, setChatMessages, chatTitle, setChatTitle } = useChatMessages();
+    const { setCurrentChatId, setChatMessages, chatTitle, setChatTitle, currentChatId } = useChatMessages();
+    const [tempChatTitle, setTempChatTitle] = useState(chatTitle);
 
     // Migration helper: Convert blocks JSON to plain text if needed
     const getInitialContent = (rawContent: string) => {
@@ -877,6 +881,31 @@ export default function MainArea() {
         }
     }
 
+    // CHAT FUNCTIONS
+    // rename a chat
+    const handleRenameChat = async () => {
+        if (!user) return;
+        setTempChatTitle(chatTitle);
+        setIsRenamingChat(true);
+    }
+    const renameChat = async () => {
+        if (!user) return;
+
+        const { data, error } = await supabase
+            .from("chats")
+            .update({ title: chatTitle })
+            .eq("id", currentChatId)
+            .select()
+            .single();
+
+        if (data) {
+            setChatTitle(data.title);
+        }
+
+        if (error) {
+            console.error("Error renaming chat:", error);
+        }
+    }
 
     // ---- DRAG & DROP ----
     // Move a folder or note into a target folder (or to root if targetFolderId is null)
@@ -1156,14 +1185,33 @@ export default function MainArea() {
                     </div>
                     :
                     <div className="w-full flex justify-center">
-                        <Tooltip>
-                            <TooltipTrigger asChild>
-                                <Button variant="ghost" className="w-64 text-foreground text-lg cursor-pointer" onClick={() => { setChatTitle("New Chat") }}>{chatTitle}</Button>
-                            </TooltipTrigger>
-                            <TooltipContent>
-                                <p>Change Chat's title</p>
-                            </TooltipContent>
-                        </Tooltip>
+                        {isRenamingChat ?
+                            <Input
+                                value={tempChatTitle}
+                                onChange={(e) => setTempChatTitle(e.target.value)}
+                                onBlur={() => { setIsRenamingChat(false) }}
+                                autoFocus
+                                maxLength={30}
+                                onKeyDown={(e) => {
+                                    if (e.key === "Enter") {
+                                        setIsRenamingChat(false);
+                                        renameChat();
+                                    };
+                                    if (e.key === "Escape") {
+                                        setIsRenamingChat(false);
+                                    }
+                                }}
+                                className="text-foreground text-lg font-medium cursor-pointer bg-transparent dark:bg-transparent focus-visible:ring-0 focus-visible:border-none shadow-none w-64 text-center p-0 md:text-lg"
+                            />
+                            :
+                            <Tooltip>
+                                <TooltipTrigger asChild>
+                                    <Button variant="ghost" className="text-foreground text-lg cursor-pointer" onClick={() => { handleRenameChat() }}>{chatTitle}</Button>
+                                </TooltipTrigger>
+                                <TooltipContent>
+                                    <p>Change Chat's title</p>
+                                </TooltipContent>
+                            </Tooltip>}
                     </div>
                 }
 
