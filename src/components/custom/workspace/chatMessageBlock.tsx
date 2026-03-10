@@ -101,7 +101,7 @@ export default function ChatMessageBlock({ message }: { message: ChatMessage }) 
                     </div>
                 ) : (
                     <div className="flex flex-col relative w-full h-fit group">
-                        {isLoading && chatMessages[chatMessages.length - 1]?.id === message.id && !message.content && !message.toolCalls?.length && (
+                        {isLoading && chatMessages[chatMessages.length - 1]?.id === message.id && !message.content && !message.toolCalls?.length && !message.thought && (
                             <div className="flex flex-row items-center mb-2 p-2">
                                 <p className="text-muted-foreground animate-pulse">
                                     {displayText.slice(0, displayText.length - 1)}
@@ -111,75 +111,122 @@ export default function ChatMessageBlock({ message }: { message: ChatMessage }) 
                                 </p>
                             </div>
                         )}
-                        {/* Tool call cards */}
-                        {message.toolCalls && message.toolCalls.length > 0 && (
-                            <div className="flex flex-col gap-1.5 mb-3 max-w-[85%]">
-                                {message.toolCalls.map((tc, i) => (
-                                    <div
-                                        key={i}
-                                        className="flex items-center gap-2.5 px-3 py-2 rounded-xl border border-border bg-popover/40 backdrop-blur-sm text-xs text-muted-foreground animate-in fade-in slide-in-from-top-1"
-                                    >
-                                        <Wrench className="w-3 h-3 shrink-0 text-primary/70" />
-                                        <span className="font-mono text-primary/80">{tc.name.replace(/_/g, " ")}</span>
-                                        {Object.keys(tc.args).length > 0 && (
-                                            <span className="truncate opacity-60 max-w-[220px]">
-                                                {Object.entries(tc.args)
-                                                    .map(([k, v]) => `${k}: ${String(v).slice(0, 40)}`)
-                                                    .join(" · ")}
-                                            </span>
-                                        )}
-                                        <span className="ml-auto shrink-0">
-                                            {tc.status === 'loading' ? (
-                                                <Spinner className="w-3 h-3" />
-                                            ) : tc.status === 'done' ? (
-                                                <Check className="w-3 h-3 text-green-500" />
-                                            ) : (
-                                                <TriangleAlert className="w-3 h-3 text-destructive" />
-                                            )}
-                                        </span>
-                                    </div>
-                                ))}
-                            </div>
-                        )}
-                        {message.thought && (
-                            <div className="flex flex-col mb-4 p-4 bg-popover/30 rounded-xl border border-border max-w-[85%] text-xs text-muted-foreground animate-in fade-in slide-in-from-top-1 overflow-hidden transition-all duration-300">
-                                <div className="flex flex-row w-full h-fit items-center justify-between cursor-pointer select-none" onClick={() => setIsThoughtExpanded(!isThoughtExpanded)}>
-                                    <span className="text-lg tracking-wider font-medium">
-                                        {message.content ? (
-                                            <div className="flex flex-row items-center gap-2">
-                                                <Lightbulb className="w-4 h-4 text-muted-foreground" />
-                                                <p>Thought</p>
-                                                {message.thinkingTime !== undefined && (
-                                                    <span className="">
-                                                        {"for " + (message.thinkingTime / 1000).toFixed(1) + "s"}
-                                                    </span>
+                        {/* Interleaved message parts: text segments and tool cards in stream order */}
+                        {message.messageParts && message.messageParts.length > 0 ? (
+                            <div className="flex flex-col w-full">
+                                {message.thought && (
+                                    <div className="flex flex-col mb-4 p-4 bg-popover/30 rounded-xl border border-border max-w-[85%] text-xs text-muted-foreground animate-in fade-in slide-in-from-top-1 overflow-hidden transition-all duration-300">
+                                        <div className="flex flex-row w-full h-fit items-center justify-between cursor-pointer select-none" onClick={() => setIsThoughtExpanded(!isThoughtExpanded)}>
+                                            <span className="text-lg tracking-wider font-medium">
+                                                {message.content || (message.messageParts?.some(p => p.type === 'text' && (p as any).content)) ? (
+                                                    <div className="flex flex-row items-center gap-2">
+                                                        <Lightbulb className="w-4 h-4 text-muted-foreground" />
+                                                        <p>Thought</p>
+                                                        {message.thinkingTime !== undefined && (
+                                                            <span>{"for " + (message.thinkingTime / 1000).toFixed(1) + "s"}</span>
+                                                        )}
+                                                    </div>
+                                                ) : (
+                                                    <div className="flex flex-row items-center gap-2">
+                                                        <Spinner />
+                                                        <p className="animate-pulse">Thinking</p>
+                                                    </div>
                                                 )}
+                                            </span>
+                                            <Button size={"icon"} variant={"ghost"} className="hover:bg-transparent">
+                                                <ChevronDown className={cn("w-4 h-4 text-muted-foreground transition-transform duration-300", isThoughtExpanded ? "rotate-180" : "")} />
+                                            </Button>
+                                        </div>
+                                        <div className={cn("grid transition-all duration-300 ease-in-out", isThoughtExpanded ? "grid-rows-[1fr] opacity-100 mt-2" : "grid-rows-[0fr] opacity-0")}>
+                                            <div className="overflow-hidden">
+                                                <MarkdownRenderer content={message.thought} className="italic opacity-50 text-sm" />
                                             </div>
-                                        ) : (
-                                            <div className="flex flex-row items-center gap-2">
-                                                <Spinner />
-                                                <p className="animate-pulse">Thinking</p>
-                                            </div>
-                                        )}
-                                    </span>
-                                    <Button size={"icon"} variant={"ghost"} className="hover:bg-transparent">
-                                        <ChevronDown className={cn("w-4 h-4 text-muted-foreground transition-transform duration-300", isThoughtExpanded ? "rotate-180" : "")} />
-                                    </Button>
-                                </div>
-                                <div className={cn("grid transition-all duration-300 ease-in-out", isThoughtExpanded ? "grid-rows-[1fr] opacity-100 mt-2" : "grid-rows-[0fr] opacity-0")}>
-                                    <div className="overflow-hidden">
-                                        <MarkdownRenderer content={message.thought} className="italic opacity-50 text-sm" />
+                                        </div>
                                     </div>
-                                </div>
-
+                                )}
+                                {message.messageParts.map((part, i) =>
+                                    part.type === 'toolCall' ? (
+                                        <div
+                                            key={i}
+                                            className="flex items-center gap-2.5 px-3 py-2 my-1 rounded-xl border border-border bg-popover/40 backdrop-blur-sm text-xs text-muted-foreground max-w-[85%] animate-in fade-in slide-in-from-top-1"
+                                        >
+                                            <Wrench className="w-3 h-3 shrink-0 text-primary/70" />
+                                            <span className="font-mono text-primary/80">{part.toolCall.name.replace(/_/g, " ")}</span>
+                                            {Object.keys(part.toolCall.args).length > 0 && (
+                                                <span className="truncate opacity-60 max-w-[220px]">
+                                                    {Object.entries(part.toolCall.args)
+                                                        .map(([k, v]) => `${k}: ${String(v).slice(0, 40)}`)
+                                                        .join(" · ")}
+                                                </span>
+                                            )}
+                                            <span className="ml-auto shrink-0">
+                                                {part.toolCall.status === 'loading' ? (
+                                                    <Spinner className="w-3 h-3" />
+                                                ) : part.toolCall.status === 'done' ? (
+                                                    <Check className="w-3 h-3 text-green-500" />
+                                                ) : (
+                                                    <TriangleAlert className="w-3 h-3 text-destructive" />
+                                                )}
+                                            </span>
+                                        </div>
+                                    ) : part.content ? (
+                                        <div key={i} className="w-full max-w-[90%] p-2">
+                                            <MarkdownRenderer content={part.content} className="text-foreground" />
+                                        </div>
+                                    ) : null
+                                )}
                             </div>
+                        ) : (
+                            // Fallback for older messages without messageParts (loaded from DB)
+                            <>
+                                {message.toolCalls && message.toolCalls.length > 0 && (
+                                    <div className="flex flex-col gap-1.5 mb-3 max-w-[85%]">
+                                        {message.toolCalls.map((tc, i) => (
+                                            <div key={i} className="flex items-center gap-2.5 px-3 py-2 rounded-xl border border-border bg-popover/40 backdrop-blur-sm text-xs text-muted-foreground animate-in fade-in slide-in-from-top-1">
+                                                <Wrench className="w-3 h-3 shrink-0 text-primary/70" />
+                                                <span className="font-mono text-primary/80">{tc.name.replace(/_/g, " ")}</span>
+                                                <span className="ml-auto shrink-0">
+                                                    {tc.status === 'loading' ? <Spinner className="w-3 h-3" /> : tc.status === 'done' ? <Check className="w-3 h-3 text-green-500" /> : <TriangleAlert className="w-3 h-3 text-destructive" />}
+                                                </span>
+                                            </div>
+                                        ))}
+                                    </div>
+                                )}
+                                {message.thought && (
+                                    <div className="flex flex-col mb-4 p-4 bg-popover/30 rounded-xl border border-border max-w-[85%] text-xs text-muted-foreground animate-in fade-in slide-in-from-top-1 overflow-hidden transition-all duration-300">
+                                        <div className="flex flex-row w-full h-fit items-center justify-between cursor-pointer select-none" onClick={() => setIsThoughtExpanded(!isThoughtExpanded)}>
+                                            <span className="text-lg tracking-wider font-medium">
+                                                {message.content ? (
+                                                    <div className="flex flex-row items-center gap-2">
+                                                        <Lightbulb className="w-4 h-4 text-muted-foreground" />
+                                                        <p>Thought</p>
+                                                        {message.thinkingTime !== undefined && (
+                                                            <span>{"for " + (message.thinkingTime / 1000).toFixed(1) + "s"}</span>
+                                                        )}
+                                                    </div>
+                                                ) : (
+                                                    <div className="flex flex-row items-center gap-2">
+                                                        <Spinner />
+                                                        <p className="animate-pulse">Thinking</p>
+                                                    </div>
+                                                )}
+                                            </span>
+                                            <Button size={"icon"} variant={"ghost"} className="hover:bg-transparent">
+                                                <ChevronDown className={cn("w-4 h-4 text-muted-foreground transition-transform duration-300", isThoughtExpanded ? "rotate-180" : "")} />
+                                            </Button>
+                                        </div>
+                                        <div className={cn("grid transition-all duration-300 ease-in-out", isThoughtExpanded ? "grid-rows-[1fr] opacity-100 mt-2" : "grid-rows-[0fr] opacity-0")}>
+                                            <div className="overflow-hidden">
+                                                <MarkdownRenderer content={message.thought} className="italic opacity-50 text-sm" />
+                                            </div>
+                                        </div>
+                                    </div>
+                                )}
+                                <div className="flex w-full h-fit max-w-[90%] items-start">
+                                    <MarkdownRenderer content={message.content} className="text-foreground w-full p-2" />
+                                </div>
+                            </>
                         )}
-                        <div className="flex w-full h-fit max-w-[90%] items-start">
-                            <MarkdownRenderer
-                                content={message.content}
-                                className="text-foreground w-full p-2"
-                            />
-                        </div>
                         {(message.isDone && !message.content) && (
                             <div className="flex w-full h-fit max-w-[90%] items-center gap-2 justify-start mt-2 fade-up">
                                 <TriangleAlert className="w-% h-5 text-muted-foreground" />
@@ -233,6 +280,6 @@ export default function ChatMessageBlock({ message }: { message: ChatMessage }) 
                     </div>
                 )
             }
-        </div>
+        </div >
     )
 }

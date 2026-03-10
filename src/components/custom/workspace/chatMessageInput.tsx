@@ -3,7 +3,7 @@ import { Tooltip, TooltipContent, TooltipTrigger } from "@/components/ui/tooltip
 import { ArrowUp, Edit, FileImage, FileTypeCorner, Leaf, Lightbulb, Mic, Plus, Square, X, Zap } from "lucide-react"
 import { useState, useRef, useEffect, Dispatch, SetStateAction } from "react"
 import { useChatMessages } from "@/context/chatMessagesContext"
-import { ChatMessage, ChatAttachment, Models, ToolCall } from "@/types/chatType"
+import { ChatMessage, ChatAttachment, Models, ToolCall, MessagePart } from "@/types/chatType"
 import { v4 as uuidv4 } from "uuid"
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover"
 import { toast } from "sonner"
@@ -42,10 +42,10 @@ export default function ChatMessageInput({ attachments, setAttachments }: ChatMe
     const { user } = useUser();
     const systemPromptString = `You are "Orthan AI", Narao's integrated assistant. You help in order to learn and to work mainly, so you use much markdown to highlight things. Narao is a note-taking app that uses AI to help users to learn and to work more efficiently. I am ${user?.username || "the user"}, and my preferences are: I like coding, AI, and technology. I am a student and I am learning about AI. Do not talk about yourself, only talk about the task except if explicitly asked.
 
-When you use tools:
-- Before calling a tool, briefly explain in natural language what you are about to do (e.g. "Let me search your workspace for notes about math...").
-- After getting a tool result, briefly acknowledge what you found before proceeding or calling another tool (e.g. "I found 3 notes. Let me now read the one about algebra.").
-- At the end, give a complete, helpful answer based on all the information you gathered.`;
+    When you use tools:
+    - !!ALWAYS!! BEFORE calling a tool, briefly explain in natural language what you are about to do (e.g. "Let me search your workspace for notes about math...").
+    - !!ALWAYS!! After getting a tool result, briefly acknowledge what you found before proceeding or calling another tool (e.g. "I found 3 notes. Let me now read the one about algebra.").
+    - !!ALWAYS!! At the end, give a complete, helpful answer based on all the information you gathered.`;
 
     // Workspace contexts for tool execution
     const { fetchedNotes, setFetchedNotes } = useFetchedNotes();
@@ -394,6 +394,7 @@ When you use tools:
                 id: assistantId,
                 role: "assistant",
                 content: "",
+                messageParts: [{ type: 'text', content: '' }],
                 createdAt: new Date()
             };
             setChatMessages(prev => [...prev, assistantMessage]);
@@ -520,14 +521,18 @@ When you use tools:
                                 }
                                 accumulatedAnswer += data.content;
                                 // ← Real-time streaming: update UI on every text chunk
-                                setChatMessages(prev => prev.map(msg =>
-                                    msg.id === msgId ? {
-                                        ...msg,
-                                        content: accumulatedAnswer,
-                                        thought: accumulatedThought,
-                                        thinkingTime: thinkingDuration
-                                    } : msg
-                                ));
+                                setChatMessages(prev => prev.map(msg => {
+                                    if (msg.id !== msgId) return msg;
+                                    // Append to the last 'text' part in messageParts
+                                    const parts = [...(msg.messageParts || [{ type: 'text', content: '' }])];
+                                    const lastIdx = parts.length - 1;
+                                    if (parts[lastIdx]?.type === 'text') {
+                                        parts[lastIdx] = { type: 'text', content: (parts[lastIdx] as { type: 'text'; content: string }).content + data.content };
+                                    } else {
+                                        parts.push({ type: 'text', content: data.content });
+                                    }
+                                    return { ...msg, content: accumulatedAnswer, thought: accumulatedThought, thinkingTime: thinkingDuration, messageParts: parts };
+                                }));
                             } else if (data.type === "functionCall") {
                                 const fc = {
                                     name: data.content.name,
@@ -535,17 +540,18 @@ When you use tools:
                                     thoughtSignature: data.content.thoughtSignature ?? null
                                 };
                                 functionCalls.push(fc);
-                                // ← Tool card appears immediately when chunk arrives
-                                setChatMessages(prev => prev.map(msg =>
-                                    msg.id === msgId ? {
+                                // ← Tool card inserted at current position in messageParts, then new text segment opened
+                                setChatMessages(prev => prev.map(msg => {
+                                    if (msg.id !== msgId) return msg;
+                                    const parts: MessagePart[] = [...(msg.messageParts || [])];
+                                    parts.push({ type: 'toolCall', toolCall: { name: fc.name, args: fc.args, status: 'loading' } });
+                                    parts.push({ type: 'text', content: '' }); // open next text segment
+                                    return {
                                         ...msg,
-                                        toolCalls: [...(msg.toolCalls || []), {
-                                            name: fc.name,
-                                            args: fc.args,
-                                            status: 'loading' as const
-                                        }]
-                                    } : msg
-                                ));
+                                        toolCalls: [...(msg.toolCalls || []), { name: fc.name, args: fc.args, status: 'loading' as const }],
+                                        messageParts: parts
+                                    };
+                                }));
                             }
                         } catch (e) {
                             console.error("Failed to parse stream line:", line, e);
@@ -575,6 +581,10 @@ When you use tools:
                         for (const fc of functionCalls) {
                             let result: string;
                             let status: 'done' | 'error' = 'done';
+
+                            // Artificial delay to ensure the user can see the loading state
+                            await new Promise(resolve => setTimeout(resolve, 1500));
+
                             try {
                                 result = await executeToolCall(fc.name, fc.args, {
                                     userId: user!.id,
@@ -590,13 +600,29 @@ When you use tools:
                             functionResponses.push({
                                 functionResponse: { name: fc.name, response: { result } }
                             });
+                            // Update status in both toolCalls array AND the matching messagePart
                             setChatMessages(prev => prev.map(msg => {
                                 if (msg.id !== assistantId) return msg;
-                                const updated = [...(msg.toolCalls || [])];
-                                const loadingIdx = updated.map((t, j) => ({ t, j })).reverse()
+                                const updatedToolCalls = [...(msg.toolCalls || [])];
+                                const tcIdx = updatedToolCalls.map((t, j) => ({ t, j })).reverse()
                                     .find(({ t }) => t.name === fc.name && t.status === 'loading')?.j ?? -1;
-                                if (loadingIdx !== -1) updated[loadingIdx] = { ...updated[loadingIdx], status, result };
-                                return { ...msg, toolCalls: updated };
+                                if (tcIdx !== -1) updatedToolCalls[tcIdx] = { ...updatedToolCalls[tcIdx], status, result };
+                                const updatedParts: MessagePart[] = (msg.messageParts || []).map(p =>
+                                    p.type === 'toolCall' && p.toolCall.name === fc.name && p.toolCall.status === 'loading'
+                                        ? { ...p, toolCall: { ...p.toolCall, status, result } }
+                                        : p
+                                );
+                                // Only patch the LAST loading one (reverse find via map+reverse trick above is on toolCalls;
+                                // for messageParts, patch the last loading match)
+                                let patchedLast = false;
+                                const finalParts: MessagePart[] = [...(msg.messageParts || [])].reverse().map(p => {
+                                    if (!patchedLast && p.type === 'toolCall' && p.toolCall.name === fc.name && p.toolCall.status === 'loading') {
+                                        patchedLast = true;
+                                        return { ...p, toolCall: { ...p.toolCall, status, result } };
+                                    }
+                                    return p;
+                                }).reverse();
+                                return { ...msg, toolCalls: updatedToolCalls, messageParts: finalParts };
                             }));
                         }
 
@@ -743,6 +769,7 @@ When you use tools:
             id: newAssistantId,
             role: "assistant",
             content: "",
+            messageParts: [{ type: 'text', content: '' }],
             createdAt: new Date()
         };
         setChatMessages(prev => [...prev, assistantPlaceholder]);
@@ -822,14 +849,17 @@ When you use tools:
                                     thinkingDuration = Date.now() - thinkingStartTime;
                                 }
                                 accumulatedAnswer += data.content;
-                                setChatMessages(prev => prev.map(msg =>
-                                    msg.id === msgId ? {
-                                        ...msg,
-                                        content: accumulatedAnswer,
-                                        thought: accumulatedThought,
-                                        thinkingTime: thinkingDuration
-                                    } : msg
-                                ));
+                                setChatMessages(prev => prev.map(msg => {
+                                    if (msg.id !== msgId) return msg;
+                                    const parts = [...(msg.messageParts || [{ type: 'text', content: '' }])];
+                                    const lastIdx = parts.length - 1;
+                                    if (parts[lastIdx]?.type === 'text') {
+                                        parts[lastIdx] = { type: 'text', content: (parts[lastIdx] as { type: 'text'; content: string }).content + data.content };
+                                    } else {
+                                        parts.push({ type: 'text', content: data.content });
+                                    }
+                                    return { ...msg, content: accumulatedAnswer, thought: accumulatedThought, thinkingTime: thinkingDuration, messageParts: parts };
+                                }));
                             } else if (data.type === "functionCall") {
                                 const fc = {
                                     name: data.content.name,
@@ -837,14 +867,17 @@ When you use tools:
                                     thoughtSignature: data.content.thoughtSignature ?? null
                                 };
                                 functionCalls.push(fc);
-                                setChatMessages(prev => prev.map(msg =>
-                                    msg.id === msgId ? {
+                                setChatMessages(prev => prev.map(msg => {
+                                    if (msg.id !== msgId) return msg;
+                                    const parts: MessagePart[] = [...(msg.messageParts || [])];
+                                    parts.push({ type: 'toolCall', toolCall: { name: fc.name, args: fc.args, status: 'loading' } });
+                                    parts.push({ type: 'text', content: '' });
+                                    return {
                                         ...msg,
-                                        toolCalls: [...(msg.toolCalls || []), {
-                                            name: fc.name, args: fc.args, status: 'loading' as const
-                                        }]
-                                    } : msg
-                                ));
+                                        toolCalls: [...(msg.toolCalls || []), { name: fc.name, args: fc.args, status: 'loading' as const }],
+                                        messageParts: parts
+                                    };
+                                }));
                             }
                         } catch (e) { console.error("Failed to parse stream line:", line, e); }
                     }
@@ -881,11 +914,19 @@ When you use tools:
                             functionResponses.push({ functionResponse: { name: fc.name, response: { result } } });
                             setChatMessages(prev => prev.map(msg => {
                                 if (msg.id !== newAssistantId) return msg;
-                                const updated = [...(msg.toolCalls || [])];
-                                const loadingIdx = updated.map((t, j) => ({ t, j })).reverse()
+                                const updatedToolCalls = [...(msg.toolCalls || [])];
+                                const tcIdx = updatedToolCalls.map((t, j) => ({ t, j })).reverse()
                                     .find(({ t }) => t.name === fc.name && t.status === 'loading')?.j ?? -1;
-                                if (loadingIdx !== -1) updated[loadingIdx] = { ...updated[loadingIdx], status, result };
-                                return { ...msg, toolCalls: updated };
+                                if (tcIdx !== -1) updatedToolCalls[tcIdx] = { ...updatedToolCalls[tcIdx], status, result };
+                                let patchedLast = false;
+                                const finalParts: MessagePart[] = [...(msg.messageParts || [])].reverse().map(p => {
+                                    if (!patchedLast && p.type === 'toolCall' && p.toolCall.name === fc.name && p.toolCall.status === 'loading') {
+                                        patchedLast = true;
+                                        return { ...p, toolCall: { ...p.toolCall, status, result } };
+                                    }
+                                    return p;
+                                }).reverse();
+                                return { ...msg, toolCalls: updatedToolCalls, messageParts: finalParts };
                             }));
                         }
 

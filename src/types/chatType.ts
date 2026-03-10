@@ -5,6 +5,10 @@ interface ToolCall {
     result?: string;
 }
 
+type MessagePart =
+    | { type: 'text'; content: string }
+    | { type: 'toolCall'; toolCall: ToolCall }
+
 interface ChatType {
     id?: string;
     title: string;
@@ -33,6 +37,7 @@ interface ChatMessage {
     role: "user" | "assistant";
     attachments?: ChatAttachment[];
     toolCalls?: ToolCall[];
+    messageParts?: MessagePart[];
     isDone?: boolean;
 }
 
@@ -42,4 +47,4 @@ interface Models {
     "gemini-3.1-flash-lite-preview": "Gemini 3.1 Flash Lite"
 }
 
-export type { ChatType, ChatMessage, ChatAttachment, Models, ToolCall };
+export type { ChatType, ChatMessage, ChatAttachment, Models, ToolCall, MessagePart };

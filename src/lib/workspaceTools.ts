@@ -97,12 +97,12 @@ function buildWorkspaceIndex(notes: Note[], folders: Folder[]): string {
     const noteLines = notes.map(n => {
         const parentFolder = folders.find(f => (f.notesIds || []).includes(n.id));
         const loc = parentFolder ? `${getFolderPath(parentFolder.id, rootFolders)}/${n.title}` : `/${n.title}`;
-        return `NOTE: "${n.title}" | path: ${loc} | description: ${n.description || "none"}`;
+        return `note_name: "${n.title}" | path: ${loc} | description: ${n.description || "none"}`;
     });
 
     const folderLines = folders.map(f => {
         const path = getFolderPath(f.id, rootFolders) || `/${f.name}`;
-        return `FOLDER: "${f.name}" | path: ${path}`;
+        return `folder_name: "${f.name}" | path: ${path}`;
     });
 
     return [...folderLines, ...noteLines].join("\n");
@@ -258,14 +258,7 @@ export async function executeToolCall(
             const note = resolveNotePath(args.localisation, fetchedNotes, fetchedFolders);
             if (!note) return `Note not found at path: ${args.localisation}`;
 
-            const { data, error } = await supabase
-                .from("notes")
-                .select("content")
-                .eq("id", note.id)
-                .single();
-
-            if (error || !data) return `Failed to read note: ${error?.message}`;
-            return data.content || "(Note is empty)";
+            return note.content || "(Note is empty)";
         }
 
         // ── modify_note ───────────────────────────────────────────────────────

@@ -1,8 +1,8 @@
-import ChatType from "@/types/chatType";
+import { ChatType } from "@/types/chatType";
 import quantifyDate from "./quantifyDate";
 
 export default function handleSearch(query: string, chatList: ChatType[]) {
-    const sortedList = [...chatList].sort((a, b) => quantifyDate(b.date) - quantifyDate(a.date));
+    const sortedList = [...chatList].sort((a, b) => quantifyDate(b.updatedAt) - quantifyDate(a.updatedAt));
 
     if (query === "") {
         return (sortedList);
