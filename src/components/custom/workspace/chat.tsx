@@ -68,6 +68,8 @@ export default function Chat() {
                             role: msg.role,
                             thought: msg.thought,
                             thinkingTime: msg.thinking_time,
+                            messageParts: msg.message_parts,
+                            toolCalls: msg.tool_calls,
                             createdAt: new Date(msg.created_at),
                             isDone: true,
                             attachments: attachments?.filter(attachment => attachment.message_id === msg.id)

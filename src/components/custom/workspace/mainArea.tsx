@@ -129,6 +129,7 @@ export default function MainArea() {
     const [renamingFolderId, setRenamingFolderId] = useState<string | null>(null);
     const [tempFolderName, setTempFolderName] = useState("");
     const [isRenamingExistingFolder, setIsRenamingExistingFolder] = useState(false);
+    const folderNameInputRef = useRef<HTMLInputElement>(null);
 
     // Note Rename State
     const [renamingNoteId, setRenamingNoteId] = useState<string | null>(null);
@@ -215,11 +216,10 @@ export default function MainArea() {
             if (data) {
                 // Map the data to ensure correct types (Date objects) and property names
                 const mappedFolders: Folder[] = data.map((item: any) => ({
-                    name: item.name || "Untitled Chat",
+                    name: item.name || "Untitled Folder",
                     id: String(item.id || ""),
                     user_id: String(item.user_id || ""),
-                    foldersIds: (item.folders_ids || item.foldersIds || []).map(String),
-                    notesIds: (item.notes_ids || item.notesIds || []).map(String),
+                    parent_id: item.parent_id ? String(item.parent_id) : undefined,
                     color: item.color || null,
                     // Handle both camelCase (if mapped) and snake_case (raw DB)
                     createdAt: new Date(item.created_at || item.createdAt || new Date()),
@@ -252,12 +252,13 @@ export default function MainArea() {
             if (data) {
                 // Map the data to ensure correct types (Date objects) and property names
                 const mappedNotes: Note[] = data.map((item: any) => ({
-                    title: item.title || "Untitled Chat",
+                    title: item.title || "Untitled Note",
                     id: String(item.id || ""),
                     user_id: String(item.user_id || ""),
                     content: item.content || "",
                     description: item.description || "",
                     tags: item.tags || [],
+                    folder_id: item.folder_id ? String(item.folder_id) : undefined,
                     // Handle both camelCase (if mapped) and snake_case (raw DB)
                     createdAt: new Date(item.created_at || item.createdAt || new Date()),
                     updatedAt: new Date(item.updated_at || item.updatedAt || new Date())
@@ -281,11 +282,8 @@ export default function MainArea() {
     const getFolderById = (id: string) => fetchedFolders.find(f => String(f.id) === String(id));
     const getNoteById = (id: string) => fetchedNotes.find(n => String(n.id) === String(id));
 
-    const allChildFolderIds = new Set(fetchedFolders.flatMap(f => f.foldersIds || []));
-    const allChildNoteIds = new Set(fetchedFolders.flatMap(f => f.notesIds || []));
-
-    const rootFolders = fetchedFolders.filter(f => !allChildFolderIds.has(f.id));
-    const rootNotes = fetchedNotes.filter(n => !allChildNoteIds.has(n.id));
+    const rootFolders = fetchedFolders.filter(f => !f.parent_id);
+    const rootNotes = fetchedNotes.filter(n => !n.folder_id);
 
     // Get content of current path
     const getContent = () => {
@@ -308,20 +306,13 @@ export default function MainArea() {
                 return { folders: [], notes: [] };
             }
 
-            currentLevel = (currentFolder.foldersIds || [])
-                .map(id => getFolderById(id))
-                .filter((f): f is Folder => !!f);
+            currentLevel = fetchedFolders.filter(f => f.parent_id === currentFolder?.id);
         }
 
         if (currentFolder) {
             console.log("Resolved Folder:", currentFolder);
-            const f = (currentFolder.foldersIds || [])
-                .map(id => getFolderById(id))
-                .filter((f): f is Folder => !!f);
-            const n = (currentFolder.notesIds || [])
-                .map(id => getNoteById(id))
-                .filter((n): n is Note => !!n);
-            console.log("Folder Content - Notes IDs:", currentFolder.notesIds);
+            const f = fetchedFolders.filter(f => f.parent_id === currentFolder?.id);
+            const n = fetchedNotes.filter(n => n.folder_id === currentFolder?.id);
             console.log("Folder Content - Resolved Notes:", n);
             return { folders: f, notes: n, currentFolder };
         }
@@ -344,23 +335,10 @@ export default function MainArea() {
 
     // Get folder path
     const getFolderPath = useCallback((folderId: string): string => {
-        const findPath = (currentFolders: Folder[], currentPath: string): string | null => {
-            for (const folder of currentFolders) {
-                const folderPath = currentPath === "/" ? `/${folder.name}` : `${currentPath}/${folder.name}`;
-                if (folder.id === folderId) return folderPath;
-
-                const children = (folder.foldersIds || [])
-                    .map(id => fetchedFolders.find(f => String(f.id) === String(id)))
-                    .filter((f): f is Folder => !!f);
-
-                const result = findPath(children, folderPath);
-                if (result) return result;
-            }
-            return null;
-        };
-
-        const rootLevel = fetchedFolders.filter(f => !fetchedFolders.some(parent => parent.foldersIds?.includes(f.id)));
-        return findPath(rootLevel, "/") || "/";
+        const folder = fetchedFolders.find(f => f.id === folderId);
+        if (!folder) return "/";
+        if (!folder.parent_id) return `/${folder.name}`;
+        return `${getFolderPath(folder.parent_id)}/${folder.name}`;
     }, [fetchedFolders]);
 
     const allFolderPaths = useMemo(() => {
@@ -375,9 +353,9 @@ export default function MainArea() {
 
     // Get note path
     const getNotePath = (noteId: string): string => {
-        const folder = fetchedFolders.find(f => f.notesIds?.includes(noteId));
-        if (!folder) return "/";
-        return getFolderPath(folder.id);
+        const note = fetchedNotes.find(n => n.id === noteId);
+        if (!note || !note.folder_id) return "/";
+        return getFolderPath(note.folder_id);
     };
 
     // Functions for arrows BACK & FORWARD
@@ -399,68 +377,32 @@ export default function MainArea() {
     }, []);
 
     // FOLDER FUNCTIONS
+    const currentPath = path;
+    // FOLDER FUNCTIONS
     // Create folder function
     const createFolder = useCallback(() => {
         // Check if we are already creating a folder
         if (renamingFolderId) return;
 
+        const currentPath = path;
+        let parent_id: string | undefined = undefined;
+
+        if (currentPath !== "/" && currentPath !== "") {
+            const parentFolder = allFolderPaths.find(p => p.path === currentPath);
+            if (parentFolder) parent_id = parentFolder.id;
+        }
+
         const newFolder: Folder = {
             id: "temp-creation", // Temporary ID
             name: "",
             user_id: user?.id,
-            foldersIds: [],
-            notesIds: [],
+            parent_id: parent_id,
             color: "folder-blue",
             createdAt: new Date(),
             updatedAt: new Date()
         };
 
-        // Add to the START of the list or end depending on sort? 
-        // Actually rendering order depends on sort, but let's add to fetchedFolders.
-        // We need to ensure it appears in the current view.
-        // Since `folders` derived from `fetchedFolders` filters by path,
-        // we need to make sure this new folder is "linked" to the current path?
-        // Wait, current logic: `getContent` finds folders whose ID is in the parent's `foldersIds`.
-        // If I just add to `fetchedFolders`, `getContent` won't find it if it's not in parent's list!
-        // EXCEPT for root path which filters by "not in any other folder".
-
-        // Handling "Virtual" existence in `getContent`:
-        // For non-root paths, we must add it to the parent folder's `foldersIds` locally effectively?
-        // Or simpler: Modify `getContent` or the way we display folders to include the "temp" folder if it's supposed to be in current path.
-
-        // Let's modify `newFolder` to be "linked" to current path implicitly.
-        // Actually, if we are in a subfolder, we need to find the parent folder and add "temp-creation" to its `foldersIds`.
-        // Update: `fetchedFolders` state directly to include the relationship?
-
-        const currentPath = path;
-
-        if (currentPath === "/" || currentPath === "") {
-            // Root: Just add it. `rootFolders` filter will pick it up because no one has it in `foldersIds`.
-            setFetchedFolders(prev => [...prev, newFolder]);
-        } else {
-            // Subfolder: Find parent and add to its foldersIds locally
-            console.log("Creating folder in subfolder. Path:", currentPath);
-            const parentFolder = allFolderPaths.find(p => p.path === currentPath);
-            console.log("Found parent folder:", parentFolder);
-
-            if (parentFolder) {
-                setFetchedFolders(prev => {
-                    const updated = prev.map(f => {
-                        if (String(f.id) === String(parentFolder.id)) {
-                            console.log("Updating parent folder:", f.name);
-                            return { ...f, foldersIds: [...(f.foldersIds || []), newFolder.id] };
-                        }
-                        return f;
-                    });
-                    return updated.concat(newFolder);
-                });
-            } else {
-                console.error("Could not find parent folder for path:", currentPath);
-                // Fallback to adding to list (will appear in root)
-                setFetchedFolders(prev => [...prev, newFolder]);
-                return;
-            }
-        }
+        setFetchedFolders(prev => [...prev, newFolder]);
 
         setRenamingFolderId(newFolder.id);
         setTempFolderName("");
@@ -502,8 +444,7 @@ export default function MainArea() {
                 .insert([{
                     name: targetName,
                     user_id: user.id,
-                    folders_ids: [],
-                    notes_ids: [],
+                    parent_id: folders.find(f => f.id === renamingFolderId)?.parent_id,
                     color: "folder-blue",
                     created_at: new Date(),
                     updated_at: new Date(),
@@ -518,58 +459,14 @@ export default function MainArea() {
                 id: realFolderId,
                 name: newFolderData.name,
                 user_id: String(newFolderData.user_id),
-                foldersIds: [],
-                notesIds: [],
+                parent_id: newFolderData.parent_id ? String(newFolderData.parent_id) : undefined,
                 color: newFolderData.color,
                 createdAt: new Date(newFolderData.created_at),
                 updatedAt: new Date(newFolderData.updated_at)
             };
 
-            // 2. If valid parent, update parent's folderIds
-            const currentPath = path.endsWith("/") && path.length > 1 ? path.slice(0, -1) : path;
-
-            if (currentPath !== "/" && currentPath !== "") {
-                const parentFolderInfo = allFolderPaths.find(p => p.path === currentPath);
-                if (parentFolderInfo) {
-                    // We need to fetch the parent folder to get its current folderIds (DB truth) or rely on local?
-                    // Relying on local `fetchedFolders` is faster.
-                    const parentFolder = fetchedFolders.find(f => f.id === parentFolderInfo.id);
-                    if (parentFolder) {
-                        // The parent folder currently has "temp-creation" in its list (from createFolder logic).
-                        // We need to replace "temp-creation" with `realFolderId`.
-                        const newFoldersIds = (parentFolder.foldersIds || []).filter(id => id !== "temp-creation").concat(realFolderId);
-
-                        const { error: updateError } = await supabase
-                            .from("folders")
-                            .update({ folders_ids: newFoldersIds })
-                            .eq("id", parentFolder.id);
-
-                        if (updateError) {
-                            console.error("Error linking to parent folder:", updateError);
-                            // Fallback?
-                        }
-
-                        setFetchedFolders(prev => prev.map(f => {
-                            if (f.id === parentFolder.id) {
-                                return { ...f, foldersIds: newFoldersIds };
-                            }
-                            // Replace temp folder object with real one
-                            if (f.id === "temp-creation") {
-                                return newFolderObj;
-                            }
-                            return f;
-                        }));
-                    }
-                }
-            } else {
-                // Root creation
-                setFetchedFolders(prev => prev.map(f => {
-                    if (f.id === "temp-creation") {
-                        return newFolderObj;
-                    }
-                    return f;
-                }));
-            }
+            // Update local state: Replace temp folder with real one
+            setFetchedFolders(prev => prev.map(f => f.id === "temp-creation" ? newFolderObj : f));
 
             toast.info(`Created ${newFolderData.name}`, {
                 position: 'bottom-right'
@@ -584,17 +481,8 @@ export default function MainArea() {
         }
     }
     const cancelFolderCreation = () => {
-        // Remove "temp-creation" folder
-        // Remove it from fetchedFolders AND from any parent's foldersIds
-        setFetchedFolders(prev => {
-            // First, find if any parent has it
-            return prev.map(f => {
-                if (f.foldersIds?.includes("temp-creation")) {
-                    return { ...f, foldersIds: f.foldersIds.filter(id => id !== "temp-creation") };
-                }
-                return f;
-            }).filter(f => f.id !== "temp-creation");
-        });
+        // Remove "temp-creation" folder from local state
+        setFetchedFolders(prev => prev.filter(f => f.id !== "temp-creation"));
         setRenamingFolderId(null);
         setTempFolderName("");
     }
@@ -652,6 +540,7 @@ export default function MainArea() {
         }
     }
     const startFolderRename = (folderId: string, currentName: string) => {
+        folderNameInputRef.current?.focus();
         setIsRenamingExistingFolder(true);
         setRenamingFolderId(folderId);
         setTempFolderName(currentName);
@@ -679,44 +568,9 @@ export default function MainArea() {
     const createNote = async () => {
         if (!user) return;
 
-        const notePayload = {
-            user_id: user.id,
-            title: noteName,
-            description: noteDescription,
-            content: "[]", // Initially an empty block array stringified
-            tags: [] // soon to be implemented
-        };
-
-        const { data: noteData, error: noteError } = await supabase.from("notes").insert([notePayload]).select().single();
-
-        if (noteError) {
-            console.error("Error creating note:", noteError);
-            return;
-        }
-        console.log("Note created:", noteData);
-
-        // Update local notes state
-        const newNote: Note = {
-            id: String(noteData.id),
-            title: noteData.title,
-            description: noteData.description || "",
-            content: noteData.content || "",
-            tags: noteData.tags || [],
-            createdAt: new Date(noteData.created_at),
-            updatedAt: new Date(noteData.updated_at)
-        };
-        setAccessedNote(newNote);
-        setContent("");
-        setFetchedNotes(prev => [...prev, newNote]);
-
         // Add to folder if needed
-        let targetFolderId: string | null = null;
-        if (noteFolder === "/") {
-            // Root folder, no update needed to a parent folder, 
-            // but we might need to handle root notes if the system distinguishes them.
-            // Based on current logic, root notes are filtered by exclusion, so creating one without parent reference is effectively root.
-        } else {
-            // Find folder by path
+        let targetFolderId: string | undefined = undefined;
+        if (noteFolder !== "/") {
             const targetPathObj = allFolderPaths.find(p => p.path === noteFolder);
             if (targetPathObj) {
                 targetFolderId = targetPathObj.id;
@@ -725,30 +579,37 @@ export default function MainArea() {
             }
         }
 
-        if (targetFolderId) {
-            const targetFolder = getFolderById(targetFolderId);
-            if (targetFolder) {
-                const newNotesIds = [...(targetFolder.notesIds || []), String(noteData.id)];
+        const notePayload = {
+            user_id: user.id,
+            title: noteName,
+            description: noteDescription,
+            content: "[]",
+            tags: [],
+            folder_id: targetFolderId
+        };
 
-                const { data: folderData, error: folderError } = await supabase
-                    .from("folders")
-                    .update({ notes_ids: newNotesIds })
-                    .eq("id", targetFolder.id)
-                    .select();
+        const { data: noteData, error: noteError } = await supabase.from("notes").insert([notePayload]).select().single();
 
-                if (folderError) {
-                    console.error("Error updating folder:", folderError);
-                } else {
-                    console.log("Folder updated:", folderData);
-                    // Update local folders state
-                    setFetchedFolders(prev => prev.map(f =>
-                        String(f.id) === String(targetFolder!.id)
-                            ? { ...f, notesIds: newNotesIds }
-                            : f
-                    ));
-                }
-            }
+        if (noteError) {
+            console.error("Error creating note:", noteError);
+            return;
         }
+
+        const newNote: Note = {
+            id: String(noteData.id),
+            title: noteData.title,
+            description: noteData.description || "",
+            content: noteData.content || "",
+            tags: noteData.tags || [],
+            folder_id: noteData.folder_id ? String(noteData.folder_id) : undefined,
+            createdAt: new Date(noteData.created_at),
+            updatedAt: new Date(noteData.updated_at)
+        };
+
+        setAccessedNote(newNote);
+        setContent("");
+        setFetchedNotes(prev => [...prev, newNote]);
+
         toast.info(`Created ${newNote.title}`, {
             position: 'bottom-right'
         })
@@ -829,8 +690,9 @@ export default function MainArea() {
                 id: String(data.id),
                 title: data.title,
                 description: data.description || "",
-                content: data.content || null,
+                content: data.content || "",
                 tags: data.tags || [],
+                folder_id: data.folder_id ? String(data.folder_id) : undefined,
                 createdAt: new Date(data.created_at),
                 updatedAt: new Date(data.updated_at)
             };
@@ -893,7 +755,7 @@ export default function MainArea() {
 
         const { data, error } = await supabase
             .from("chats")
-            .update({ title: chatTitle })
+            .update({ title: tempChatTitle })
             .eq("id", currentChatId)
             .select()
             .single();
@@ -915,68 +777,27 @@ export default function MainArea() {
         // Prevent moving a folder into itself
         if (itemType === 'folder' && itemId === targetFolderId) return;
 
-        // Find the current parent folder of the item
-        const currentParent = fetchedFolders.find(f =>
-            itemType === 'folder'
-                ? (f.foldersIds || []).includes(itemId)
-                : (f.notesIds || []).includes(itemId)
-        );
-
-        // If it's already in the target, do nothing
-        if ((currentParent?.id ?? null) === targetFolderId) return;
-
         try {
-            // 1. Remove from old parent (if it had one)
-            if (currentParent) {
-                if (itemType === 'folder') {
-                    const newIds = (currentParent.foldersIds || []).filter(id => id !== itemId);
-                    const { error } = await supabase
-                        .from('folders')
-                        .update({ folders_ids: newIds })
-                        .eq('id', currentParent.id);
-                    if (error) throw error;
-                    setFetchedFolders(prev => prev.map(f =>
-                        f.id === currentParent.id ? { ...f, foldersIds: newIds } : f
-                    ));
-                } else {
-                    const newIds = (currentParent.notesIds || []).filter(id => id !== itemId);
-                    const { error } = await supabase
-                        .from('folders')
-                        .update({ notes_ids: newIds })
-                        .eq('id', currentParent.id);
-                    if (error) throw error;
-                    setFetchedFolders(prev => prev.map(f =>
-                        f.id === currentParent.id ? { ...f, notesIds: newIds } : f
-                    ));
-                }
-            }
+            if (itemType === 'folder') {
+                const { error } = await supabase
+                    .from('folders')
+                    .update({ parent_id: targetFolderId })
+                    .eq('id', itemId);
+                if (error) throw error;
 
-            // 2. Add to new parent (if there is one; null means root)
-            if (targetFolderId) {
-                const targetFolder = getFolderById(targetFolderId);
-                if (targetFolder) {
-                    if (itemType === 'folder') {
-                        const newIds = [...(targetFolder.foldersIds || []), itemId];
-                        const { error } = await supabase
-                            .from('folders')
-                            .update({ folders_ids: newIds })
-                            .eq('id', targetFolderId);
-                        if (error) throw error;
-                        setFetchedFolders(prev => prev.map(f =>
-                            f.id === targetFolderId ? { ...f, foldersIds: newIds } : f
-                        ));
-                    } else {
-                        const newIds = [...(targetFolder.notesIds || []), itemId];
-                        const { error } = await supabase
-                            .from('folders')
-                            .update({ notes_ids: newIds })
-                            .eq('id', targetFolderId);
-                        if (error) throw error;
-                        setFetchedFolders(prev => prev.map(f =>
-                            f.id === targetFolderId ? { ...f, notesIds: newIds } : f
-                        ));
-                    }
-                }
+                setFetchedFolders(prev => prev.map(f =>
+                    f.id === itemId ? { ...f, parent_id: targetFolderId || undefined } : f
+                ));
+            } else {
+                const { error } = await supabase
+                    .from('notes')
+                    .update({ folder_id: targetFolderId })
+                    .eq('id', itemId);
+                if (error) throw error;
+
+                setFetchedNotes(prev => prev.map(n =>
+                    n.id === itemId ? { ...n, folder_id: targetFolderId || undefined } : n
+                ));
             }
         } catch (err) {
             console.error('Error moving item:', err);
@@ -1201,7 +1022,7 @@ export default function MainArea() {
                                         setIsRenamingChat(false);
                                     }
                                 }}
-                                className="text-foreground text-lg font-medium cursor-pointer bg-transparent dark:bg-transparent focus-visible:ring-0 focus-visible:border-none shadow-none w-64 text-center p-0 md:text-lg"
+                                className="text-foreground text-lg font-medium cursor-pointer bg-transparent dark:bg-transparent focus-visible:ring-0 focus-visible:border-none shadow-none w-full text-center p-0 md:text-lg"
                             />
                             :
                             currentChatId ? (
@@ -1348,205 +1169,222 @@ export default function MainArea() {
                                     )}
                                     {folders.slice().sort((a, b) => sortOrder === "asc" ? a.name.localeCompare(b.name) : b.name.localeCompare(a.name)).map(folder => (
                                         <ContextMenu key={folder.id}>
-                                            <ContextMenuTrigger>
-                                                {renamingFolderId === folder.id ? (
-                                                    <div
-                                                        className="group flex flex-col items-center gap-2 p-4 bg-muted/50 rounded-xl cursor-default w-32 h-28 justify-center border border-primary/50"
-                                                        onClick={(e) => e.stopPropagation()}
-                                                    >
-                                                        <FolderIcon className={cn("w-12 h-12", folder.color && folderColorClasses[folder.color]?.text)} />
-                                                        <Input
-                                                            value={tempFolderName}
-                                                            onChange={(e) => setTempFolderName(e.target.value)}
-                                                            autoFocus
-                                                            maxLength={24}
-                                                            className="h-6 w-full text-xs text-center px-2 bg-transparent border-none focus-visible:border-transparent focus-visible:ring-transparent focus-visible:ring-[3px]"
-                                                            placeholder="Name"
-                                                            onBlur={() => {
-                                                                if (isRenamingExistingFolder) {
-                                                                    handleFolderRenameSubmit();
-                                                                } else {
-                                                                    handleFolderSave();
-                                                                }
-                                                            }}
-                                                            onKeyDown={(e) => {
-                                                                if (e.key === "Enter") {
-                                                                    if (isRenamingExistingFolder) {
-                                                                        handleFolderRenameSubmit();
-                                                                    } else {
-                                                                        handleFolderSave();
-                                                                    }
-                                                                } else if (e.key === "Escape") {
-                                                                    if (isRenamingExistingFolder) {
-                                                                        cancelFolderRename();
-                                                                    } else {
-                                                                        cancelFolderCreation();
-                                                                    }
-                                                                }
-                                                            }}
-                                                        />
-                                                    </div>
-                                                ) : (
-                                                    <div
-                                                        className={cn(
-                                                            "group flex flex-col items-center gap-2 p-4 hover:bg-muted/50 rounded-xl cursor-pointer w-32 h-28 justify-center transition-all duration-200 border border-transparent hover:border-sidebar-border overflow-hidden",
-                                                            dragItem && dragOverFolderId === folder.id && dragItem.id !== folder.id && "border-primary/60 bg-transparent scale-105"
-                                                        )}
-                                                        draggable
-                                                        onDragStart={(e) => {
-                                                            e.dataTransfer.effectAllowed = 'move';
-                                                            setDragItem({ type: 'folder', id: folder.id });
-                                                        }}
-                                                        onDragEnd={() => { setDragItem(null); setDragOverFolderId(null); }}
-                                                        onDragOver={(e) => { e.preventDefault(); if (dragItem?.id !== folder.id) setDragOverFolderId(folder.id); }}
-                                                        onDragLeave={() => setDragOverFolderId(null)}
-                                                        onDrop={(e) => {
-                                                            e.preventDefault();
-                                                            setDragOverFolderId(null);
-                                                            if (dragItem && dragItem.id !== folder.id) {
-                                                                moveItemToFolder(dragItem.type, dragItem.id, folder.id);
-                                                                setDragItem(null);
-                                                            }
-                                                        }}
-                                                        onDoubleClick={() => startFolderRename(folder.id, folder.name)}
-                                                        onClick={() => navigateToFolder(folder.name)}
-                                                    >
-                                                        <FolderIcon className={cn("w-12 h-12 group-hover:scale-110 transition-transform duration-200", folder.color && folderColorClasses[folder.color]?.text, folder.color && folderColorClasses[folder.color]?.fill)} />
-                                                        <p className="text-xs font-medium text-center truncate w-full px-1">{folder.name}</p>
-                                                    </div>
-                                                )}
-                                            </ContextMenuTrigger>
-                                            <ContextMenuContent >
-                                                <p className="text-foreground text-md px-2 mt-1">{folder.name}</p>
-                                                <p className="text-muted-foreground text-xs px-2 mb-1">{`Last updated: ${dateConvert(folder.updatedAt.toString())}`}</p>
-                                                <ContextMenuItem className="cursor-pointer group" onClick={() => startFolderRename(folder.id, folder.name)}>
-                                                    <FolderPen size={16} className="text-muted-foreground group-hover:text-accent-foreground" />
-                                                    <p className="text-foreground group-hover:text-accent-foreground">Rename</p>
-                                                </ContextMenuItem>
-                                                {/* Color submenu */}
-                                                <ContextMenuSub>
-                                                    <ContextMenuSubTrigger className="cursor-pointer group gap-2">
-                                                        <Palette size={16} className="text-muted-foreground group-hover:text-accent-foreground" />
-                                                        <p className="text-foreground group-hover:text-accent-foreground">Change Color</p>
-                                                    </ContextMenuSubTrigger>
-                                                    <ContextMenuSubContent>
-                                                        {folderColors.map((color) => (
-                                                            <ContextMenuItem
-                                                                key={color.value}
-                                                                className="cursor-pointer group gap-2"
-                                                                onClick={() => changeFolderColor(folder.id, color.value)}
+                                            <Tooltip>
+                                                <ContextMenuTrigger>
+                                                    <TooltipTrigger asChild>
+                                                        {renamingFolderId === folder.id ? (
+
+                                                            <div
+                                                                className="group flex flex-col items-center gap-2 p-4 bg-muted/50 rounded-xl cursor-default w-32 h-28 justify-center border border-primary/50"
+                                                                onClick={(e) => e.stopPropagation()}
                                                             >
-                                                                <div className={`w-3 h-3 rounded-full ${color.bgClass}`} />
-                                                                <p className="text-foreground group-hover:text-accent-foreground">
-                                                                    {color.label}
-                                                                </p>
-                                                                {folder.color === color.value && (
-                                                                    <Check size={16} className="text-muted-foreground group-hover:text-accent-foreground" />
+                                                                <FolderIcon className={cn("w-12 h-12", folder.color && folderColorClasses[folder.color]?.text)} />
+                                                                <Input
+                                                                    value={tempFolderName}
+                                                                    onChange={(e) => setTempFolderName(e.target.value)}
+                                                                    autoFocus
+                                                                    ref={folderNameInputRef}
+                                                                    maxLength={24}
+                                                                    className="h-6 w-full text-xs text-center px-2 bg-transparent border-none focus-visible:border-transparent focus-visible:ring-transparent focus-visible:ring-[3px]"
+                                                                    placeholder="Name"
+                                                                    onBlur={() => {
+                                                                        if (isRenamingExistingFolder) {
+                                                                            handleFolderRenameSubmit();
+                                                                        } else {
+                                                                            handleFolderSave();
+                                                                        }
+                                                                    }}
+                                                                    onKeyDown={(e) => {
+                                                                        if (e.key === "Enter") {
+                                                                            if (isRenamingExistingFolder) {
+                                                                                handleFolderRenameSubmit();
+                                                                            } else {
+                                                                                handleFolderSave();
+                                                                            }
+                                                                        } else if (e.key === "Escape") {
+                                                                            if (isRenamingExistingFolder) {
+                                                                                cancelFolderRename();
+                                                                            } else {
+                                                                                cancelFolderCreation();
+                                                                            }
+                                                                        }
+                                                                    }}
+                                                                />
+                                                            </div>
+                                                        ) : (
+                                                            <div
+                                                                className={cn(
+                                                                    "group flex flex-col items-center gap-2 p-4 hover:bg-muted/50 rounded-xl cursor-pointer w-32 h-28 justify-center transition-all duration-200 border border-transparent hover:border-sidebar-border overflow-hidden",
+                                                                    dragItem && dragOverFolderId === folder.id && dragItem.id !== folder.id && "border-primary/60 bg-transparent scale-105"
                                                                 )}
-                                                            </ContextMenuItem>
-                                                        ))}
-                                                    </ContextMenuSubContent>
-                                                </ContextMenuSub>
-                                                <ContextMenuItem className="cursor-pointer group">
-                                                    <Move size={16} className="text-muted-foreground group-hover:text-accent-foreground" />
-                                                    <p className="text-foreground group-hover:text-accent-foreground">Move to...</p>
-                                                </ContextMenuItem>
-                                                <ContextMenuItem className="cursor-pointer group" onClick={createFolder}>
-                                                    <FolderEdit size={16} className="text-muted-foreground group-hover:text-accent-foreground" />
-                                                    <p className="text-foreground group-hover:text-accent-foreground">New Folder</p>
-                                                    <KbdGroup>
-                                                        <Kbd className="bg-popover text-muted-foreground">Ctrl + Shift + N</Kbd>
-                                                    </KbdGroup>
-                                                </ContextMenuItem>
-                                                <ContextMenuItem className="cursor-pointer group" onClick={() => setCreateNoteDialogOpen(true)}>
-                                                    <FileEdit size={16} className="text-muted-foreground group-hover:text-accent-foreground" />
-                                                    <p className="text-foreground group-hover:text-accent-foreground">New Note</p>
-                                                    <KbdGroup>
-                                                        <Kbd className="bg-popover text-muted-foreground">Ctrl + N</Kbd>
-                                                    </KbdGroup>
-                                                </ContextMenuItem>
-                                                <ContextMenuItem className="cursor-pointer group text-destructive focus:text-destructive focus:bg-destructive/10" onClick={() => deleteFolder(folder.id, folder.name)}>
-                                                    <Trash size={16} className="text-destructive" />
-                                                    <p className="text-destructive">Delete</p>
-                                                </ContextMenuItem>
-                                            </ContextMenuContent>
+                                                                draggable
+                                                                onDragStart={(e) => {
+                                                                    e.dataTransfer.effectAllowed = 'move';
+                                                                    setDragItem({ type: 'folder', id: folder.id });
+                                                                }}
+                                                                onDragEnd={() => { setDragItem(null); setDragOverFolderId(null); }}
+                                                                onDragOver={(e) => { e.preventDefault(); if (dragItem?.id !== folder.id) setDragOverFolderId(folder.id); }}
+                                                                onDragLeave={() => setDragOverFolderId(null)}
+                                                                onDrop={(e) => {
+                                                                    e.preventDefault();
+                                                                    setDragOverFolderId(null);
+                                                                    if (dragItem && dragItem.id !== folder.id) {
+                                                                        moveItemToFolder(dragItem.type, dragItem.id, folder.id);
+                                                                        setDragItem(null);
+                                                                    }
+                                                                }}
+                                                                onDoubleClick={() => startFolderRename(folder.id, folder.name)}
+                                                                onClick={() => navigateToFolder(folder.name)}
+                                                            >
+                                                                <FolderIcon className={cn("w-12 h-12 group-hover:scale-110 transition-transform duration-200", folder.color && folderColorClasses[folder.color]?.text, folder.color && folderColorClasses[folder.color]?.fill)} />
+                                                                <p className="text-xs font-medium text-center truncate w-full px-1">{folder.name}</p>
+                                                            </div>
+                                                        )}
+                                                    </TooltipTrigger>
+                                                    <TooltipContent side="bottom">
+                                                        <p className="text-foreground text-md px-2 mt-1">{folder.name}</p>
+                                                        <p className="text-muted-foreground text-xs px-2 mb-1">{`Last updated: ${dateConvert(folder.updatedAt.toString())}`}</p>
+                                                    </TooltipContent>
+                                                </ContextMenuTrigger>
+                                                <ContextMenuContent >
+                                                    <p className="text-foreground text-md px-2 mt-1">{folder.name}</p>
+                                                    <p className="text-muted-foreground text-xs px-2 mb-1">{`Last updated: ${dateConvert(folder.updatedAt.toString())}`}</p>
+                                                    <ContextMenuItem className="cursor-pointer group" onClick={() => startFolderRename(folder.id, folder.name)}>
+                                                        <FolderPen size={16} className="text-muted-foreground group-hover:text-accent-foreground" />
+                                                        <p className="text-foreground group-hover:text-accent-foreground">Rename</p>
+                                                    </ContextMenuItem>
+                                                    {/* Color submenu */}
+                                                    <ContextMenuSub>
+                                                        <ContextMenuSubTrigger className="cursor-pointer group gap-2">
+                                                            <Palette size={16} className="text-muted-foreground group-hover:text-accent-foreground" />
+                                                            <p className="text-foreground group-hover:text-accent-foreground">Change Color</p>
+                                                        </ContextMenuSubTrigger>
+                                                        <ContextMenuSubContent>
+                                                            {folderColors.map((color) => (
+                                                                <ContextMenuItem
+                                                                    key={color.value}
+                                                                    className="cursor-pointer group gap-2"
+                                                                    onClick={() => changeFolderColor(folder.id, color.value)}
+                                                                >
+                                                                    <div className={`w-3 h-3 rounded-full ${color.bgClass}`} />
+                                                                    <p className="text-foreground group-hover:text-accent-foreground">
+                                                                        {color.label}
+                                                                    </p>
+                                                                    {folder.color === color.value && (
+                                                                        <Check size={16} className="text-muted-foreground group-hover:text-accent-foreground" />
+                                                                    )}
+                                                                </ContextMenuItem>
+                                                            ))}
+                                                        </ContextMenuSubContent>
+                                                    </ContextMenuSub>
+                                                    <ContextMenuItem className="cursor-pointer group">
+                                                        <Move size={16} className="text-muted-foreground group-hover:text-accent-foreground" />
+                                                        <p className="text-foreground group-hover:text-accent-foreground">Move to...</p>
+                                                    </ContextMenuItem>
+                                                    <ContextMenuItem className="cursor-pointer group" onClick={createFolder}>
+                                                        <FolderEdit size={16} className="text-muted-foreground group-hover:text-accent-foreground" />
+                                                        <p className="text-foreground group-hover:text-accent-foreground">New Folder</p>
+                                                        <KbdGroup>
+                                                            <Kbd className="bg-popover text-muted-foreground">Ctrl + Shift + N</Kbd>
+                                                        </KbdGroup>
+                                                    </ContextMenuItem>
+                                                    <ContextMenuItem className="cursor-pointer group" onClick={() => setCreateNoteDialogOpen(true)}>
+                                                        <FileEdit size={16} className="text-muted-foreground group-hover:text-accent-foreground" />
+                                                        <p className="text-foreground group-hover:text-accent-foreground">New Note</p>
+                                                        <KbdGroup>
+                                                            <Kbd className="bg-popover text-muted-foreground">Ctrl + N</Kbd>
+                                                        </KbdGroup>
+                                                    </ContextMenuItem>
+                                                    <ContextMenuItem className="cursor-pointer group text-destructive focus:text-destructive focus:bg-destructive/10" onClick={() => deleteFolder(folder.id, folder.name)}>
+                                                        <Trash size={16} className="text-destructive" />
+                                                        <p className="text-destructive">Delete</p>
+                                                    </ContextMenuItem>
+                                                </ContextMenuContent>
+
+                                            </Tooltip>
                                         </ContextMenu>
                                     ))}
                                     {notes.slice().sort((a, b) => sortOrder === "asc" ? a.title.localeCompare(b.title) : b.title.localeCompare(a.title)).map(note => (
                                         <ContextMenu key={note.id}>
-                                            <ContextMenuTrigger>
-                                                {renamingNoteId === note.id ? (
-                                                    <div
-                                                        className="group flex flex-col items-center gap-2 p-4 bg-muted/50 rounded-xl cursor-default w-32 h-28 justify-center border border-primary/50"
-                                                        onClick={(e) => e.stopPropagation()}
-                                                    >
-                                                        <FileText className="w-10 h-10 text-foreground/50" />
-                                                        <Input
-                                                            value={tempNoteName}
-                                                            onChange={(e) => setTempNoteName(e.target.value)}
-                                                            autoFocus
-                                                            maxLength={48}
-                                                            className="h-6 w-full text-xs text-center px-2 bg-transparent border-none focus-visible:border-transparent focus-visible:ring-transparent focus-visible:ring-[3px]"
-                                                            placeholder="Title"
-                                                            onBlur={handleNoteRenameSubmit}
-                                                            onKeyDown={(e) => {
-                                                                if (e.key === "Enter") handleNoteRenameSubmit();
-                                                                else if (e.key === "Escape") cancelNoteRename();
-                                                            }}
-                                                        />
-                                                    </div>
-                                                ) : (
-                                                    <div
-                                                        className="group flex flex-col items-center gap-2 p-4 hover:bg-muted/50 rounded-xl cursor-pointer w-32 h-28 justify-center transition-all duration-200 border border-transparent hover:border-sidebar-border"
-                                                        draggable
-                                                        onDragStart={(e) => {
-                                                            e.dataTransfer.effectAllowed = 'move';
-                                                            setDragItem({ type: 'note', id: note.id });
-                                                        }}
-                                                        onDragEnd={() => { setDragItem(null); setDragOverFolderId(null); }}
-                                                        onDoubleClick={() => startNoteRename(note.id, note.title)}
-                                                        onClick={() => openNote(note)}
-                                                    >
-                                                        <FileText className="w-10 h-10 text-foreground/50 group-hover:text-foreground group-hover:scale-110 transition-all duration-200" />
-                                                        <p className="text-xs font-medium text-center truncate w-full px-1 mt-1">{note.title}</p>
-                                                    </div>
-                                                )}
-                                            </ContextMenuTrigger>
-                                            <ContextMenuContent >
-                                                <p className="text-foreground text-md px-2 mt-1">{note.title}</p>
-                                                <p className="text-muted-foreground text-xs px-2">{note.description}</p>
-                                                <p className="text-muted-foreground text-xs px-2 mb-1">{`Last updated: ${dateConvert(note.updatedAt.toString())}`}</p>
-                                                <ContextMenuItem className="cursor-pointer group" onClick={() => startNoteRename(note.id, note.title)}>
-                                                    <FolderPen size={16} className="text-muted-foreground group-hover:text-accent-foreground" />
-                                                    <p className="text-foreground group-hover:text-accent-foreground">Rename</p>
-                                                </ContextMenuItem>
-                                                <ContextMenuItem className="cursor-pointer group">
-                                                    <Palette size={16} className="text-muted-foreground group-hover:text-accent-foreground" />
-                                                    <p className="text-foreground group-hover:text-accent-foreground">Change Color</p>
-                                                </ContextMenuItem>
-                                                <ContextMenuItem className="cursor-pointer group">
-                                                    <Move size={16} className="text-muted-foreground group-hover:text-accent-foreground" />
-                                                    <p className="text-foreground group-hover:text-accent-foreground">Move to...</p>
-                                                </ContextMenuItem>
-                                                <ContextMenuItem className="cursor-pointer group" onClick={createFolder}>
-                                                    <FolderEdit size={16} className="text-muted-foreground group-hover:text-accent-foreground" />
-                                                    <p className="text-foreground group-hover:text-accent-foreground">New Folder</p>
-                                                    <KbdGroup>
-                                                        <Kbd className="bg-popover text-muted-foreground">Ctrl + Shift + N</Kbd>
-                                                    </KbdGroup>
-                                                </ContextMenuItem>
-                                                <ContextMenuItem className="cursor-pointer group" onClick={() => setCreateNoteDialogOpen(true)}>
-                                                    <FileEdit size={16} className="text-muted-foreground group-hover:text-accent-foreground" />
-                                                    <p className="text-foreground group-hover:text-accent-foreground">New Note</p>
-                                                    <KbdGroup>
-                                                        <Kbd className="bg-popover text-muted-foreground">Ctrl + N</Kbd>
-                                                    </KbdGroup>
-                                                </ContextMenuItem>
-                                                <ContextMenuItem className="cursor-pointer group text-destructive focus:text-destructive focus:bg-destructive/10" onClick={() => deleteNote(note.id)}>
-                                                    <Trash size={16} className="text-destructive" />
-                                                    <p className="text-destructive">Delete</p>
-                                                </ContextMenuItem>
-                                            </ContextMenuContent>
+                                            <Tooltip>
+                                                <ContextMenuTrigger>
+                                                    <TooltipTrigger asChild>
+                                                        {renamingNoteId === note.id ? (
+                                                            <div
+                                                                className="group flex flex-col items-center gap-2 p-4 bg-muted/50 rounded-xl cursor-default w-32 h-28 justify-center border border-primary/50"
+                                                                onClick={(e) => e.stopPropagation()}
+                                                            >
+                                                                <FileText className="w-10 h-10 text-foreground/50" />
+                                                                <Input
+                                                                    value={tempNoteName}
+                                                                    onChange={(e) => setTempNoteName(e.target.value)}
+                                                                    autoFocus
+                                                                    maxLength={48}
+                                                                    className="h-6 w-full text-xs text-center px-2 bg-transparent border-none focus-visible:border-transparent focus-visible:ring-transparent focus-visible:ring-[3px]"
+                                                                    placeholder="Title"
+                                                                    onBlur={handleNoteRenameSubmit}
+                                                                    onKeyDown={(e) => {
+                                                                        if (e.key === "Enter") handleNoteRenameSubmit();
+                                                                        else if (e.key === "Escape") cancelNoteRename();
+                                                                    }}
+                                                                />
+                                                            </div>
+                                                        ) : (
+                                                            <div
+                                                                className="group flex flex-col items-center gap-2 p-4 hover:bg-muted/50 rounded-xl cursor-pointer w-32 h-28 justify-center transition-all duration-200 border border-transparent hover:border-sidebar-border"
+                                                                draggable
+                                                                onDragStart={(e) => {
+                                                                    e.dataTransfer.effectAllowed = 'move';
+                                                                    setDragItem({ type: 'note', id: note.id });
+                                                                }}
+                                                                onDragEnd={() => { setDragItem(null); setDragOverFolderId(null); }}
+                                                                onDoubleClick={() => startNoteRename(note.id, note.title)}
+                                                                onClick={() => openNote(note)}
+                                                            >
+                                                                <FileText className="w-10 h-10 text-foreground/50 group-hover:text-foreground group-hover:scale-110 transition-all duration-200" />
+                                                                <p className="text-xs font-medium text-center truncate w-full px-1 mt-1">{note.title}</p>
+                                                            </div>
+                                                        )}
+                                                    </TooltipTrigger>
+                                                    <TooltipContent side="bottom">
+                                                        <p className="text-foreground text-md px-2 mt-1">{note.title}</p>
+                                                        <p className="text-muted-foreground text-xs px-2">{note.description}</p>
+                                                        <p className="text-muted-foreground text-xs px-2 mb-1">{`Last updated: ${dateConvert(note.updatedAt.toString())}`}</p>
+                                                    </TooltipContent>
+                                                </ContextMenuTrigger>
+                                                <ContextMenuContent >
+                                                    <ContextMenuItem className="cursor-pointer group" onClick={() => startNoteRename(note.id, note.title)}>
+                                                        <FolderPen size={16} className="text-muted-foreground group-hover:text-accent-foreground" />
+                                                        <p className="text-foreground group-hover:text-accent-foreground">Rename</p>
+                                                    </ContextMenuItem>
+                                                    <ContextMenuItem className="cursor-pointer group">
+                                                        <Palette size={16} className="text-muted-foreground group-hover:text-accent-foreground" />
+                                                        <p className="text-foreground group-hover:text-accent-foreground">Change Color</p>
+                                                    </ContextMenuItem>
+                                                    <ContextMenuItem className="cursor-pointer group">
+                                                        <Move size={16} className="text-muted-foreground group-hover:text-accent-foreground" />
+                                                        <p className="text-foreground group-hover:text-accent-foreground">Move to...</p>
+                                                    </ContextMenuItem>
+                                                    <ContextMenuItem className="cursor-pointer group" onClick={createFolder}>
+                                                        <FolderEdit size={16} className="text-muted-foreground group-hover:text-accent-foreground" />
+                                                        <p className="text-foreground group-hover:text-accent-foreground">New Folder</p>
+                                                        <KbdGroup>
+                                                            <Kbd className="bg-popover text-muted-foreground">Ctrl + Shift + N</Kbd>
+                                                        </KbdGroup>
+                                                    </ContextMenuItem>
+                                                    <ContextMenuItem className="cursor-pointer group" onClick={() => setCreateNoteDialogOpen(true)}>
+                                                        <FileEdit size={16} className="text-muted-foreground group-hover:text-accent-foreground" />
+                                                        <p className="text-foreground group-hover:text-accent-foreground">New Note</p>
+                                                        <KbdGroup>
+                                                            <Kbd className="bg-popover text-muted-foreground">Ctrl + N</Kbd>
+                                                        </KbdGroup>
+                                                    </ContextMenuItem>
+                                                    <ContextMenuItem className="cursor-pointer group text-destructive focus:text-destructive focus:bg-destructive/10" onClick={() => deleteNote(note.id)}>
+                                                        <Trash size={16} className="text-destructive" />
+                                                        <p className="text-destructive">Delete</p>
+                                                    </ContextMenuItem>
+                                                </ContextMenuContent>
+                                            </Tooltip>
                                         </ContextMenu>
                                     ))}
                                     {folders.length === 0 && notes.length === 0 && (
@@ -1619,26 +1457,74 @@ export default function MainArea() {
                             </InputGroup>
                         </div>
                     </div>) : (
-                    <div className="flex flex-col items-center justify-center h-full relative w-full">
-                        <Haze size={64} className="text-muted-foreground/30" />
-                        <p className="text-muted-foreground/30 text-center text-lg mt-2">No folders or notes yet!</p>
-                        <div className="w-full absolute bottom-[-0.5rem] left-0 right-0 px-4 flex justify-center pointer-events-none">
-                            <InputGroup className="w-full max-w-[40%] bg-popover dark:bg-popover shadow-lg cursor-pointer px-2 pointer-events-auto"
-                                onClick={() => { }}>
-                                <InputGroupAddon align="inline-end" className="cursor-pointer">
-                                    <InputGroupText className="bg-transparent cursor-pointer">
-                                    </InputGroupText>
-                                </InputGroupAddon>
-                                <InputGroupInput
-                                    placeholder="No path selected..."
-                                    className="cursor-pointer"
-                                    // if path is none default to "/"
-                                    onChange={(e) => { setPath(e.target.value === "" ? "/" : e.target.value) }}
-                                    value={path}
-                                />
-                            </InputGroup>
+                    path !== "/" ? (
+
+                        <div className="p-4">
+                            <div
+                                className={cn(
+                                    "group flex flex-col items-center gap-2 p-4 hover:bg-muted/50 rounded-xl cursor-pointer w-32 h-28 justify-center transition-all duration-200 border border-transparent hover:border-sidebar-border",
+                                    dragItem && dragOverFolderId === '__parent__' && "border-primary/60 bg-primary/10 scale-105"
+                                )}
+                                onClick={() => goBack()}
+                                onDragOver={(e) => { e.preventDefault(); setDragOverFolderId('__parent__'); }}
+                                onDragLeave={() => setDragOverFolderId(null)}
+                                onDrop={(e) => {
+                                    e.preventDefault();
+                                    setDragOverFolderId(null);
+                                    if (dragItem) {
+                                        const parentId = getParentFolderIdOfCurrentPath();
+                                        moveItemToFolder(dragItem.type, dragItem.id, parentId);
+                                        setDragItem(null);
+                                    }
+                                }}
+                            >
+                                <FolderIcon className={cn("w-12 h-12 group-hover:scale-110 transition-transform duration-200", currentFolder?.color && folderColorClasses[currentFolder.color]?.text, currentFolder?.color && folderColorClasses[currentFolder.color]?.fill)} />
+                                <p className="text-xs font-medium text-center truncate w-full px-1">...</p>
+                            </div>
                         </div>
-                    </div>
+                    ) : (
+                        <ContextMenu>
+                            <ContextMenuTrigger className="w-full h-full block">
+                                <div className="flex flex-col items-center justify-center h-full relative w-full">
+                                    <Haze size={64} className="text-muted-foreground/30" />
+                                    <p className="text-muted-foreground/30 text-center text-lg mt-2">No folders or notes yet!</p>
+                                    <div className="w-full absolute bottom-[-0.5rem] left-0 right-0 px-4 flex justify-center pointer-events-none">
+                                        <InputGroup className="w-full max-w-[40%] bg-popover dark:bg-popover shadow-lg cursor-pointer px-2 pointer-events-auto"
+                                            onClick={() => { }}>
+                                            <InputGroupAddon align="inline-end" className="cursor-pointer">
+                                                <InputGroupText className="bg-transparent cursor-pointer">
+                                                </InputGroupText>
+                                            </InputGroupAddon>
+                                            <InputGroupInput
+                                                placeholder="No path selected..."
+                                                className="cursor-pointer"
+                                                // if path is none default to "/"
+                                                onChange={(e) => { setPath(e.target.value === "" ? "/" : e.target.value) }}
+                                                value={path}
+                                            />
+                                        </InputGroup>
+                                    </div>
+                                </div>
+                            </ContextMenuTrigger>
+                            <ContextMenuContent >
+                                <p className="text-foreground/50 text-xs px-2 my-1">Actions</p>
+                                <ContextMenuItem className="cursor-pointer group" onClick={createFolder}>
+                                    <FolderEdit size={16} className="text-muted-foreground group-hover:text-accent-foreground" />
+                                    <p className="text-foreground group-hover:text-accent-foreground">New Folder</p>
+                                    <KbdGroup>
+                                        <Kbd className="bg-popover text-muted-foreground">Ctrl + Shift + N</Kbd>
+                                    </KbdGroup>
+                                </ContextMenuItem>
+                                <ContextMenuItem className="cursor-pointer group" onClick={() => setCreateNoteDialogOpen(true)}>
+                                    <FileEdit size={16} className="text-muted-foreground group-hover:text-accent-foreground" />
+                                    <p className="text-foreground group-hover:text-accent-foreground">New Note</p>
+                                    <KbdGroup>
+                                        <Kbd className="bg-popover text-muted-foreground">Ctrl + N</Kbd>
+                                    </KbdGroup>
+                                </ContextMenuItem>
+                            </ContextMenuContent>
+                        </ContextMenu>
+                    )
 
                 )
                 ) : activeTab === 1 ? (

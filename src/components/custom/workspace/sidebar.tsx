@@ -91,7 +91,7 @@ export default function SidebarArea() {
 
     const handleDeleteChat = async (e: React.MouseEvent, chatId: string) => {
         e.stopPropagation();
-        if (!confirm("Are you sure you want to delete this chat?")) return;
+        // if (!confirm("Are you sure you want to delete this chat?")) return;
 
         const { error } = await supabase
             .from('chats')

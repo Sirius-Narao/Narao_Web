@@ -43,9 +43,11 @@ export default function ChatMessageInput({ attachments, setAttachments }: ChatMe
     const systemPromptString = `You are "Orthan AI", Narao's integrated assistant. You help in order to learn and to work mainly, so you use much markdown to highlight things. Narao is a note-taking app that uses AI to help users to learn and to work more efficiently. I am ${user?.username || "the user"}, and my preferences are: I like coding, AI, and technology. I am a student and I am learning about AI. Do not talk about yourself, only talk about the task except if explicitly asked.
 
     When you use tools:
-    - !!ALWAYS!! BEFORE calling a tool, briefly explain in natural language what you are about to do (e.g. "Let me search your workspace for notes about math...").
-    - !!ALWAYS!! After getting a tool result, briefly acknowledge what you found before proceeding or calling another tool (e.g. "I found 3 notes. Let me now read the one about algebra.").
-    - !!ALWAYS!! At the end, give a complete, helpful answer based on all the information you gathered.`;
+    - BEFORE calling a tool, briefly explain in natural language what you are about to do (e.g. "Let me search your workspace for notes about math...").
+    - After getting a tool result, briefly acknowledge what you found before proceeding or calling another tool (e.g. "I found 3 notes. Let me now read the one about algebra.").
+    - At the end, give a complete, helpful answer based on all the information you gathered.
+    
+    Do not stop a message before having completed the task, this even if you encounter errors (max 3 errors, then stop).`;
 
     // Workspace contexts for tool execution
     const { fetchedNotes, setFetchedNotes } = useFetchedNotes();
@@ -252,6 +254,8 @@ export default function ChatMessageInput({ attachments, setAttachments }: ChatMe
             };
             if (message.thought != null) payload.thought = message.thought;
             if (message.thinkingTime != null) payload.thinking_time = message.thinkingTime;
+            if (message.messageParts != null) payload.message_parts = message.messageParts;
+            if (message.toolCalls != null) payload.tool_calls = message.toolCalls;
 
             console.log("Attempting to insert into chat_messages with payload:", payload);
 
@@ -328,6 +332,8 @@ export default function ChatMessageInput({ attachments, setAttachments }: ChatMe
         let accumulatedThought = "";
         let accumulatedAnswer = "";
         let thinkingDuration: number | undefined = undefined;
+        let accumulatedMessageParts: MessagePart[] = [{ type: 'text', content: '' }];
+        let accumulatedToolCalls: ToolCall[] = [];
 
         try {
             // 0. If this send is completing an edit: remove the original message
@@ -520,18 +526,18 @@ export default function ChatMessageInput({ attachments, setAttachments }: ChatMe
                                     thinkingDuration = Date.now() - thinkingStartTime;
                                 }
                                 accumulatedAnswer += data.content;
+
+                                const lastIdx = accumulatedMessageParts.length - 1;
+                                if (accumulatedMessageParts[lastIdx]?.type === 'text') {
+                                    accumulatedMessageParts[lastIdx] = { type: 'text', content: (accumulatedMessageParts[lastIdx] as { type: 'text'; content: string }).content + data.content };
+                                } else {
+                                    accumulatedMessageParts.push({ type: 'text', content: data.content });
+                                }
+
                                 // ← Real-time streaming: update UI on every text chunk
                                 setChatMessages(prev => prev.map(msg => {
                                     if (msg.id !== msgId) return msg;
-                                    // Append to the last 'text' part in messageParts
-                                    const parts = [...(msg.messageParts || [{ type: 'text', content: '' }])];
-                                    const lastIdx = parts.length - 1;
-                                    if (parts[lastIdx]?.type === 'text') {
-                                        parts[lastIdx] = { type: 'text', content: (parts[lastIdx] as { type: 'text'; content: string }).content + data.content };
-                                    } else {
-                                        parts.push({ type: 'text', content: data.content });
-                                    }
-                                    return { ...msg, content: accumulatedAnswer, thought: accumulatedThought, thinkingTime: thinkingDuration, messageParts: parts };
+                                    return { ...msg, content: accumulatedAnswer, thought: accumulatedThought, thinkingTime: thinkingDuration, messageParts: accumulatedMessageParts };
                                 }));
                             } else if (data.type === "functionCall") {
                                 const fc = {
@@ -540,16 +546,18 @@ export default function ChatMessageInput({ attachments, setAttachments }: ChatMe
                                     thoughtSignature: data.content.thoughtSignature ?? null
                                 };
                                 functionCalls.push(fc);
+
+                                accumulatedToolCalls.push({ name: fc.name, args: fc.args, status: 'loading' });
+                                accumulatedMessageParts.push({ type: 'toolCall', toolCall: { name: fc.name, args: fc.args, status: 'loading' } });
+                                accumulatedMessageParts.push({ type: 'text', content: '' });
+
                                 // ← Tool card inserted at current position in messageParts, then new text segment opened
                                 setChatMessages(prev => prev.map(msg => {
                                     if (msg.id !== msgId) return msg;
-                                    const parts: MessagePart[] = [...(msg.messageParts || [])];
-                                    parts.push({ type: 'toolCall', toolCall: { name: fc.name, args: fc.args, status: 'loading' } });
-                                    parts.push({ type: 'text', content: '' }); // open next text segment
                                     return {
                                         ...msg,
-                                        toolCalls: [...(msg.toolCalls || []), { name: fc.name, args: fc.args, status: 'loading' as const }],
-                                        messageParts: parts
+                                        toolCalls: accumulatedToolCalls,
+                                        messageParts: accumulatedMessageParts
                                     };
                                 }));
                             }
@@ -600,29 +608,23 @@ export default function ChatMessageInput({ attachments, setAttachments }: ChatMe
                             functionResponses.push({
                                 functionResponse: { name: fc.name, response: { result } }
                             });
+
+                            const tcIdx = accumulatedToolCalls.findIndex(t => t.name === fc.name && t.status === 'loading');
+                            if (tcIdx !== -1) accumulatedToolCalls[tcIdx] = { ...accumulatedToolCalls[tcIdx], status, result };
+
+                            let patchedLast = false;
+                            accumulatedMessageParts = accumulatedMessageParts.map(p => {
+                                if (!patchedLast && p.type === 'toolCall' && p.toolCall.name === fc.name && p.toolCall.status === 'loading') {
+                                    patchedLast = true;
+                                    return { ...p, toolCall: { ...p.toolCall, status, result } };
+                                }
+                                return p;
+                            });
+
                             // Update status in both toolCalls array AND the matching messagePart
                             setChatMessages(prev => prev.map(msg => {
                                 if (msg.id !== assistantId) return msg;
-                                const updatedToolCalls = [...(msg.toolCalls || [])];
-                                const tcIdx = updatedToolCalls.map((t, j) => ({ t, j })).reverse()
-                                    .find(({ t }) => t.name === fc.name && t.status === 'loading')?.j ?? -1;
-                                if (tcIdx !== -1) updatedToolCalls[tcIdx] = { ...updatedToolCalls[tcIdx], status, result };
-                                const updatedParts: MessagePart[] = (msg.messageParts || []).map(p =>
-                                    p.type === 'toolCall' && p.toolCall.name === fc.name && p.toolCall.status === 'loading'
-                                        ? { ...p, toolCall: { ...p.toolCall, status, result } }
-                                        : p
-                                );
-                                // Only patch the LAST loading one (reverse find via map+reverse trick above is on toolCalls;
-                                // for messageParts, patch the last loading match)
-                                let patchedLast = false;
-                                const finalParts: MessagePart[] = [...(msg.messageParts || [])].reverse().map(p => {
-                                    if (!patchedLast && p.type === 'toolCall' && p.toolCall.name === fc.name && p.toolCall.status === 'loading') {
-                                        patchedLast = true;
-                                        return { ...p, toolCall: { ...p.toolCall, status, result } };
-                                    }
-                                    return p;
-                                }).reverse();
-                                return { ...msg, toolCalls: updatedToolCalls, messageParts: finalParts };
+                                return { ...msg, toolCalls: accumulatedToolCalls, messageParts: accumulatedMessageParts };
                             }));
                         }
 
@@ -666,6 +668,8 @@ export default function ChatMessageInput({ attachments, setAttachments }: ChatMe
                     content: accumulatedAnswer,
                     thought: accumulatedThought,
                     thinkingTime: thinkingDuration,
+                    messageParts: accumulatedMessageParts,
+                    toolCalls: accumulatedToolCalls,
                     createdAt: new Date()
                 });
             }
@@ -690,6 +694,8 @@ export default function ChatMessageInput({ attachments, setAttachments }: ChatMe
                         content: accumulatedAnswer.trim(),
                         thought: accumulatedThought.trim(),
                         thinkingTime: thinkingDuration,
+                        messageParts: accumulatedMessageParts,
+                        toolCalls: accumulatedToolCalls,
                         createdAt: new Date()
                     });
 
@@ -763,6 +769,8 @@ export default function ChatMessageInput({ attachments, setAttachments }: ChatMe
         let accumulatedThought = "";
         let accumulatedAnswer = "";
         let thinkingDuration: number | undefined = undefined;
+        let accumulatedMessageParts: MessagePart[] = [{ type: 'text', content: '' }];
+        let accumulatedToolCalls: ToolCall[] = [];
 
         // Add new assistant placeholder
         const assistantPlaceholder: ChatMessage = {
@@ -849,16 +857,17 @@ export default function ChatMessageInput({ attachments, setAttachments }: ChatMe
                                     thinkingDuration = Date.now() - thinkingStartTime;
                                 }
                                 accumulatedAnswer += data.content;
+
+                                const lastIdx = accumulatedMessageParts.length - 1;
+                                if (accumulatedMessageParts[lastIdx]?.type === 'text') {
+                                    accumulatedMessageParts[lastIdx] = { type: 'text', content: (accumulatedMessageParts[lastIdx] as { type: 'text'; content: string }).content + data.content };
+                                } else {
+                                    accumulatedMessageParts.push({ type: 'text', content: data.content });
+                                }
+
                                 setChatMessages(prev => prev.map(msg => {
                                     if (msg.id !== msgId) return msg;
-                                    const parts = [...(msg.messageParts || [{ type: 'text', content: '' }])];
-                                    const lastIdx = parts.length - 1;
-                                    if (parts[lastIdx]?.type === 'text') {
-                                        parts[lastIdx] = { type: 'text', content: (parts[lastIdx] as { type: 'text'; content: string }).content + data.content };
-                                    } else {
-                                        parts.push({ type: 'text', content: data.content });
-                                    }
-                                    return { ...msg, content: accumulatedAnswer, thought: accumulatedThought, thinkingTime: thinkingDuration, messageParts: parts };
+                                    return { ...msg, content: accumulatedAnswer, thought: accumulatedThought, thinkingTime: thinkingDuration, messageParts: accumulatedMessageParts };
                                 }));
                             } else if (data.type === "functionCall") {
                                 const fc = {
@@ -867,15 +876,17 @@ export default function ChatMessageInput({ attachments, setAttachments }: ChatMe
                                     thoughtSignature: data.content.thoughtSignature ?? null
                                 };
                                 functionCalls.push(fc);
+
+                                accumulatedToolCalls.push({ name: fc.name, args: fc.args, status: 'loading' });
+                                accumulatedMessageParts.push({ type: 'toolCall', toolCall: { name: fc.name, args: fc.args, status: 'loading' } });
+                                accumulatedMessageParts.push({ type: 'text', content: '' });
+
                                 setChatMessages(prev => prev.map(msg => {
                                     if (msg.id !== msgId) return msg;
-                                    const parts: MessagePart[] = [...(msg.messageParts || [])];
-                                    parts.push({ type: 'toolCall', toolCall: { name: fc.name, args: fc.args, status: 'loading' } });
-                                    parts.push({ type: 'text', content: '' });
                                     return {
                                         ...msg,
-                                        toolCalls: [...(msg.toolCalls || []), { name: fc.name, args: fc.args, status: 'loading' as const }],
-                                        messageParts: parts
+                                        toolCalls: accumulatedToolCalls,
+                                        messageParts: accumulatedMessageParts
                                     };
                                 }));
                             }
@@ -912,21 +923,23 @@ export default function ChatMessageInput({ attachments, setAttachments }: ChatMe
                                 status = 'error';
                             }
                             functionResponses.push({ functionResponse: { name: fc.name, response: { result } } });
+
+                            const tcIdx = accumulatedToolCalls.map((t, j) => ({ t, j })).reverse()
+                                .find(({ t }) => t.name === fc.name && t.status === 'loading')?.j ?? -1;
+                            if (tcIdx !== -1) accumulatedToolCalls[tcIdx] = { ...accumulatedToolCalls[tcIdx], status, result };
+
+                            let patchedLast = false;
+                            accumulatedMessageParts = [...accumulatedMessageParts].reverse().map(p => {
+                                if (!patchedLast && p.type === 'toolCall' && p.toolCall.name === fc.name && p.toolCall.status === 'loading') {
+                                    patchedLast = true;
+                                    return { ...p, toolCall: { ...p.toolCall, status, result } };
+                                }
+                                return p;
+                            }).reverse();
+
                             setChatMessages(prev => prev.map(msg => {
                                 if (msg.id !== newAssistantId) return msg;
-                                const updatedToolCalls = [...(msg.toolCalls || [])];
-                                const tcIdx = updatedToolCalls.map((t, j) => ({ t, j })).reverse()
-                                    .find(({ t }) => t.name === fc.name && t.status === 'loading')?.j ?? -1;
-                                if (tcIdx !== -1) updatedToolCalls[tcIdx] = { ...updatedToolCalls[tcIdx], status, result };
-                                let patchedLast = false;
-                                const finalParts: MessagePart[] = [...(msg.messageParts || [])].reverse().map(p => {
-                                    if (!patchedLast && p.type === 'toolCall' && p.toolCall.name === fc.name && p.toolCall.status === 'loading') {
-                                        patchedLast = true;
-                                        return { ...p, toolCall: { ...p.toolCall, status, result } };
-                                    }
-                                    return p;
-                                }).reverse();
-                                return { ...msg, toolCalls: updatedToolCalls, messageParts: finalParts };
+                                return { ...msg, toolCalls: accumulatedToolCalls, messageParts: accumulatedMessageParts };
                             }));
                         }
 
@@ -964,6 +977,8 @@ export default function ChatMessageInput({ attachments, setAttachments }: ChatMe
                     content: accumulatedAnswer,
                     thought: accumulatedThought,
                     thinkingTime: thinkingDuration,
+                    messageParts: accumulatedMessageParts,
+                    toolCalls: accumulatedToolCalls,
                     createdAt: new Date()
                 });
             }
@@ -980,6 +995,8 @@ export default function ChatMessageInput({ attachments, setAttachments }: ChatMe
                         content: accumulatedAnswer.trim(),
                         thought: accumulatedThought.trim(),
                         thinkingTime: thinkingDuration,
+                        messageParts: accumulatedMessageParts,
+                        toolCalls: accumulatedToolCalls,
                         createdAt: new Date()
                     });
                 }

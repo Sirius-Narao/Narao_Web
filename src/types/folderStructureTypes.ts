@@ -13,6 +13,7 @@ export type Note = {
     createdAt: Date;
     updatedAt: Date;
     tags?: string[];
+    folder_id?: string;
 }
 
 export type Folder = {
@@ -21,8 +22,7 @@ export type Folder = {
     name: string;
     createdAt: Date;
     updatedAt: Date;
-    notesIds?: string[];
-    foldersIds?: string[];
+    parent_id?: string;
     color?: FolderColor;
 }
 

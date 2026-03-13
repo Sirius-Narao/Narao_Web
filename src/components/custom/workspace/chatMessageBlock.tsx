@@ -19,6 +19,21 @@ const THINKING_PHRASES = [
     "Why am I taking so long... "
 ];
 
+type ToolName = keyof typeof TOOL_NAMES
+const TOOL_NAMES = {
+    "get_all_notes_and_folders": "Get All Notes and Folders",
+    "read_note": "Read Note",
+    "create_note": "Create Note",
+    "delete_note": "Delete Note",
+    "rename_note": "Rename Note",
+    "move_note": "Move Note",
+    "modify_note": "Modify Note",
+    "create_folder": "Create Folder",
+    "delete_folder": "Delete Folder",
+    "rename_folder": "Rename Folder",
+    "move_folder": "Move Folder",
+}
+
 export default function ChatMessageBlock({ message }: { message: ChatMessage }) {
     const [isThoughtExpanded, setIsThoughtExpanded] = useState(false);
     const { isLoading } = useIsLoading();
@@ -148,14 +163,14 @@ export default function ChatMessageBlock({ message }: { message: ChatMessage }) 
                                     part.type === 'toolCall' ? (
                                         <div
                                             key={i}
-                                            className="flex items-center gap-2.5 px-3 py-2 my-1 rounded-xl border border-border bg-popover/40 backdrop-blur-sm text-xs text-muted-foreground max-w-[85%] animate-in fade-in slide-in-from-top-1"
+                                            className="flex items-center gap-2.5 px-3 py-2 my-1 rounded-xl border border-border bg-popover/40 backdrop-blur-sm text-xs text-muted-foreground max-w-[85%] animate-in fade-in slide-in-from-top-1 shadow-sm"
                                         >
                                             <Wrench className="w-3 h-3 shrink-0 text-primary/70" />
-                                            <span className="font-mono text-primary/80">{part.toolCall.name.replace(/_/g, " ")}</span>
+                                            <span className="font-mono text-primary/80">{TOOL_NAMES[part.toolCall.name as keyof typeof TOOL_NAMES]}</span>
                                             {Object.keys(part.toolCall.args).length > 0 && (
-                                                <span className="truncate opacity-60 max-w-[220px]">
+                                                <span className="truncate opacity-60 max-w-[264px]">
                                                     {Object.entries(part.toolCall.args)
-                                                        .map(([k, v]) => `${k}: ${String(v).slice(0, 40)}`)
+                                                        .map(([k, v]) => `${String(v)}`)
                                                         .join(" · ")}
                                                 </span>
                                             )}
@@ -176,6 +191,7 @@ export default function ChatMessageBlock({ message }: { message: ChatMessage }) 
                                     ) : null
                                 )}
                             </div>
+
                         ) : (
                             // Fallback for older messages without messageParts (loaded from DB)
                             <>

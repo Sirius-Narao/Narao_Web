@@ -50,10 +50,11 @@ export async function POST(req: NextRequest) {
         };
 
         // Build history, re-fetching past attachments from their stored Supabase URLs
-        const contents = await Promise.all(
-            history.map(async (msg: any) => {
+        const contents: any[] = [];
+        for (const msg of history.slice(0, -1)) {
+            if (msg.role === "user") {
                 const parts: any[] = [{ text: msg.content }];
-                if (msg.role === "user" && msg.attachments?.length > 0) {
+                if (msg.attachments?.length > 0) {
                     await Promise.all(msg.attachments.map(async (att: any) => {
                         try {
                             const data = await urlToBase64(att.file_url);
@@ -63,9 +64,27 @@ export async function POST(req: NextRequest) {
                         }
                     }));
                 }
-                return { role: msg.role === "user" ? "user" : "model", parts };
-            })
-        );
+                contents.push({ role: "user", parts });
+            } else {
+                // Assistant message
+                const parts: any[] = [{ text: msg.content || "" }];
+                if (msg.toolCalls?.length > 0) {
+                    // Turn 1: Model response with function calls
+                    msg.toolCalls.forEach((tc: any) => {
+                        parts.push({ functionCall: { name: tc.name, args: tc.args } });
+                    });
+                    contents.push({ role: "model", parts });
+
+                    // Turn 2: User response with function results
+                    const responseParts = msg.toolCalls.map((tc: any) => ({
+                        functionResponse: { name: tc.name, response: { result: tc.result || "" } }
+                    }));
+                    contents.push({ role: "user", parts: responseParts });
+                } else {
+                    contents.push({ role: "model", parts });
+                }
+            }
+        }
 
         const currentParts: any[] = [{ text: userInput }];
         if (attachments && attachments.length > 0) {
