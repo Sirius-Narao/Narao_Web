@@ -44,7 +44,8 @@ interface ChatMessage {
 interface Models {
     "gemini-2.5-flash": "Gemini 2.5 Flash",
     "gemini-3-flash-preview": "Gemini 3 Flash",
-    "gemini-3.1-flash-lite-preview": "Gemini 3.1 Flash Lite"
+    // Defective model, it doesn't work well with tools
+    // "gemini-3.1-flash-lite-preview": "Gemini 3.1 Flash Lite"
 }
 
 export type { ChatType, ChatMessage, ChatAttachment, Models, ToolCall, MessagePart };

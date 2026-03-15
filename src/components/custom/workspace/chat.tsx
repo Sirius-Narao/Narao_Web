@@ -140,7 +140,7 @@ export default function Chat() {
 
     return (
         <EditMessageProvider>
-            <div className="flex flex-col.....0 relative w-full h-full overflow-hidden">
+            <div className="flex flex-col h-full relative w-full h-full overflow-hidden">
                 {/* Main scrollable area container */}
                 <div className="flex-1 relative w-full h-full overflow-hidden">
                     {/* Fixed fade effects at top and bottom */}
@@ -161,13 +161,7 @@ export default function Chat() {
                                 <div className="h-20 " key={"padding-top"}></div>
 
                                 {chatMessages.map((message) => (
-                                    message.role === "user" ? (
-                                        <div className="flex flex-row relative w-full h-fit justify-end" key={message.id}>
-                                            <ChatMessageBlock message={message} />
-                                        </div>
-                                    ) : (
-                                        <ChatMessageBlock key={message.id} message={message} />
-                                    )
+                                    <ChatMessageBlock key={message.id} message={message} />
                                 ))}
                                 {chatMessages.length === 0 && (
                                     <div className="flex flex-col items-center justify-center h-[50vh]">

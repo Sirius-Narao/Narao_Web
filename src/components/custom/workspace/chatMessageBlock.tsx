@@ -1,6 +1,6 @@
 import { ChatMessage } from "@/types/chatType";
 import { MarkdownRenderer } from "./MarkdownRenderer";
-import { Check, ChevronDown, Copy, Edit, FileImage, FileTypeCorner, Lightbulb, RefreshCcw, Sun, ThumbsDown, ThumbsUp, TriangleAlert, Wrench } from "lucide-react";
+import { BookOpen, Check, ChevronDown, Copy, Edit, FileImage, FileMinus, FilePen, FilePlus, FileText, FileTypeCorner, FolderMinus, FolderPlus, FolderSearch, Lightbulb, Move, Palette, PenTool, RefreshCcw, Sun, ThumbsDown, ThumbsUp, TriangleAlert, Wrench } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { useState, useEffect } from "react";
 import { cn } from "@/lib/utils";
@@ -21,17 +21,18 @@ const THINKING_PHRASES = [
 
 type ToolName = keyof typeof TOOL_NAMES
 const TOOL_NAMES = {
-    "get_all_notes_and_folders": "Get All Notes and Folders",
-    "read_note": "Read Note",
-    "create_note": "Create Note",
-    "delete_note": "Delete Note",
-    "rename_note": "Rename Note",
-    "move_note": "Move Note",
-    "modify_note": "Modify Note",
-    "create_folder": "Create Folder",
-    "delete_folder": "Delete Folder",
-    "rename_folder": "Rename Folder",
-    "move_folder": "Move Folder",
+    "get_all_notes_and_folders": { loading: "Getting All Notes and Folders...", done: "Get All Notes and Folders", icon: <FolderSearch className="w-3 h-3 shrink-0 text-primary/70" /> },
+    "read_note": { loading: "Reading Note...", done: "Read Note", icon: <BookOpen className="w-3 h-3 shrink-0 text-primary/70" /> },
+    "create_note": { loading: "Creating Note...", done: "Create Note", icon: <FilePlus className="w-3 h-3 shrink-0 text-primary/70" /> },
+    "delete_note": { loading: "Deleting Note...", done: "Delete Note", icon: <FileMinus className="w-3 h-3 shrink-0 text-primary/70" /> },
+    "rename_note": { loading: "Renaming Note...", done: "Rename Note", icon: <PenTool className="w-3 h-3 shrink-0 text-primary/70" /> },
+    "move_note": { loading: "Moving Note...", done: "Move Note", icon: <Move className="w-3 h-3 shrink-0 text-primary/70" /> },
+    "modify_note": { loading: "Modifying Note...", done: "Modify Note", icon: <FilePen className="w-3 h-3 shrink-0 text-primary/70" /> },
+    "create_folder": { loading: "Creating Folder...", done: "Create Folder", icon: <FolderPlus className="w-3 h-3 shrink-0 text-primary/70" /> },
+    "delete_folder": { loading: "Deleting Folder...", done: "Delete Folder", icon: <FolderMinus className="w-3 h-3 shrink-0 text-primary/70" /> },
+    "rename_folder": { loading: "Renaming Folder...", done: "Rename Folder", icon: <PenTool className="w-3 h-3 shrink-0 text-primary/70" /> },
+    "move_folder": { loading: "Moving Folder...", done: "Move Folder", icon: <Move className="w-3 h-3 shrink-0 text-primary/70" /> },
+    "change_color_folder": { loading: "Changing Folder Color...", done: "Change Folder Color", icon: <Palette className="w-3 h-3 shrink-0 text-primary/70" /> },
 }
 
 export default function ChatMessageBlock({ message }: { message: ChatMessage }) {
@@ -70,8 +71,8 @@ export default function ChatMessageBlock({ message }: { message: ChatMessage }) 
             {
                 message.role === "user" ? (
                     <div className="flex flex-col relative w-fit h-fit max-w-[80%] items-end">
-                        {message.content && <div className="flex relative w-fit h-fit rounded-2xl bg-secondary/80 p-4 px-6 shadow-sm border border-border/10">
-                            <MarkdownRenderer content={message.content} className="text-foreground" />
+                        {message.content && <div className="relative w-fit max-w-[100%] h-fit rounded-2xl bg-secondary/80 p-4 px-6 shadow-sm border border-border/10 overflow-hidden text-left">
+                            <MarkdownRenderer content={message.content} className="text-foreground break-words" />
                         </div>}
                         {/* Content such as images, pdfs, etc */}
                         {message.attachments && message.attachments.length > 0 && (
@@ -165,15 +166,11 @@ export default function ChatMessageBlock({ message }: { message: ChatMessage }) 
                                             key={i}
                                             className="flex items-center gap-2.5 px-3 py-2 my-1 rounded-xl border border-border bg-popover/40 backdrop-blur-sm text-xs text-muted-foreground max-w-[85%] animate-in fade-in slide-in-from-top-1 shadow-sm"
                                         >
-                                            <Wrench className="w-3 h-3 shrink-0 text-primary/70" />
-                                            <span className="font-mono text-primary/80">{TOOL_NAMES[part.toolCall.name as keyof typeof TOOL_NAMES]}</span>
-                                            {Object.keys(part.toolCall.args).length > 0 && (
-                                                <span className="truncate opacity-60 max-w-[264px]">
-                                                    {Object.entries(part.toolCall.args)
-                                                        .map(([k, v]) => `${String(v)}`)
-                                                        .join(" · ")}
-                                                </span>
-                                            )}
+                                            {TOOL_NAMES[part.toolCall.name as keyof typeof TOOL_NAMES].icon}
+                                            <span className="font-mono text-primary/80">{part.toolCall.status === "loading" ? TOOL_NAMES[part.toolCall.name as keyof typeof TOOL_NAMES].loading : TOOL_NAMES[part.toolCall.name as keyof typeof TOOL_NAMES].done}</span>
+                                            {/* <span className="truncate opacity-60 max-w-[264px]">
+                                                {JSON.stringify(part.toolCall.args?.localisation)}
+                                            </span> */}
                                             <span className="ml-auto shrink-0">
                                                 {part.toolCall.status === 'loading' ? (
                                                     <Spinner className="w-3 h-3" />

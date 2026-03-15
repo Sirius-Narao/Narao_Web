@@ -21,6 +21,7 @@ function resolveNotePath(
     fetchedNotes: Note[],
     fetchedFolders: Folder[]
 ): Note | undefined {
+    if (typeof localisation !== "string") return undefined;
     const clean = localisation.replace(/^\//, "");
     const segments = clean.split("/");
     const noteName = segments[segments.length - 1];
@@ -58,6 +59,7 @@ function resolveFolderPath(
     localisation: string,
     fetchedFolders: Folder[]
 ): Folder | null | undefined {
+    if (typeof localisation !== "string") return undefined;
     const clean = localisation.replace(/^\//, "");
     if (!clean || clean === "/") return null; // root
 
@@ -289,6 +291,43 @@ export const WORKSPACE_TOOL_DECLARATIONS = [
             required: ["localisation", "new_parent_path"]
         }
     },
+    {
+        name: "change_color_folder",
+        description: "Change the color of a folder.",
+        parameters: {
+            type: Type.OBJECT,
+            properties: {
+                localisation: {
+                    type: Type.STRING,
+                    description: "Absolute path to the folder (e.g. '/maths')."
+                },
+                color: {
+                    type: Type.STRING,
+                    enum: ["folder-red", "folder-blue", "folder-green", "folder-yellow", "folder-purple", "folder-orange", "folder-pink", "folder-cyan", "folder-lime", "folder-teal", "folder-indigo", "folder-rose", "folder-amber", "folder-brown", "folder-slate", "folder-gray", "folder-black", "folder-white"],
+                    description: "The new color of the folder (e.g. 'folder-red')."
+                },
+            },
+            required: ["localisation", "color"]
+        }
+    },
+    // {
+    //     name: "change_color_note",
+    //     description: "Change the color of a note.",
+    //     parameters: {
+    //         type: Type.OBJECT,
+    //         properties: {
+    //             localisation: {
+    //                 type: Type.STRING,
+    //                 description: "Absolute path to the note (e.g. '/maths/introduction')."
+    //             },
+    //             color: {
+    //                 type: Type.STRING,
+    //                 description: "The new color of the note (e.g. 'red')."
+    //             },
+    //         },
+    //         required: ["localisation", "color"]
+    //     }
+    // },
 ];
 
 // ─── Executor ─────────────────────────────────────────────────────────────────
@@ -311,16 +350,18 @@ export async function executeToolCall(
 
         // ── read_note ─────────────────────────────────────────────────────────
         case "read_note": {
-            const note = resolveNotePath(args.localisation, fetchedNotes, fetchedFolders);
-            if (!note) return `Note not found at path: ${args.localisation}`;
+            const targetPath = args.localisation || args.path;
+            const note = resolveNotePath(targetPath, fetchedNotes, fetchedFolders);
+            if (!note) return `Note not found at path: ${targetPath}`;
 
             return note.content || "(Note is empty)";
         }
 
         // ── modify_note ───────────────────────────────────────────────────────
         case "modify_note": {
-            const note = resolveNotePath(args.localisation, fetchedNotes, fetchedFolders);
-            if (!note) return `Note not found at path: ${args.localisation}`;
+            const targetPath = args.localisation || args.path;
+            const note = resolveNotePath(targetPath, fetchedNotes, fetchedFolders);
+            if (!note) return `Note not found at path: ${targetPath}`;
 
             const { error } = await supabase
                 .from("notes")
@@ -441,8 +482,9 @@ export async function executeToolCall(
 
         // ── delete_note ───────────────────────────────────────────────────────
         case "delete_note": {
-            const note = resolveNotePath(args.localisation, fetchedNotes, fetchedFolders);
-            if (!note) return `Note not found at path: ${args.localisation}`;
+            const targetPath = args.localisation || args.path;
+            const note = resolveNotePath(targetPath, fetchedNotes, fetchedFolders);
+            if (!note) return `Note not found at path: ${targetPath}`;
 
             const { error } = await supabase
                 .from("notes")
@@ -458,8 +500,9 @@ export async function executeToolCall(
 
         // ── delete_folder ─────────────────────────────────────────────────────
         case "delete_folder": {
-            const folder = resolveFolderPath(args.localisation, fetchedFolders);
-            if (!folder) return `Folder not found at path: ${args.localisation}`;
+            const targetPath = args.localisation || args.path;
+            const folder = resolveFolderPath(targetPath, fetchedFolders);
+            if (!folder) return `Folder not found at path: ${targetPath}`;
 
             const { error } = await supabase
                 .from("folders")
@@ -475,8 +518,9 @@ export async function executeToolCall(
 
         // ── rename_folder ─────────────────────────────────────────────────────
         case "rename_folder": {
-            const folder = resolveFolderPath(args.localisation, fetchedFolders);
-            if (!folder) return `Folder not found at path: ${args.localisation}`;
+            const targetPath = args.localisation || args.path;
+            const folder = resolveFolderPath(targetPath, fetchedFolders);
+            if (!folder) return `Folder not found at path: ${targetPath}`;
 
             const { error } = await supabase
                 .from("folders")
@@ -494,8 +538,9 @@ export async function executeToolCall(
 
         // ── rename_note ───────────────────────────────────────────────────────
         case "rename_note": {
-            const note = resolveNotePath(args.localisation, fetchedNotes, fetchedFolders);
-            if (!note) return `Note not found at path: ${args.localisation}`;
+            const targetPath = args.localisation || args.path;
+            const note = resolveNotePath(targetPath, fetchedNotes, fetchedFolders);
+            if (!note) return `Note not found at path: ${targetPath}`;
 
             const { error } = await supabase
                 .from("notes")
@@ -513,8 +558,9 @@ export async function executeToolCall(
 
         // ── move_folder ───────────────────────────────────────────────────────
         case "move_folder": {
-            const folder = resolveFolderPath(args.localisation, fetchedFolders);
-            if (!folder) return `Folder not found at path: ${args.localisation}`;
+            const targetPath = args.localisation || args.path;
+            const folder = resolveFolderPath(targetPath, fetchedFolders);
+            if (!folder) return `Folder not found at path: ${targetPath}`;
 
             let newParentId: string | null = null;
             if (args.new_parent_path && args.new_parent_path !== "/") {
@@ -539,8 +585,9 @@ export async function executeToolCall(
 
         // ── move_note ───────────────────────────────────────────────────────
         case "move_note": {
-            const note = resolveNotePath(args.localisation, fetchedNotes, fetchedFolders);
-            if (!note) return `Note not found at path: ${args.localisation}`;
+            const targetPath = args.localisation || args.path;
+            const note = resolveNotePath(targetPath, fetchedNotes, fetchedFolders);
+            if (!note) return `Note not found at path: ${targetPath}`;
 
             let newFolderId: string | null = null;
             if (args.new_folder_path && args.new_folder_path !== "/") {
@@ -561,6 +608,25 @@ export async function executeToolCall(
             );
 
             return `Note "${note.title}" moved to "${args.new_folder_path}" successfully.`;
+        }
+
+        case "change_color_folder": {
+            const targetPath = args.localisation || args.path;
+            const folder = resolveFolderPath(targetPath, fetchedFolders);
+            if (!folder) return `Folder not found at path: ${targetPath}`;
+
+            const { error } = await supabase
+                .from("folders")
+                .update({ color: args.color })
+                .eq("id", folder.id);
+
+            if (error) return `Failed to change folder color: ${error.message}`;
+
+            setFetchedFolders(prev =>
+                prev.map(f => f.id === folder.id ? { ...f, color: args.color } : f)
+            );
+
+            return `Folder "${folder.name}" color changed from "${folder.color}" to "${args.color}" successfully.`;
         }
 
         default:

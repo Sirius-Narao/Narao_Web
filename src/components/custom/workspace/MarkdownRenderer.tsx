@@ -95,13 +95,13 @@ export function MarkdownRenderer({ content, className = "" }: MarkdownRendererPr
                         )
                     },
                     thead({ children }) {
-                        return <thead className="bg-secondary/50">{children}</thead>
+                        return <thead className="bg-secondary/70 ">{children}</thead>
                     },
                     th({ children }) {
-                        return <th className="border-b border-border px-4 py-3 text-left font-bold text-foreground/80">{children}</th>
+                        return <th className="border-b border-secondary/70 px-4 py-3 text-left font-bold text-foreground/80 ">{children}</th>
                     },
                     td({ children }) {
-                        return <td className="border-b border-border px-4 py-2.5 text-foreground/70">{children}</td>
+                        return <td className="border-b border-secondary/70 px-4 py-2.5 text-foreground/70">{children}</td>
                     },
                     blockquote({ children }) {
                         return (
@@ -120,13 +120,13 @@ export function MarkdownRenderer({ content, className = "" }: MarkdownRendererPr
                         return <li className="leading-relaxed pl-1">{children}</li>
                     },
                     h1({ children }) {
-                        return <h1 className="my-6 text-2xl font-bold border-b border-border pb-6 text-foreground/90 tracking-tight">{children}</h1>
+                        return <h1 className="my-6 text-2xl font-bold border-b border-border pb-6 text-foreground/90 tracking-tight whitespace-pre-wrap">{children}</h1>
                     },
                     h2({ children }) {
-                        return <h2 className="my-5 text-xl font-semibold text-foreground/90 tracking-tight">{children}</h2>
+                        return <h2 className="my-5 text-xl font-semibold text-foreground/90 tracking-tight whitespace-pre-wrap">{children}</h2>
                     },
                     h3({ children }) {
-                        return <h3 className="my-4 text-lg font-semibold text-foreground/80 tracking-tight">{children}</h3>
+                        return <h3 className="my-4 text-lg font-semibold text-foreground/80 tracking-tight whitespace-pre-wrap">{children}</h3>
                     },
                     a({ children, href }) {
                         return (
@@ -141,10 +141,10 @@ export function MarkdownRenderer({ content, className = "" }: MarkdownRendererPr
                         )
                     },
                     p({ children }) {
-                        return <p className="mb-4 last:mb-0 leading-relaxed text-foreground/95">{children}</p>
+                        return <p className="mb-4 last:mb-0 leading-relaxed text-foreground/95 whitespace-pre-wrap break-words">{children}</p>
                     },
                     hr() {
-                        return <hr className="h-px bg-border my-6" />
+                        return <hr className="h-px bg-foreground/10 my-6" />
                     }
                 }}
             >

@@ -58,7 +58,7 @@ export default function SidebarArea() {
     // settings open
     const { settingsOpen, setSettingsOpen } = useSettingsOpen();
     // chat title
-    const { chatTitle, setChatTitle } = useChatMessages();
+    const { chatTitle, setChatTitle, setChatMessages, currentChatId, setCurrentChatId } = useChatMessages();
 
     // auth fetch
     useEffect(() => {
@@ -68,7 +68,6 @@ export default function SidebarArea() {
         }
         fetchUserAuth();
     }, [])
-
     // Fetch user data
     useEffect(() => {
         if (!userAuth) return;
@@ -86,68 +85,6 @@ export default function SidebarArea() {
         };
         fetchUsers();
     }, [userAuth]);
-
-    const { setChatMessages, currentChatId, setCurrentChatId, refreshTrigger, refreshChats } = useChatMessages();
-
-    const handleDeleteChat = async (e: React.MouseEvent, chatId: string) => {
-        e.stopPropagation();
-        // if (!confirm("Are you sure you want to delete this chat?")) return;
-
-        const { error } = await supabase
-            .from('chats')
-            .delete()
-            .eq('id', chatId);
-
-        if (error) {
-            console.error("Error deleting chat:", error);
-            toast.error("Failed to delete chat", { duration: 1000 });
-        } else {
-            toast.success("Chat deleted", { duration: 1000 });
-            if (currentChatId === chatId) {
-                setCurrentChatId(null);
-                setChatMessages([]);
-            }
-            refreshChats();
-        }
-    };
-
-    // Fetch chats data
-    useEffect(() => {
-        if (!user) return;
-
-        const fetchChats = async () => {
-            const { data, error } = await supabase
-                .from('chats')         // your table name
-                .select('*')          // select all columns
-                .eq('user_id', user.id);           // select only those of the user
-
-            if (error) {
-                console.error(error);
-                return;
-            }
-
-            if (data) {
-                // Map the data to ensure correct types (Date objects) and property names
-                const mappedChats: ChatType[] = data.map((item: any) => ({
-                    id: item.id,
-                    title: item.title || "Untitled Chat",
-                    description: item.description || "",
-                    // Handle both camelCase (if mapped) and snake_case (raw DB)
-                    createdAt: new Date(item.created_at || item.createdAt || new Date()),
-                    updatedAt: new Date(item.updated_at || item.updatedAt || new Date())
-                }));
-                setChats(mappedChats);
-            }
-        };
-        fetchChats();
-        setChatsFetched(true);
-    }, [user, refreshTrigger]);
-
-    // Update filtered chats when chats change, preserving sort order
-    useEffect(() => {
-        setFilteredChats([...chats].sort((a, b) => b.updatedAt.getTime() - a.updatedAt.getTime()));
-    }, [chats]);
-
     // Fetch announces data
     useEffect(() => {
         const fetchAnnounces = async () => {
@@ -165,8 +102,6 @@ export default function SidebarArea() {
         fetchAnnounces();
     }, []);
 
-    // Filtered chats state
-    const [filteredChats, setFilteredChats] = useState<ChatType[]>([]);
 
     return (
         <Sidebar variant="inset" className="bg-background">
@@ -260,107 +195,6 @@ export default function SidebarArea() {
                             </div>
                         )
                     })}
-                </div>
-
-                {/* Search Bar & Chat List */}
-                <div className="mt-2 flex-1 flex flex-col min-h-0">
-                    <InputGroup className="w-full bg-card shadow-lg transition-all duration-200 ease-in-out group-data-[state=collapsed]:w-10 group-data-[state=collapsed]:h-10 group-data-[state=collapsed]:rounded-full group-data-[state=collapsed]:p-0 group-data-[state=collapsed]:justify-center group-data-[state=collapsed]:mx-auto cursor-pointer hover:bg-card/30 "
-                        onClick={() => { if (state === "collapsed") { setOpen(true) } }}>
-                        <InputGroupAddon align="inline-end" className="group-data-[state=collapsed]:pr-0 group-data-[state=collapsed]:w-full group-data-[state=collapsed]:h-full group-data-[state=collapsed]:justify-center transition-all duration-200 cursor-pointer hover:bg-card/30">
-                            <InputGroupText className="bg-transparent group-data-[state=collapsed]:p-0 cursor-pointer hover:bg-card/30">
-                                <KbdGroup className="group-data-[state=collapsed]:hidden">
-                                    <Kbd className="bg-popover text-muted-foreground">Ctrl + K</Kbd>
-                                </KbdGroup>
-                                <Search />
-                            </InputGroupText>
-                        </InputGroupAddon>
-                        <InputGroupInput
-                            placeholder="Look for a chat..."
-                            aria-placeholder="Look for a chat..."
-                            className="bg-card group-data-[state=collapsed]:hidden cursor-pointer hover:bg-card/30"
-                            onChange={(e) => setFilteredChats(handleSearch(e.target.value, chats))}
-                        />
-                    </InputGroup>
-                    <div className="rounded-lg min-h-0 max-h-[50vh] mt-2 overflow-y-hidden">
-                        <ScrollArea className="flex-1 rounded-lg border border-sidebar-border px-1 shadow-lg bg-card/30 group-data-[state=collapsed]:hidden h-full">
-                            <div className="h-1" key={"division-scroll"}></div>
-                            {chats.length > 0 && chatsFetched ? filteredChats.map((chat, index) => (
-                                <div
-                                    key={index}
-                                    className="flex items-center justify-between pl-4 pr-2 py-2 rounded-lg hover:bg-card/80 cursor-pointer transition-all duration-100 ease-in-out mb-1"
-                                    onClick={() => {
-                                        setChatMessages([]);
-                                        setCurrentChatId(chat.id || null);
-                                        setActiveTab(2);
-                                        setChatTitle(chat.title);
-                                    }}
-                                >
-                                    <Tooltip>
-                                        <TooltipTrigger asChild>
-                                            <div className="flex flex-row items-center gap-2 w-full">
-                                                <p className="text-sm">{chat.title.length > 20 ? chat.title.slice(0, 20).trimEnd().concat("...") : chat.title}</p>
-                                            </div>
-                                        </TooltipTrigger>
-                                        <TooltipContent side="right" sideOffset={16}>
-                                            <p>{chat.title}</p>
-                                            <p className="text-xs text-muted-foreground">{chat.description}</p>
-                                        </TooltipContent>
-                                    </Tooltip>
-                                    <DropdownMenu>
-                                        <DropdownMenuTrigger>
-                                            <Tooltip>
-                                                <TooltipTrigger asChild>
-                                                    <Button variant="ghost" className="p-1 h-6 w-6" asChild>
-                                                        <MoreVertical size={16} className="text-muted-foreground" />
-                                                    </Button>
-                                                </TooltipTrigger>
-                                                <TooltipContent side="right">
-                                                    <p>Options</p>
-                                                </TooltipContent>
-                                            </Tooltip>
-                                        </DropdownMenuTrigger>
-                                        <DropdownMenuContent className="w-40" align="start">
-                                            <DropdownMenuGroup>
-                                                <div className="flex flex-col p-2">
-                                                    <p>{chat.title}</p>
-                                                    <p className="text-xs text-muted-foreground/50">{chat.updatedAt.toLocaleString()}</p>
-                                                    <div className="w-full h-[1px] bg-foreground/10 my-1"></div>
-                                                    <p className="text-xs text-muted-foreground">{chat.description}</p>
-                                                </div>
-                                                <DropdownMenuItem className="group cursor-pointer">
-                                                    <Pencil size={16} className="text-muted-foreground group-hover:text-accent-foreground" />
-                                                    Rename Chat
-                                                </DropdownMenuItem >
-                                                <DropdownMenuItem className="group cursor-pointer">
-                                                    <FolderDown size={16} className="text-muted-foreground group-hover:text-accent-foreground" />
-                                                    Move To
-                                                </DropdownMenuItem >
-                                                <DropdownMenuItem
-                                                    className="text-destructive focus:text-destructive focus:bg-destructive/10 cursor-pointer"
-                                                    onClick={(e) => handleDeleteChat(e, chat.id!)}
-                                                >
-                                                    <Trash2 size={16} className="text-destructive" />
-                                                    Delete Chat
-                                                </DropdownMenuItem>
-                                            </DropdownMenuGroup>
-                                        </DropdownMenuContent>
-                                    </DropdownMenu>
-                                </div>
-                            )) : chatsFetched ? (
-                                <div className="flex flex-col items-center justify-center h-full2 my-5 text-center">
-                                    <CircleSlash size={48} className="text-muted-foreground mb-2" />
-                                    <p className="font-medium text-muted-foreground">No chats found</p>
-                                </div>
-                            ) : (
-                                <div className="flex flex-col items-center justify-center h-full gap-1 my-1">
-                                    <Skeleton className="w-full h-10 rounded-full" />
-                                    <Skeleton className="w-full h-10 rounded-full" />
-                                    <Skeleton className="w-full h-10 rounded-full" />
-                                    <Skeleton className="w-full h-10 rounded-full" />
-                                </div>
-                            )}
-                        </ScrollArea>
-                    </div>
                 </div>
             </SidebarContent>
 

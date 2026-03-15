@@ -96,7 +96,7 @@
   --accent-foreground: oklch(0.8120 0.0940 259.9070);
   --destructive: oklch(0.7040 0.1910 22.2160);
   --destructive-foreground: oklch(0.9850 0 0);
-  --border: oklch(0.3000 0 0);
+  --border: oklch(0.3200 0 0);
   --input: oklch(0.5000 0 0);
   --ring: oklch(0.5560 0 0);
   --chart-1: oklch(0.8100 0.1000 252);
@@ -391,4 +391,94 @@ body {
   padding: 0.1em 0.35em;
   border-radius: 4px;
   font-size: 0.875em;
+}
+
+/* TipTap Editor Styles matching MarkdownRenderer */
+.tiptap {
+  font-family: var(--font-sans);
+}
+
+.tiptap h1 {
+  @apply my-6 text-2xl font-bold border-b border-border pb-6 text-foreground/90 tracking-tight;
+}
+
+.tiptap h2 {
+  @apply my-5 text-xl font-semibold text-foreground/90 tracking-tight;
+}
+
+.tiptap h3 {
+  @apply my-4 text-lg font-semibold text-foreground/80 tracking-tight;
+}
+
+.tiptap p {
+  @apply mb-4 last:mb-0 leading-relaxed text-foreground/95;
+}
+
+.tiptap a {
+  @apply text-primary font-medium hover:underline transition-all underline-offset-4 decoration-primary/30;
+}
+
+.tiptap ul {
+  @apply my-4 ml-6 list-disc space-y-2 text-foreground/90;
+}
+
+.tiptap ol {
+  @apply my-4 ml-6 list-decimal space-y-2 text-foreground/90;
+}
+
+.tiptap li {
+  @apply leading-relaxed pl-1;
+}
+
+.tiptap blockquote {
+  @apply my-4 pl-4 py-1 italic text-muted-foreground bg-transparent border-l-2 border-primary flex items-start;
+}
+
+.tiptap hr {
+  @apply h-px bg-border my-6;
+}
+
+.tiptap code {
+  @apply px-1.5 py-0.5 rounded bg-secondary/80 text-primary font-mono text-sm font-medium;
+}
+
+.tiptap pre {
+  @apply my-4 rounded-xl bg-popover p-4 overflow-x-auto border border-border/50 w-full;
+}
+
+.tiptap pre code {
+  @apply rounded-lg !bg-popover whitespace-pre-wrap break-words text-foreground;
+  background: transparent !important;
+  color: inherit !important;
+}
+
+.tiptap p.is-editor-empty:first-child::before {
+  color: var(--muted-foreground);
+  content: attr(data-placeholder);
+  float: left;
+  height: 0;
+  pointer-events: none;
+}
+
+.tiptap .katex-display {
+  padding: 1rem 0;
+  overflow-x: auto;
+  overflow-y: hidden;
+}
+
+.tiptap table {
+  @apply w-full border-collapse border border-border my-6 overflow-hidden rounded-lg bg-secondary/50;
+}
+
+.tiptap table th,
+.tiptap table td {
+  @apply border border-border px-4 py-2 text-left align-top bg-popover;
+}
+
+.tiptap table th {
+  @apply bg-muted font-bold text-foreground;
+}
+
+.tiptap table td {
+  @apply bg-card text-muted-foreground;
 }

@@ -1,0 +1,43 @@
+import { FolderColor } from "@/types/folderStructureTypes";
+
+export const folderColors: { value: FolderColor; label: string; bgClass: string }[] = [
+    { value: "folder-red", label: "Red", bgClass: "bg-folder-red" },
+    { value: "folder-blue", label: "Blue", bgClass: "bg-folder-blue" },
+    { value: "folder-green", label: "Green", bgClass: "bg-folder-green" },
+    { value: "folder-yellow", label: "Yellow", bgClass: "bg-folder-yellow" },
+    { value: "folder-purple", label: "Purple", bgClass: "bg-folder-purple" },
+    { value: "folder-orange", label: "Orange", bgClass: "bg-folder-orange" },
+    { value: "folder-pink", label: "Pink", bgClass: "bg-folder-pink" },
+    { value: "folder-cyan", label: "Cyan", bgClass: "bg-folder-cyan" },
+    { value: "folder-lime", label: "Lime", bgClass: "bg-folder-lime" },
+    { value: "folder-teal", label: "Teal", bgClass: "bg-folder-teal" },
+    { value: "folder-indigo", label: "Indigo", bgClass: "bg-folder-indigo" },
+    { value: "folder-rose", label: "Rose", bgClass: "bg-folder-rose" },
+    { value: "folder-amber", label: "Amber", bgClass: "bg-folder-amber" },
+    { value: "folder-brown", label: "Brown", bgClass: "bg-folder-brown" },
+    { value: "folder-slate", label: "Slate", bgClass: "bg-folder-slate" },
+    { value: "folder-gray", label: "Gray", bgClass: "bg-folder-gray" },
+    { value: "folder-black", label: "Black", bgClass: "bg-folder-black" },
+    { value: "folder-white", label: "White", bgClass: "bg-folder-white" },
+];
+
+export const folderColorClasses: Record<string, { text: string; fill: string }> = {
+    "folder-red": { text: "text-folder-red", fill: "fill-folder-red" },
+    "folder-blue": { text: "text-folder-blue", fill: "fill-folder-blue" },
+    "folder-green": { text: "text-folder-green", fill: "fill-folder-green" },
+    "folder-yellow": { text: "text-folder-yellow", fill: "fill-folder-yellow" },
+    "folder-purple": { text: "text-folder-purple", fill: "fill-folder-purple" },
+    "folder-orange": { text: "text-folder-orange", fill: "fill-folder-orange" },
+    "folder-pink": { text: "text-folder-pink", fill: "fill-folder-pink" },
+    "folder-cyan": { text: "text-folder-cyan", fill: "fill-folder-cyan" },
+    "folder-lime": { text: "text-folder-lime", fill: "fill-folder-lime" },
+    "folder-teal": { text: "text-folder-teal", fill: "fill-folder-teal" },
+    "folder-indigo": { text: "text-folder-indigo", fill: "fill-folder-indigo" },
+    "folder-rose": { text: "text-folder-rose", fill: "fill-folder-rose" },
+    "folder-amber": { text: "text-folder-amber", fill: "fill-folder-amber" },
+    "folder-brown": { text: "text-folder-brown", fill: "fill-folder-brown" },
+    "folder-slate": { text: "text-folder-slate", fill: "fill-folder-slate" },
+    "folder-gray": { text: "text-folder-gray", fill: "fill-folder-gray" },
+    "folder-black": { text: "text-folder-black", fill: "fill-folder-black" },
+    "folder-white": { text: "text-folder-white", fill: "fill-folder-white" },
+};

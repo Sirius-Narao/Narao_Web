@@ -20,7 +20,8 @@ import { useFetchedFolders } from "@/context/fetchedFoldersContext"
 const models = {
     "gemini-2.5-flash": "Gemini 2.5 Flash",
     "gemini-3-flash-preview": "Gemini 3 Flash",
-    "gemini-3.1-flash-lite-preview": "Gemini 3.1 Flash Lite"
+    // Defective model, it doesn't work well with tools
+    // "gemini-3.1-flash-lite-preview": "Gemini 3.1 Flash Lite"
 }
 
 interface ChatMessageInputProps {
@@ -45,16 +46,14 @@ export default function ChatMessageInput({ attachments, setAttachments }: ChatMe
     When you use tools:
     - BEFORE calling a tool, briefly explain in natural language what you are about to do (e.g. "Let me search your workspace for notes about math...").
     - After getting a tool result, briefly acknowledge what you found before proceeding or calling another tool (e.g. "I found 3 notes. Let me now read the one about algebra.").
-    - At the end, give a complete, helpful answer based on all the information you gathered.
-    
-    Do not stop a message before having completed the task, this even if you encounter errors (max 3 errors, then stop).`;
+    - At the end, give a complete, helpful answer based on all the information you gathered.`;
 
     // Workspace contexts for tool execution
     const { fetchedNotes, setFetchedNotes } = useFetchedNotes();
     const { fetchedFolders, setFetchedFolders } = useFetchedFolders();
 
     // Model Settings
-    const [currentModel, setCurrentModel] = useState<keyof Models>("gemini-3.1-flash-lite-preview")
+    const [currentModel, setCurrentModel] = useState<keyof Models>("gemini-3-flash-preview")
 
     // Popover Settings
     const [isSelectingModelPopoverOpen, setIsSelectingModelPopoverOpen] = useState(false)
@@ -1192,7 +1191,7 @@ export default function ChatMessageInput({ attachments, setAttachments }: ChatMe
                                             >
                                                 {model === "gemini-2.5-flash" && <Zap className="" />}
                                                 {model === "gemini-3-flash-preview" && <Lightbulb className="" />}
-                                                {model === "gemini-3.1-flash-lite-preview" && <Leaf className="" />}
+                                                {/* {model === "gemini-3.1-flash-lite-preview" && <Leaf className="" />} */}
                                                 <p className="text-xs">{models[model]}</p>
                                             </Button>
                                         </div>
