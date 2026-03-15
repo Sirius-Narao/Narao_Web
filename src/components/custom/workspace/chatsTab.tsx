@@ -20,17 +20,73 @@ import { ScrollArea } from "@/components/ui/scroll-area";
 import { InputGroup, InputGroupAddon, InputGroupInput, InputGroupText } from "@/components/ui/input-group";
 import { Kbd, KbdGroup } from "@/components/ui/kbd";
 import handleSearch from "@/lib/handleSearch";
+import { useTabs } from "@/context/tabsContext";
 
-export default function ChatsTab() {
+interface ChatsTabProps {
+    initialChatId: string | null;
+}
+
+export default function ChatsTab({ initialChatId }: ChatsTabProps) {
     const { state, setOpen } = useSidebar();
     const { user } = useUser();
     const { chatTitle, setChatTitle, setChatMessages, currentChatId, setCurrentChatId, refreshTrigger, refreshChats } = useChatMessages();
+    const { activeTabId, updateTabTitle, updateTabChatId } = useTabs();
     const [isRenamingChat, setIsRenamingChat] = useState(false);
     const [tempChatTitle, setTempChatTitle] = useState(chatTitle);
     const [chats, setChats] = useState<ChatType[]>([]);
     const [chatsFetched, setChatsFetched] = useState(false);
     const [isSearchOpen, setIsSearchOpen] = useState(false);
     const searchInputRef = useRef<HTMLInputElement>(null);
+
+    // Sync tab title with chat title
+    useEffect(() => {
+        if (!activeTabId) return;
+        updateTabTitle(activeTabId, chatTitle || "New Chat");
+        if (currentChatId) updateTabChatId(activeTabId, currentChatId);
+    }, [chatTitle, currentChatId, activeTabId]);
+
+    // Restore chat from initialChatId on mount
+    useEffect(() => {
+        if (!initialChatId) {
+            // New blank chat — reset context
+            setCurrentChatId(null);
+            setChatMessages([]);
+            setChatTitle("New Chat");
+            return;
+        }
+        // Load the chat's messages from DB
+        const loadChat = async () => {
+            const { data: chatData } = await supabase
+                .from("chats")
+                .select("*")
+                .eq("id", initialChatId)
+                .single();
+            if (chatData) {
+                setChatTitle(chatData.title);
+                setCurrentChatId(initialChatId);
+            }
+            const { data: messagesData } = await supabase
+                .from("chat_messages")
+                .select("*")
+                .eq("chat_id", initialChatId)
+                .order("created_at", { ascending: true });
+            if (messagesData) {
+                setChatMessages(messagesData.map((m: any) => ({
+                    id: m.id,
+                    role: m.role,
+                    content: m.content || "",
+                    thought: m.thought,
+                    thinkingTime: m.thinking_time,
+                    messageParts: m.message_parts,
+                    toolCalls: m.tool_calls,
+                    createdAt: new Date(m.created_at),
+                    isDone: true,
+                })));
+            }
+        };
+        loadChat();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+    }, [initialChatId]);
 
     // Filtered chats state
     const [filteredChats, setFilteredChats] = useState<ChatType[]>([]);

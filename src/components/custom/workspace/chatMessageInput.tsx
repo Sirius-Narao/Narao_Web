@@ -9,7 +9,7 @@ import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover
 import { toast } from "sonner"
 import { supabase } from "@/lib/supabaseClient"
 import { useUser } from "@/context/userContext"
-import { useActiveTabs } from "@/context/activeTabsContext"
+import { useTabs } from "@/context/tabsContext"
 import { useIsLoading } from "@/context/isLoadingContext"
 import { useEditMessage } from "@/context/editMessageContext"
 import { cn } from "@/lib/utils"
@@ -59,7 +59,7 @@ export default function ChatMessageInput({ attachments, setAttachments }: ChatMe
     const [isSelectingModelPopoverOpen, setIsSelectingModelPopoverOpen] = useState(false)
 
     // active tab
-    const { activeTab } = useActiveTabs()
+    const { activeTab } = useTabs()
 
     // edit message context
     const { pendingEdit, clearEdit, pendingRegenerate, clearRegenerate } = useEditMessage()
@@ -72,7 +72,7 @@ export default function ChatMessageInput({ attachments, setAttachments }: ChatMe
     }, [content])
 
     useEffect(() => {
-        if (activeTab === 2) {
+        if (activeTab?.type === "chat") {
             textareaRef.current?.focus()
         }
     }, [activeTab])

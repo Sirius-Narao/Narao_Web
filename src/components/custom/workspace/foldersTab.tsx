@@ -29,7 +29,7 @@ import { cn } from "@/lib/utils";
 import dateConvert from "@/lib/dateConvert";
 import { Popover, PopoverAnchor, PopoverContent } from "@/components/ui/popover";
 import { Toggle } from "@/components/ui/toggle";
-import { useActiveTabs } from "@/context/activeTabsContext";
+import { useTabs } from "@/context/tabsContext";
 import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
 import { supabase } from "@/lib/supabaseClient";
@@ -61,19 +61,20 @@ interface FoldersTabProps {
     setIsNoteOpened: (opened: boolean) => void;
     foldersLoaded: boolean;
     notesLoaded: boolean;
+    initialPath?: string;
 }
 
-export default function FoldersTab({ accessedNote, setAccessedNote, setIsNoteOpened, foldersLoaded, notesLoaded }: FoldersTabProps) {
+export default function FoldersTab({ accessedNote, setAccessedNote, setIsNoteOpened, foldersLoaded, notesLoaded, initialPath = "/" }: FoldersTabProps) {
     const { user } = useUser();
     const { fetchedFolders, setFetchedFolders } = useFetchedFolders();
     const { fetchedNotes, setFetchedNotes } = useFetchedNotes();
-    const { activeTab, setActiveTab } = useActiveTabs();
+    const { activeTab, activeTabId, openTab, updateTabTitle, updateTabLocation } = useTabs();
     const { setContent } = useContent();
     const { createNoteDialogOpen, setCreateNoteDialogOpen } = useCreateNoteDialogOpen();
 
-    // Path State
-    const [path, setPath] = useState("/");
-    const [pathHistory, setPathHistory] = useState<string[]>(["/"]);
+    // Path State — initialized from the tab's stored location
+    const [path, setPath] = useState(initialPath);
+    const [pathHistory, setPathHistory] = useState<string[]>([initialPath]);
     const searchInputRef = useRef<HTMLInputElement>(null);
     const [searchOpen, setSearchOpen] = useState(false);
     const [searchQuery, setSearchQuery] = useState("");
@@ -105,6 +106,15 @@ export default function FoldersTab({ accessedNote, setAccessedNote, setIsNoteOpe
     useEffect(() => {
         setPathHistory(prev => [...prev, path]);
     }, [path]);
+
+    // Update tab title / location when path changes
+    useEffect(() => {
+        if (!activeTabId) return;
+        const segments = path.split("/").filter(Boolean);
+        const folderName = segments.length > 0 ? segments[segments.length - 1] : "Folders";
+        updateTabTitle(activeTabId, folderName);
+        updateTabLocation(activeTabId, path);
+    }, [path, activeTabId]);
 
     const rootFolders = useMemo(() => fetchedFolders.filter(f => !f.parent_id), [fetchedFolders]);
     const rootNotes = useMemo(() => fetchedNotes.filter(n => !n.folder_id), [fetchedNotes]);
@@ -364,7 +374,7 @@ export default function FoldersTab({ accessedNote, setAccessedNote, setIsNoteOpe
         setFetchedNotes(prev => [...prev, newNote]);
         toast.info(`Created ${newNote.title}`, { position: 'bottom-right' });
         setCreateNoteDialogOpen(false);
-        setActiveTab(1);
+        openTab({ type: "note", title: newNote.title, noteId: newNote.id });
     };
 
     const deleteNote = async (noteId: string) => {
@@ -435,7 +445,7 @@ export default function FoldersTab({ accessedNote, setAccessedNote, setIsNoteOpe
             };
             setAccessedNote(mappedNote);
             setContent(mappedNote.content || "");
-            setActiveTab(1);
+            openTab({ type: "note", title: mappedNote.title, noteId: mappedNote.id });
         } else if (error) {
             console.error("Error opening note:", error);
         }
@@ -471,7 +481,7 @@ export default function FoldersTab({ accessedNote, setAccessedNote, setIsNoteOpe
     useEffect(() => {
         const handleKeyDown = (e: KeyboardEvent) => {
             const key = e.key.toLowerCase();
-            if (activeTab !== 0) return;
+            if (activeTab?.type !== "folder") return;
 
             if (e.ctrlKey && key === "z" && !e.shiftKey && !e.altKey) {
                 e.preventDefault();

@@ -4,6 +4,7 @@ import { Tooltip, TooltipContent, TooltipTrigger } from "@/components/ui/tooltip
 import { Note } from "@/types/folderStructureTypes";
 import { useUser } from "@/context/userContext";
 import { useContent } from "@/context/contentContext";
+import { useTabs } from "@/context/tabsContext";
 import { toast } from "sonner";
 import { supabase } from "@/lib/supabaseClient";
 import { useEffect, useState } from "react";
@@ -14,12 +15,44 @@ import { Spinner } from "@/components/ui/spinner";
 interface NotesTabProps {
     accessedNote: Note | null;
     setAccessedNote: (note: Note | null) => void;
+    initialNoteId?: string;
 }
 
-export default function NotesTab({ accessedNote, setAccessedNote }: NotesTabProps) {
+export default function NotesTab({ accessedNote, setAccessedNote, initialNoteId }: NotesTabProps) {
     const { user } = useUser();
-    const { content } = useContent();
+    const { content, setContent } = useContent();
     const [isSavedComplete, setIsSavedComplete] = useState(true);
+    const { activeTabId, updateTabTitle } = useTabs();
+
+    // Sync tab title with note title
+    useEffect(() => {
+        if (!activeTabId) return;
+        updateTabTitle(activeTabId, accessedNote?.title || "Notes");
+    }, [accessedNote?.title, activeTabId]);
+
+    // Restore note from initialNoteId on mount
+    useEffect(() => {
+        if (!initialNoteId || accessedNote?.id === initialNoteId) return;
+        const loadNote = async () => {
+            const { data, error } = await supabase.from("notes").select("*").eq("id", initialNoteId).single();
+            if (data) {
+                const mappedNote: Note = {
+                    id: String(data.id),
+                    title: data.title,
+                    description: data.description || "",
+                    content: data.content || null,
+                    tags: data.tags || [],
+                    folder_id: data.folder_id ? String(data.folder_id) : undefined,
+                    createdAt: new Date(data.created_at),
+                    updatedAt: new Date(data.updated_at)
+                };
+                setAccessedNote(mappedNote);
+                setContent(mappedNote.content || "");
+            }
+        };
+        loadNote();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+    }, [initialNoteId]);
 
     const saveNote = async () => {
         if (!user || !accessedNote) return;

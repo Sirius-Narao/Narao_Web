@@ -2,11 +2,10 @@
 
 import { Sidebar, SidebarContent, SidebarHeader, SidebarTrigger, SidebarFooter, useSidebar } from "@/components/ui/sidebar";
 import Image from "next/image";
-import { User, Settings, X, Icon, Folder, NotebookPen, MessageCircle, MessageCirclePlus, Search, MoreHorizontal, MoreVertical, Pencil, Trash2, FolderDown, CircleOff, Sun, Bot, Bell, Tags, Star, MoveUpLeft, ArrowUpLeft, CircleSlash } from "lucide-react";
-import { motion, AnimatePresence } from "framer-motion";
+import { User, Settings, X, Sun, Bot, Tags, ArrowUpLeft } from "lucide-react";
+import { AnimatePresence, motion } from "framer-motion";
 import { Button } from "@/components/ui/button";
 import { cn } from "@/lib/utils";
-import { toast } from "sonner";
 import {
     Card,
     CardDescription,
@@ -20,45 +19,23 @@ import {
     TooltipContent,
     TooltipTrigger,
 } from "@/components/ui/tooltip"
-import { InputGroup, InputGroupAddon, InputGroupInput, InputGroupText } from "@/components/ui/input-group";
-import { ScrollArea } from "@/components/ui/scroll-area";
-import { DropdownMenu, DropdownMenuContent, DropdownMenuGroup, DropdownMenuItem, DropdownMenuTrigger } from "@/components/ui/dropdown-menu";
-
-import { ChatType } from "@/types/chatType";
-import dateConvert from "@/lib/dateConvert";
-import quantifyDate from "@/lib/quantifyDate";
-import handleSearch from "@/lib/handleSearch";
-import { Dialog, DialogClose, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog";
+import { Dialog, DialogClose, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { Kbd, KbdGroup } from "@/components/ui/kbd";
-import { useActiveTabs } from "@/context/activeTabsContext";
 import { supabase } from "@/lib/supabaseClient";
 import ProfileType from "@/types/profileType";
 import { Skeleton } from "@/components/ui/skeleton";
 import AnnounceType from "@/types/announceType";
 import { useSettingsOpen } from "@/context/settingOpenContext";
-import { useChatMessages } from "@/context/chatMessagesContext";
 
 export default function SidebarArea() {
-    // fetched data
     const [userAuth, setUserAuth] = useState<any>(null);
     const [user, setUser] = useState<ProfileType | null>(null);
-    const [chats, setChats] = useState<ChatType[]>([]);
-    const [announce, setAnnounce] = useState<AnnounceType | null>(null); // latest announce only
-    // fetched data state
-    const [chatsFetched, setChatsFetched] = useState(false);
+    const [announce, setAnnounce] = useState<AnnounceType | null>(null);
     const [announceFetched, setAnnounceFetched] = useState(false);
-    // show announce
     const [showAnnounce, setShowAnnounce] = useState(true);
-    // active tab
-    const { activeTab, setActiveTab } = useActiveTabs();
-    // sidebar state
-    const { state, setOpen } = useSidebar();
-    // settings tab
+    const { state } = useSidebar();
     const [settingsTab, setSettingsTab] = useState(0);
-    // settings open
     const { settingsOpen, setSettingsOpen } = useSettingsOpen();
-    // chat title
-    const { chatTitle, setChatTitle, setChatMessages, currentChatId, setCurrentChatId } = useChatMessages();
 
     // auth fetch
     useEffect(() => {
@@ -132,71 +109,12 @@ export default function SidebarArea() {
                 </TooltipContent>
             </Tooltip>
 
+
             {/* --------------------------- Content --------------------------- */}
             <SidebarContent className="bg-background mt-[9px] overflow-hidden">
-                {/* Slider between tabs */}
-                <div className={cn(
-                    "bg-card border border-sidebar-border shadow-lg relative flex items-center justify-between transition-all duration-300 ease-in-out",
-                    state === "collapsed"
-                        ? "w-10 h-10 rounded-full p-0 gap-0 justify-center mx-auto"
-                        : "w-full h-14 rounded-full px-2 gap-2"
-                )}>
-                    {Array.from({ length: 3 }).map((_, index) => {
-                        const isHidden = state === "collapsed" && activeTab !== index;
-                        if (isHidden) return null;
-
-                        return (
-                            <div
-                                className={cn(
-                                    "relative z-20 h-full cursor-pointer flex items-center justify-center transition-all duration-300",
-                                    state === "collapsed" ? "w-full py-0" : "w-[calc(100%/3)] py-2"
-                                )}
-                                key={index}
-                                onClick={() => { setActiveTab(index) }}
-                            >
-                                {activeTab === index && (
-                                    <motion.div
-                                        layoutId="tab-slider"
-                                        className={cn(
-                                            "absolute bg-accent-foreground -z-10",
-                                            state === "collapsed" ? "inset-0 rounded-full" : "inset-y-2 inset-x-0 rounded-lg"
-                                        )}
-                                        transition={{ duration: 0.2, ease: "easeInOut" }}
-                                    />
-                                )}
-                                <Tooltip>
-                                    <TooltipTrigger asChild>
-                                        <Button
-                                            className={cn(
-                                                "w-full h-full transition-colors duration-200",
-                                                state === "collapsed" ? "rounded-full" : "rounded-lg",
-                                                activeTab === index ? "text-background hover:bg-transparent" : "text-muted-foreground hover:bg-muted"
-                                            )}
-                                            variant="ghost"
-                                            onClick={() => {
-                                                if (index === 2) {
-                                                    setChatMessages([]);
-                                                    setCurrentChatId(null);
-                                                    setChatTitle("New Chat");
-                                                }
-                                            }}
-                                        >
-                                            {/* Tabs */}
-                                            {index === 0 ? <Folder /> : index === 1 ? <NotebookPen /> : <MessageCirclePlus />}
-                                        </Button>
-                                    </TooltipTrigger>
-                                    <TooltipContent className="flex items-center gap-2">
-                                        <p>{index === 0 ? "Open Folders" : index === 1 ? "New Note" : "New Chat"}</p>
-                                        <KbdGroup>
-                                            <Kbd className="bg-popover text-foreground">Ctrl + Shift + {index === 0 ? "U" : index === 1 ? "I" : "O"}</Kbd>
-                                        </KbdGroup>
-                                    </TooltipContent>
-                                </Tooltip>
-                            </div>
-                        )
-                    })}
-                </div>
+                {/* Tab navigation moved to mainArea tab bar */}
             </SidebarContent>
+
 
             {/* --------------------------- Footer --------------------------- */}
             <SidebarFooter className="bg-background p-0 group-data-[state=collapsed]:pl-1 transition-all duration-200">
