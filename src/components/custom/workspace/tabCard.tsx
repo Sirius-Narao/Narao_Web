@@ -63,7 +63,7 @@ export default function TabCard({ tab, index }: TabCardProps) {
                     onDragLeave={handleDragLeave}
                     onClick={() => setActiveTabId(tab.id)}
                     className={cn(
-                        "relative bg-card border border-border transition-all duration-100 rounded-3xl h-9 px-4 flex items-center group hover:bg-accent flex-shrink min-w-10 overflow-hidden cursor-pointer select-none",
+                        "relative bg-card border border-border transition-all duration-100 rounded-3xl h-9 px-4 flex items-center group hover:bg-accent flex-shrink min-w-10 overflow-hidden cursor-pointer select-none fade-up",
                         isActive && "bg-accent text-accent-foreground hover:bg-accent/80"
                     )}
                 >
@@ -72,7 +72,7 @@ export default function TabCard({ tab, index }: TabCardProps) {
                             {tab.type === "folder" && <FolderIcon className="w-4 h-4" />}
                             {tab.type === "note" && <BookOpen className="w-4 h-4" />}
                             {tab.type === "chat" && <MessageCircle className="w-4 h-4" />}
-                            {tab.type === "placeholder" && <Home className="w-4 h-4" />}
+                            {tab.type === "home" && <Home className="w-4 h-4" />}
                         </div>
                         <p className="text-sm truncate select-none">{displayTitle}</p>
                     </div>

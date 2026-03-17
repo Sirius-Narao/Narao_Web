@@ -13,7 +13,7 @@ import { toast } from "sonner";
 import { ChatType } from "@/types/chatType";
 import Chat from "./chat";
 import { DropdownMenu, DropdownMenuContent, DropdownMenuGroup, DropdownMenuItem, DropdownMenuTrigger } from "@/components/ui/dropdown-menu";
-import { AArrowDown, AArrowUp, CircleSlash, FolderDown, MoreVertical, Pen, Pencil, PenSquare, Plus, Search, Trash2 } from "lucide-react";
+import { AArrowDown, AArrowUp, CircleSlash, FolderDown, MoreVertical, Pen, Pencil, PenSquare, Plus, Search, Trash2, X } from "lucide-react";
 import { Toggle } from "@/components/ui/toggle";
 import { Skeleton } from "@/components/ui/skeleton";
 import { ScrollArea } from "@/components/ui/scroll-area";
@@ -43,7 +43,7 @@ export default function ChatsTab({ initialChatId }: ChatsTabProps) {
         if (!activeTabId || !currentChatId) return;
         // Don't sync if we haven't finished loading the correct chat for this tab yet
         if (initialChatId && currentChatId !== initialChatId) return;
-        
+
         updateTabTitle(activeTabId, chatTitle || "New Chat");
         updateTabChatId(activeTabId, currentChatId);
     }, [chatTitle, currentChatId, activeTabId, initialChatId, updateTabTitle, updateTabChatId]);
@@ -78,7 +78,7 @@ export default function ChatsTab({ initialChatId }: ChatsTabProps) {
                 .select("*")
                 .eq("id", initialChatId)
                 .single();
-            
+
             if (chatData) {
                 setChatTitle(chatData.title);
                 setCurrentChatId(initialChatId);
@@ -88,7 +88,7 @@ export default function ChatsTab({ initialChatId }: ChatsTabProps) {
             }
         };
         loadChat();
-    // eslint-disable-next-line react-hooks/exhaustive-deps
+        // eslint-disable-next-line react-hooks/exhaustive-deps
     }, [initialChatId]);
 
     // Filtered chats state
@@ -317,7 +317,7 @@ export default function ChatsTab({ initialChatId }: ChatsTabProps) {
                         {/* Close button */}
                         <InputGroupAddon align="inline-end" className="cursor-pointer">
                             <InputGroupText className="bg-transparent cursor-pointer" onClick={() => setIsSearchOpen(false)}>
-                                <svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round" className="text-muted-foreground hover:text-foreground transition-colors"><line x1="18" y1="6" x2="6" y2="18" /><line x1="6" y1="6" x2="18" y2="18" /></svg>
+                                <X size={15} />
                             </InputGroupText>
                         </InputGroupAddon>
                     </InputGroup>
@@ -338,24 +338,23 @@ export default function ChatsTab({ initialChatId }: ChatsTabProps) {
                                 <div
                                     key={index}
                                     className="flex items-center justify-between pl-4 pr-2 py-2 rounded-lg hover:bg-popover cursor-pointer transition-all duration-100 ease-in-out mb-1"
-                                    onClick={() => {
-                                        if (chat.id && chat.id !== currentChatId) {
-                                            const cached = chatCache[chat.id];
-                                            if (cached) {
-                                                setChatMessages(cached.messages);
-                                                setChatTitle(cached.title);
-                                            } else {
-                                                setChatMessages([]);
-                                                setChatTitle(chat.title);
-                                            }
-                                            setCurrentChatId(chat.id);
-                                        }
-                                        setIsSearchOpen(false);
-                                    }}
                                 >
                                     <Tooltip>
                                         <TooltipTrigger asChild>
-                                            <div className="flex flex-row items-center gap-2 w-full">
+                                            <div className="flex flex-row items-center gap-2 w-full" onClick={() => {
+                                                if (chat.id && chat.id !== currentChatId) {
+                                                    const cached = chatCache[chat.id];
+                                                    if (cached) {
+                                                        setChatMessages(cached.messages);
+                                                        setChatTitle(cached.title);
+                                                    } else {
+                                                        setChatMessages([]);
+                                                        setChatTitle(chat.title);
+                                                    }
+                                                    setCurrentChatId(chat.id);
+                                                }
+                                                setIsSearchOpen(false);
+                                            }}>
                                                 <p className="text-sm">{chat.title.length > 20 ? chat.title.slice(0, 20).trimEnd().concat("...") : chat.title}</p>
                                             </div>
                                         </TooltipTrigger>
@@ -368,7 +367,7 @@ export default function ChatsTab({ initialChatId }: ChatsTabProps) {
                                         <DropdownMenuTrigger>
                                             <Tooltip>
                                                 <TooltipTrigger asChild>
-                                                    <Button variant="ghost" className="p-1 h-6 w-6" asChild>
+                                                    <Button variant="ghost" className="p-1 h-6 w-6 cursor-pointer" asChild>
                                                         <MoreVertical size={16} className="text-muted-foreground" />
                                                     </Button>
                                                 </TooltipTrigger>

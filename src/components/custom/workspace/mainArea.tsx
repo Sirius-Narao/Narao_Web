@@ -21,7 +21,8 @@ import FoldersTab from "./foldersTab";
 import NotesTab from "./notesTab";
 import ChatsTab from "./chatsTab";
 import TabCard from "./tabCard";
-import PlaceholderTab from "./placeholderTab";
+import HomeTab from "./homeTab";
+import { Kbd, KbdGroup } from "@/components/ui/kbd";
 
 export default function MainArea() {
     const { userAuth, setUserAuth } = useUserAuth();
@@ -113,21 +114,33 @@ export default function MainArea() {
 
     // ─── Open tab helpers ─────────────────────────────────────────────────────
     const handleOpenFolders = useCallback(() => {
-        openTab({ type: "folder", title: "Folders", location: "/" });
-    }, [openTab]);
+        if (tabs.length < 24) {
+            openTab({ type: "folder", title: "Folders", location: "/" });
+        } else {
+            toast.error("Too many tabs open", { position: 'bottom-right' });
+        }
+    }, [openTab, tabs.length]);
 
     const handleNewNote = useCallback(() => {
-        openTab({ type: "note", title: "Notes" });
+        if (tabs.length < 24) {
+            openTab({ type: "note", title: "Notes" });
+        } else {
+            toast.error("Too many tabs open", { position: 'bottom-right' });
+        }
         setAccessedNote(null);
         setContent("");
-    }, [openTab, setContent]);
+    }, [openTab, setContent, tabs.length]);
 
     const handleNewChat = useCallback(() => {
-        openTab({ type: "chat", title: "New Chat" });
+        if (tabs.length < 24) {
+            openTab({ type: "chat", title: "New Chat" });
+        } else {
+            toast.error("Too many tabs open", { position: 'bottom-right' });
+        }
         setCurrentChatId(null);
         setChatMessages([]);
         setChatTitle("New Chat");
-    }, [openTab, setCurrentChatId, setChatMessages, setChatTitle]);
+    }, [openTab, setCurrentChatId, setChatMessages, setChatTitle, tabs.length]);
 
     // ─── Global Shortcuts ────────────────────────────────────────────────────
     useEffect(() => {
@@ -145,7 +158,7 @@ export default function MainArea() {
             } else if (e.ctrlKey && key === "u" && e.shiftKey) {
                 e.preventDefault();
                 handleOpenFolders();
-            } else if (e.ctrlKey && key === "w" && e.shiftKey) {
+            } else if (e.ctrlKey && key === "n" && !e.shiftKey) {
                 e.preventDefault();
                 if (activeTabId) {
                     closeTab(activeTabId);
@@ -158,7 +171,7 @@ export default function MainArea() {
 
     useEffect(() => {
         if (!activeTab) {
-            openTab({ type: "placeholder", title: "Home" });
+            openTab({ type: "home", title: "Home" });
         }
     }, [activeTab, openTab, closeTab]);
 
@@ -189,8 +202,8 @@ export default function MainArea() {
         }
         else if (activeTab.type === "chat") {
             return <ChatsTab initialChatId={activeTab.chatId ?? null} />;
-        } else if (activeTab.type === "placeholder") {
-            return <PlaceholderTab setIsNoteOpened={setIsNoteOpened} setAccessedNote={setAccessedNote} />;
+        } else if (activeTab.type === "home") {
+            return <HomeTab setIsNoteOpened={setIsNoteOpened} setAccessedNote={setAccessedNote} />;
         }
 
         return null;
@@ -226,14 +239,23 @@ export default function MainArea() {
                             <DropdownMenuItem className="group cursor-pointer" onClick={handleOpenFolders}>
                                 <Folders size={16} className="text-muted-foreground group-hover:text-accent-foreground" />
                                 Open Folders
+                                <KbdGroup>
+                                    <Kbd className="bg-card text-foreground">Ctrl + Shift + U</Kbd>
+                                </KbdGroup>
                             </DropdownMenuItem>
                             <DropdownMenuItem className="group cursor-pointer" onClick={handleNewNote}>
                                 <Pen size={16} className="text-muted-foreground group-hover:text-accent-foreground" />
                                 New Note
+                                <KbdGroup>
+                                    <Kbd className="bg-card text-foreground">Ctrl + Shift + I</Kbd>
+                                </KbdGroup>
                             </DropdownMenuItem>
                             <DropdownMenuItem className="group cursor-pointer" onClick={handleNewChat}>
                                 <MessageCircle size={16} className="text-muted-foreground group-hover:text-accent-foreground" />
                                 New Chat
+                                <KbdGroup>
+                                    <Kbd className="bg-card text-foreground">Ctrl + Shift + O</Kbd>
+                                </KbdGroup>
                             </DropdownMenuItem>
                         </DropdownMenuContent>
                     </DropdownMenu>

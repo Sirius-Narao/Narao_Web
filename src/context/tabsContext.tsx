@@ -3,7 +3,7 @@ import { useState, createContext, useContext, useCallback } from "react";
 
 // ─── Types ───────────────────────────────────────────────────────────────────
 
-export type TabType = "folder" | "note" | "chat" | "placeholder";
+export type TabType = "folder" | "note" | "chat" | "home";
 
 export interface Tab {
     id: string;
@@ -43,7 +43,7 @@ const DEFAULT_TITLE: Record<TabType, string> = {
     folder: "Folders",
     note: "Notes",
     chat: "New Chat",
-    placeholder: "Home",
+    home: "Home",
 };
 
 // ─── Context ─────────────────────────────────────────────────────────────────
@@ -53,7 +53,7 @@ const TabsContext = createContext<TabsContextType | undefined>(undefined);
 function TabsProvider({ children }: { children: React.ReactNode }) {
     const initialId = genId();
     const [tabs, setTabs] = useState<Tab[]>([
-        { id: initialId, type: "folder", title: "Folders", location: "/" },
+        { id: initialId, type: "home", title: "Home", location: "/" },
     ]);
     const [activeTabId, setActiveTabIdState] = useState<string | null>(initialId);
 

@@ -41,6 +41,11 @@ export default function NotesTab({ accessedNote, setAccessedNote, initialNoteId 
     const [noteDescription, setNoteDescription] = useState("");
     const [noteFolder, setNoteFolder] = useState("/");
 
+    // rename note state
+    const [isRenamingNote, setIsRenamingNote] = useState(false);
+    const [renamingNoteId, setRenamingNoteId] = useState<string | null>(null);
+    const [tempNoteName, setTempNoteName] = useState(accessedNote?.title || "");
+
     // Sync tab title with note title
     useEffect(() => {
         if (!activeTabId) return;
@@ -165,6 +170,35 @@ export default function NotesTab({ accessedNote, setAccessedNote, initialNoteId 
         if (error) console.error("Error saving note:", error);
     };
 
+    const renameNote = async () => {
+        if (!user || !accessedNote) return;
+        if (tempNoteName === accessedNote.title) return;
+
+        const { data, error } = await supabase
+            .from("notes")
+            .update({ title: tempNoteName })
+            .eq("id", accessedNote.id)
+            .select()
+            .single();
+
+        if (data) {
+            const updatedNote: Note = {
+                id: String(data.id),
+                title: data.title,
+                description: data.description || "",
+                content: data.content || "",
+                tags: data.tags || [],
+                folder_id: data.folder_id ? String(data.folder_id) : undefined,
+                createdAt: new Date(data.created_at),
+                updatedAt: new Date(data.updated_at)
+            };
+            toast.info(`Renamed ${updatedNote.title} successfully`, { position: 'bottom-right' });
+            setAccessedNote(updatedNote);
+        }
+        setIsRenamingNote(false);
+        if (error) console.error("Error renaming note:", error);
+    };
+
     useEffect(() => {
         const handleKeyDown = (e: KeyboardEvent) => {
             if (e.ctrlKey && e.key === "s" && accessedNote) {
@@ -183,9 +217,21 @@ export default function NotesTab({ accessedNote, setAccessedNote, initialNoteId 
                 <div className="w-fit h-fit flex items-center justify-center bg-popover rounded-3xl border border-border p-1">
                     <Tooltip>
                         <TooltipTrigger asChild>
-                            <Button variant="ghost" className="max-w-96 text-foreground text-lg truncate">
-                                {accessedNote?.title || "New Note"}
-                            </Button>
+                            {isRenamingNote ? <Input
+                                value={tempNoteName}
+                                onChange={(e) => setTempNoteName(e.target.value)}
+                                onBlur={() => setIsRenamingNote(false)}
+                                autoFocus
+                                maxLength={34}
+                                onKeyDown={(e) => {
+                                    if (e.key === "Enter") { setIsRenamingNote(false); renameNote(); }
+                                    if (e.key === "Escape") setIsRenamingNote(false);
+                                }}
+                                className="text-center border-none shadow-none text-lg! font-medium focus-visible:ring-0 w-full bg-transparent! w-[364px]"
+                            /> :
+                                <Button variant="ghost" className="max-w-96 text-foreground text-lg truncate" onClick={() => { setRenamingNoteId(accessedNote?.id || null), setIsRenamingNote(true) }}>
+                                    {accessedNote?.title || "New Note"}
+                                </Button>}
                         </TooltipTrigger>
                         <TooltipContent><p>Note Title</p></TooltipContent>
                     </Tooltip>
