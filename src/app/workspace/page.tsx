@@ -5,7 +5,6 @@ import MainArea from "@/components/custom/workspace/mainArea";
 import { SidebarProvider } from "@/components/ui/sidebar";
 import { TabsProvider } from "@/context/tabsContext";
 import { SettingsOpenProvider } from "@/context/settingOpenContext";
-import { CreateNoteDialogOpenProvider } from "@/context/createNoteDialogOpenContext";
 import { ContentProvider } from "@/context/contentContext";
 import { ChatMessagesProvider } from "@/context/chatMessagesContext";
 import { UserAuthProvider } from "@/context/userAuthContext";
@@ -20,24 +19,22 @@ export default function Workspace() {
             <SidebarProvider>
                 <TabsProvider>
                     <SettingsOpenProvider>
-                        <CreateNoteDialogOpenProvider>
-                            <ContentProvider>
-                                <ChatMessagesProvider>
-                                    <UserAuthProvider>
-                                        <UserProvider>
-                                            <FetchedFoldersProvider>
-                                                <FetchedNotesProvider>
-                                                    <IsLoadingProvider>
-                                                        <SidebarArea />
-                                                        <MainArea />
-                                                    </IsLoadingProvider>
-                                                </FetchedNotesProvider>
-                                            </FetchedFoldersProvider>
-                                        </UserProvider>
-                                    </UserAuthProvider>
-                                </ChatMessagesProvider>
-                            </ContentProvider>
-                        </CreateNoteDialogOpenProvider>
+                        <ContentProvider>
+                            <ChatMessagesProvider>
+                                <UserAuthProvider>
+                                    <UserProvider>
+                                        <FetchedFoldersProvider>
+                                            <FetchedNotesProvider>
+                                                <IsLoadingProvider>
+                                                    <SidebarArea />
+                                                    <MainArea />
+                                                </IsLoadingProvider>
+                                            </FetchedNotesProvider>
+                                        </FetchedFoldersProvider>
+                                    </UserProvider>
+                                </UserAuthProvider>
+                            </ChatMessagesProvider>
+                        </ContentProvider>
                     </SettingsOpenProvider>
                 </TabsProvider>
             </SidebarProvider>

@@ -35,7 +35,6 @@ import { Textarea } from "@/components/ui/textarea";
 import { supabase } from "@/lib/supabaseClient";
 import { Skeleton } from "@/components/ui/skeleton";
 import { folderColorClasses, folderColors } from "@/constants/folderColors";
-import { useCreateNoteDialogOpen } from "@/context/createNoteDialogOpenContext";
 import {
     ContextMenu,
     ContextMenuContent,
@@ -70,7 +69,7 @@ export default function FoldersTab({ accessedNote, setAccessedNote, setIsNoteOpe
     const { fetchedNotes, setFetchedNotes } = useFetchedNotes();
     const { activeTab, activeTabId, openTab, updateTabTitle, updateTabLocation } = useTabs();
     const { setContent } = useContent();
-    const { createNoteDialogOpen, setCreateNoteDialogOpen } = useCreateNoteDialogOpen();
+    const [createNoteDialogOpen, setCreateNoteDialogOpen] = useState(false);
 
     // Path State — initialized from the tab's stored location
     const [path, setPath] = useState(initialPath);
@@ -495,9 +494,6 @@ export default function FoldersTab({ accessedNote, setAccessedNote, setIsNoteOpe
             } else if (e.ctrlKey && key === "n" && e.shiftKey) {
                 e.preventDefault();
                 createFolder();
-            } else if (e.ctrlKey && key === "n" && !e.shiftKey) {
-                e.preventDefault();
-                setCreateNoteDialogOpen(true);
             }
         };
 
@@ -710,13 +706,13 @@ export default function FoldersTab({ accessedNote, setAccessedNote, setIsNoteOpe
                                 </div>
                             )}
 
-                            {folders.slice().sort((a, b) => sortOrder === "asc" ? a.name.localeCompare(b.name) : b.name.localeCompare(a.name)).map(folder => (
+                            {folders.slice().sort((a, b) => sortOrder === "asc" ? a.name.localeCompare(b.name) : b.name.localeCompare(a.name)).map((folder, index) => (
                                 <ContextMenu key={folder.id}>
                                     <Tooltip>
                                         <ContextMenuTrigger>
                                             <TooltipTrigger asChild>
                                                 {renamingFolderId === folder.id ? (
-                                                    <div className="group flex flex-col items-center gap-2 p-4 bg-muted/50 rounded-xl cursor-default w-32 h-28 justify-center border border-primary/50">
+                                                    <div className="group flex flex-col items-center gap-2 p-4 bg-muted/50 rounded-xl cursor-default w-32 h-28 justify-center border border-primary/50 fade-up">
                                                         <FolderIcon className={cn("w-12 h-12", folder.color && folderColorClasses[folder.color]?.text)} />
                                                         <Input
                                                             value={tempFolderName}
@@ -735,9 +731,10 @@ export default function FoldersTab({ accessedNote, setAccessedNote, setIsNoteOpe
                                                 ) : (
                                                     <div
                                                         className={cn(
-                                                            "group flex flex-col items-center gap-2 p-4 hover:bg-muted/50 rounded-xl cursor-pointer w-32 h-28 justify-center transition-all duration-200 border border-transparent hover:border-sidebar-border overflow-hidden",
+                                                            "group flex flex-col items-center gap-2 p-4 hover:bg-muted/50 rounded-xl cursor-pointer w-32 h-28 justify-center transition-all duration-200 border border-transparent hover:border-sidebar-border overflow-hidden fade-up",
                                                             dragItem && dragOverFolderId === folder.id && dragItem.id !== folder.id && "border-primary/60 bg-primary/10 scale-105"
                                                         )}
+                                                        style={{ animationDelay: `${index * 100}ms` }}
                                                         draggable
                                                         onDragStart={() => setDragItem({ type: 'folder', id: folder.id })}
                                                         onDragEnd={() => { setDragItem(null); setDragOverFolderId(null); }}
@@ -787,13 +784,13 @@ export default function FoldersTab({ accessedNote, setAccessedNote, setIsNoteOpe
                                 </ContextMenu>
                             ))}
 
-                            {notes.slice().sort((a, b) => sortOrder === "asc" ? a.title.localeCompare(b.title) : b.title.localeCompare(a.title)).map(note => (
+                            {notes.slice().sort((a, b) => sortOrder === "asc" ? a.title.localeCompare(b.title) : b.title.localeCompare(a.title)).map((note, index) => (
                                 <ContextMenu key={note.id}>
                                     <Tooltip>
                                         <ContextMenuTrigger>
                                             <TooltipTrigger asChild>
                                                 {renamingNoteId === note.id ? (
-                                                    <div className="group flex flex-col items-center gap-2 p-4 bg-muted/50 rounded-xl cursor-default w-32 h-28 justify-center border border-primary/50">
+                                                    <div className="group flex flex-col items-center gap-2 p-4 bg-muted/50 rounded-xl cursor-default w-32 h-28 justify-center border border-primary/50 fade-up">
                                                         <FileText className="w-10 h-10 text-foreground/50" />
                                                         <Input
                                                             value={tempNoteName}
@@ -810,7 +807,8 @@ export default function FoldersTab({ accessedNote, setAccessedNote, setIsNoteOpe
                                                     </div>
                                                 ) : (
                                                     <div
-                                                        className="group flex flex-col items-center gap-2 p-4 hover:bg-muted/50 rounded-xl cursor-pointer w-32 h-28 justify-center transition-all duration-200 border border-transparent hover:border-sidebar-border"
+                                                        className="group flex flex-col items-center gap-2 p-4 hover:bg-muted/50 rounded-xl cursor-pointer w-32 h-28 justify-center transition-all duration-200 border border-transparent hover:border-sidebar-border fade-up"
+                                                        style={{ animationDelay: `${folders.length * 100 + index * 100}ms` }}
                                                         draggable
                                                         onDragStart={() => setDragItem({ type: 'note', id: note.id })}
                                                         onDragEnd={() => { setDragItem(null); setDragOverFolderId(null); }}

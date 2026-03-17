@@ -4,11 +4,10 @@ import { Button } from "@/components/ui/button";
 import { SidebarInset } from "@/components/ui/sidebar";
 import { Tooltip, TooltipContent, TooltipTrigger } from "@/components/ui/tooltip";
 import { Folders, MessageCircle, Pen, Plus } from "lucide-react";
-import { useEffect, useState } from "react";
+import { useCallback, useEffect, useState } from "react";
 import { useTabs } from "@/context/tabsContext";
 import { supabase } from "@/lib/supabaseClient";
 import { useSettingsOpen } from "@/context/settingOpenContext";
-import { useCreateNoteDialogOpen } from "@/context/createNoteDialogOpenContext";
 import { toast } from "sonner";
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from "@/components/ui/dropdown-menu";
 import { useContent } from "@/context/contentContext";
@@ -22,18 +21,18 @@ import FoldersTab from "./foldersTab";
 import NotesTab from "./notesTab";
 import ChatsTab from "./chatsTab";
 import TabCard from "./tabCard";
+import PlaceholderTab from "./placeholderTab";
 
 export default function MainArea() {
     const { userAuth, setUserAuth } = useUserAuth();
     const { user, setUser } = useUser();
     const { setSettingsOpen } = useSettingsOpen();
-    const { setCreateNoteDialogOpen } = useCreateNoteDialogOpen();
     const { setFetchedFolders } = useFetchedFolders();
     const { setFetchedNotes } = useFetchedNotes();
     const { setCurrentChatId, setChatMessages, setChatTitle } = useChatMessages();
     const { setContent } = useContent();
 
-    const { tabs, activeTab, openTab } = useTabs();
+    const { tabs, activeTab, openTab, closeTab, activeTabId } = useTabs();
 
     // Per-tab state: note/note open state tracked locally per folder tab
     const [accessedNote, setAccessedNote] = useState<Note | null>(null);
@@ -112,6 +111,24 @@ export default function MainArea() {
         fetchUsers();
     }, [userAuth]);
 
+    // ─── Open tab helpers ─────────────────────────────────────────────────────
+    const handleOpenFolders = useCallback(() => {
+        openTab({ type: "folder", title: "Folders", location: "/" });
+    }, [openTab]);
+
+    const handleNewNote = useCallback(() => {
+        openTab({ type: "note", title: "Notes" });
+        setAccessedNote(null);
+        setContent("");
+    }, [openTab, setContent]);
+
+    const handleNewChat = useCallback(() => {
+        openTab({ type: "chat", title: "New Chat" });
+        setCurrentChatId(null);
+        setChatMessages([]);
+        setChatTitle("New Chat");
+    }, [openTab, setCurrentChatId, setChatMessages, setChatTitle]);
+
     // ─── Global Shortcuts ────────────────────────────────────────────────────
     useEffect(() => {
         const handleKeyDown = (e: KeyboardEvent) => {
@@ -119,30 +136,31 @@ export default function MainArea() {
             if (e.ctrlKey && key === "," && !e.shiftKey) {
                 e.preventDefault();
                 setSettingsOpen(true);
+            } else if (e.ctrlKey && key === "o" && e.shiftKey) {
+                e.preventDefault();
+                handleNewChat();
+            } else if (e.ctrlKey && key === "i" && e.shiftKey) {
+                e.preventDefault();
+                handleNewNote();
+            } else if (e.ctrlKey && key === "u" && e.shiftKey) {
+                e.preventDefault();
+                handleOpenFolders();
+            } else if (e.ctrlKey && key === "w" && e.shiftKey) {
+                e.preventDefault();
+                if (activeTabId) {
+                    closeTab(activeTabId);
+                }
             }
         };
         window.addEventListener("keydown", handleKeyDown);
         return () => window.removeEventListener("keydown", handleKeyDown);
-    }, []);
+    }, [activeTabId, closeTab, setSettingsOpen, handleNewChat, handleNewNote, handleOpenFolders]);
 
-    // ─── Open tab helpers ─────────────────────────────────────────────────────
-    const handleOpenFolders = () => {
-        openTab({ type: "folder", title: "Folders", location: "/" });
-    };
-
-    const handleNewNote = () => {
-        openTab({ type: "note", title: "Notes" });
-        setCreateNoteDialogOpen(true);
-        setAccessedNote(null);
-        setContent("");
-    };
-
-    const handleNewChat = () => {
-        openTab({ type: "chat", title: "New Chat" });
-        setCurrentChatId(null);
-        setChatMessages([]);
-        setChatTitle("New Chat");
-    };
+    useEffect(() => {
+        if (!activeTab) {
+            openTab({ type: "placeholder", title: "Home" });
+        }
+    }, [activeTab, openTab, closeTab]);
 
     // ─── Render active tab content ─────────────────────────────────────────
     const renderContent = () => {
@@ -160,7 +178,7 @@ export default function MainArea() {
                 />
             );
         }
-        if (activeTab.type === "note") {
+        else if (activeTab.type === "note") {
             return (
                 <NotesTab
                     accessedNote={accessedNote}
@@ -169,9 +187,12 @@ export default function MainArea() {
                 />
             );
         }
-        if (activeTab.type === "chat") {
+        else if (activeTab.type === "chat") {
             return <ChatsTab initialChatId={activeTab.chatId ?? null} />;
+        } else if (activeTab.type === "placeholder") {
+            return <PlaceholderTab setIsNoteOpened={setIsNoteOpened} setAccessedNote={setAccessedNote} />;
         }
+
         return null;
     };
 

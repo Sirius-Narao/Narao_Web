@@ -20,7 +20,7 @@ const LOADING_PHRASES = [
 ];
 
 export default function Chat() {
-    const { chatMessages, setChatMessages, currentChatId, setCurrentChatId } = useChatMessages();
+    const { chatMessages, setChatMessages, currentChatId, setCurrentChatId, chatCache, setChatCache } = useChatMessages();
     const bottomRef = useRef<HTMLDivElement>(null);
     const scrollAreaRef = useRef<HTMLDivElement>(null);
     const [isAtBottom, setIsAtBottom] = useState(true);
@@ -36,6 +36,15 @@ export default function Chat() {
     useEffect(() => {
         if (!currentChatId) {
             setChatMessages([]);
+            return;
+        }
+
+        // Check if we already have these messages in cache (or in the current state)
+        if (chatCache[currentChatId]) {
+            // Already have it in cache, and the context should have been updated by ChatsTab or previous interaction.
+            // If chatMessages is already populated with the correct chatId's data, we can skip.
+            // However, to be safe and handle cases where context might be out of sync:
+            setChatMessages(chatCache[currentChatId].messages);
             return;
         }
 
@@ -56,29 +65,32 @@ export default function Chat() {
 
             if (error || attachmentsError) {
                 console.error("Error fetching messages:", error || attachmentsError);
+                setIsLoadingChats(false);
                 return;
             }
 
             if (!ignore && messages) {
-                setChatMessages(prev => {
-                    const mappedMessages: ChatMessage[] = messages.map((msg: any) => {
-                        return {
-                            id: msg.id,
-                            content: msg.content,
-                            role: msg.role,
-                            thought: msg.thought,
-                            thinkingTime: msg.thinking_time,
-                            messageParts: msg.message_parts,
-                            toolCalls: msg.tool_calls,
-                            createdAt: new Date(msg.created_at),
-                            isDone: true,
-                            attachments: attachments?.filter(attachment => attachment.message_id === msg.id)
-                        };
-                    });
+                const mappedMessages: ChatMessage[] = messages.map((msg: any) => {
+                    return {
+                        id: msg.id,
+                        content: msg.content,
+                        role: msg.role,
+                        thought: msg.thought,
+                        thinkingTime: msg.thinking_time,
+                        messageParts: msg.message_parts,
+                        toolCalls: msg.tool_calls,
+                        createdAt: new Date(msg.created_at),
+                        isDone: true,
+                        attachments: attachments?.filter(attachment => attachment.message_id === msg.id)
+                    };
+                });
 
+                setChatMessages(prev => {
                     const dbIds = new Set(mappedMessages.map(m => m.id));
                     const missingLocal = prev.filter(m => !dbIds.has(m.id));
-                    return [...mappedMessages, ...missingLocal];
+                    const finalMessages = [...mappedMessages, ...missingLocal];
+
+                    return finalMessages;
                 });
             }
             setIsLoadingChats(false);

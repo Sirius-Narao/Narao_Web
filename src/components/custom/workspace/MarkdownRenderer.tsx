@@ -30,8 +30,8 @@ export function MarkdownRenderer({ content, className = "" }: MarkdownRendererPr
     // Normalize LaTeX-style delimiters \[ \] and \( \) to $$ and $
     // We use a function to avoid replacing delimiters inside code blocks if they are already strings
     const processedContent = content
-        .replace(/\\\[/g, '$$$$')
-        .replace(/\\\]/g, '$$$$')
+        .replace(/\\\[/g, '\n$$\n')
+        .replace(/\\\]/g, '\n$$\n')
         .replace(/\\\(/g, '$')
         .replace(/\\\)/g, '$');
 
@@ -39,7 +39,10 @@ export function MarkdownRenderer({ content, className = "" }: MarkdownRendererPr
         <div className={`markdown-content ${className}`}>
             <ReactMarkdown
                 remarkPlugins={[remarkGfm, remarkMath]}
-                rehypePlugins={[rehypeKatex, [rehypeHighlight, { detect: true, ignoreMissing: true }]]}
+                rehypePlugins={[
+                    [rehypeKatex, { strict: false, throwOnError: false }],
+                    [rehypeHighlight, { detect: true, ignoreMissing: true }]
+                ]}
                 components={{
                     code({ className, children, ...props }: ComponentPropsWithoutRef<'code'> & { inline?: boolean }) {
                         const match = /language-(\w+)/.exec(className || '')
@@ -141,7 +144,7 @@ export function MarkdownRenderer({ content, className = "" }: MarkdownRendererPr
                         )
                     },
                     p({ children }) {
-                        return <p className="mb-4 last:mb-0 leading-relaxed text-foreground/95 whitespace-pre-wrap break-words">{children}</p>
+                        return <p className="mb-4 last:mb-0 leading-relaxed text-foreground/95 whitespace-pre-line break-words">{children}</p>
                     },
                     hr() {
                         return <hr className="h-px bg-foreground/10 my-6" />

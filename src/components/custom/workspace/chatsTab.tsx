@@ -40,48 +40,51 @@ export default function ChatsTab({ initialChatId }: ChatsTabProps) {
 
     // Sync tab title with chat title
     useEffect(() => {
-        if (!activeTabId) return;
+        if (!activeTabId || !currentChatId) return;
+        // Don't sync if we haven't finished loading the correct chat for this tab yet
+        if (initialChatId && currentChatId !== initialChatId) return;
+        
         updateTabTitle(activeTabId, chatTitle || "New Chat");
-        if (currentChatId) updateTabChatId(activeTabId, currentChatId);
-    }, [chatTitle, currentChatId, activeTabId]);
+        updateTabChatId(activeTabId, currentChatId);
+    }, [chatTitle, currentChatId, activeTabId, initialChatId, updateTabTitle, updateTabChatId]);
 
     // Restore chat from initialChatId on mount
+    const { chatCache } = useChatMessages();
+
     useEffect(() => {
         if (!initialChatId) {
-            // New blank chat — reset context
             setCurrentChatId(null);
             setChatMessages([]);
             setChatTitle("New Chat");
             return;
         }
-        // Load the chat's messages from DB
+
+        // If we already have this chat open, don't do anything
+        if (currentChatId === initialChatId) return;
+
+        // Check cache first
+        if (chatCache[initialChatId]) {
+            const cached = chatCache[initialChatId];
+            setCurrentChatId(initialChatId);
+            setChatTitle(cached.title);
+            setChatMessages(cached.messages);
+            return;
+        }
+
+        // Load just the chat metadata from DB
         const loadChat = async () => {
-            const { data: chatData } = await supabase
+            const { data: chatData, error } = await supabase
                 .from("chats")
                 .select("*")
                 .eq("id", initialChatId)
                 .single();
+            
             if (chatData) {
                 setChatTitle(chatData.title);
                 setCurrentChatId(initialChatId);
-            }
-            const { data: messagesData } = await supabase
-                .from("chat_messages")
-                .select("*")
-                .eq("chat_id", initialChatId)
-                .order("created_at", { ascending: true });
-            if (messagesData) {
-                setChatMessages(messagesData.map((m: any) => ({
-                    id: m.id,
-                    role: m.role,
-                    content: m.content || "",
-                    thought: m.thought,
-                    thinkingTime: m.thinking_time,
-                    messageParts: m.message_parts,
-                    toolCalls: m.tool_calls,
-                    createdAt: new Date(m.created_at),
-                    isDone: true,
-                })));
+            } else if (error) {
+                console.error("Error loading chat:", error);
+                toast.error("Failed to load chat");
             }
         };
         loadChat();
@@ -336,9 +339,17 @@ export default function ChatsTab({ initialChatId }: ChatsTabProps) {
                                     key={index}
                                     className="flex items-center justify-between pl-4 pr-2 py-2 rounded-lg hover:bg-popover cursor-pointer transition-all duration-100 ease-in-out mb-1"
                                     onClick={() => {
-                                        setChatMessages([]);
-                                        setCurrentChatId(chat.id || null);
-                                        setChatTitle(chat.title);
+                                        if (chat.id && chat.id !== currentChatId) {
+                                            const cached = chatCache[chat.id];
+                                            if (cached) {
+                                                setChatMessages(cached.messages);
+                                                setChatTitle(cached.title);
+                                            } else {
+                                                setChatMessages([]);
+                                                setChatTitle(chat.title);
+                                            }
+                                            setCurrentChatId(chat.id);
+                                        }
                                         setIsSearchOpen(false);
                                     }}
                                 >

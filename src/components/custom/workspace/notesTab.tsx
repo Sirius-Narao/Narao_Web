@@ -7,10 +7,17 @@ import { useContent } from "@/context/contentContext";
 import { useTabs } from "@/context/tabsContext";
 import { toast } from "sonner";
 import { supabase } from "@/lib/supabaseClient";
-import { useEffect, useState } from "react";
+import { useCallback, useEffect, useMemo, useState } from "react";
 import { ArrowBigDown } from "lucide-react";
 import { Kbd, KbdGroup } from "@/components/ui/kbd";
 import { Spinner } from "@/components/ui/spinner";
+import { useFetchedNotes } from "@/context/fetchedNotesContext";
+import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from "@/components/ui/dialog";
+import { Field, FieldDescription, FieldLabel } from "@/components/ui/field";
+import { Input } from "@/components/ui/input";
+import { Textarea } from "@/components/ui/textarea";
+import { Combobox, ComboboxContent, ComboboxEmpty, ComboboxInput, ComboboxItem, ComboboxList } from "@/components/ui/combobox";
+import { useFetchedFolders } from "@/context/fetchedFoldersContext";
 
 interface NotesTabProps {
     accessedNote: Note | null;
@@ -22,12 +29,26 @@ export default function NotesTab({ accessedNote, setAccessedNote, initialNoteId 
     const { user } = useUser();
     const { content, setContent } = useContent();
     const [isSavedComplete, setIsSavedComplete] = useState(true);
-    const { activeTabId, updateTabTitle } = useTabs();
+    const { activeTabId, updateTabTitle, closeTab } = useTabs();
+    const { setFetchedNotes } = useFetchedNotes();
+    const { fetchedFolders } = useFetchedFolders();
+
+    // dialog state
+    const [createNoteDialogOpen, setCreateNoteDialogOpen] = useState(false);
+
+    // create note state
+    const [noteName, setNoteName] = useState("");
+    const [noteDescription, setNoteDescription] = useState("");
+    const [noteFolder, setNoteFolder] = useState("/");
 
     // Sync tab title with note title
     useEffect(() => {
         if (!activeTabId) return;
         updateTabTitle(activeTabId, accessedNote?.title || "Notes");
+
+        if (!accessedNote) {
+            setCreateNoteDialogOpen(true);
+        }
     }, [accessedNote?.title, activeTabId]);
 
     // Restore note from initialNoteId on mount
@@ -51,8 +72,68 @@ export default function NotesTab({ accessedNote, setAccessedNote, initialNoteId 
             }
         };
         loadNote();
-    // eslint-disable-next-line react-hooks/exhaustive-deps
+        // eslint-disable-next-line react-hooks/exhaustive-deps
     }, [initialNoteId]);
+
+    const getFolderPath = useCallback((folderId: string): string => {
+        const folder = fetchedFolders.find(f => f.id === folderId);
+        if (!folder) return "/";
+        if (!folder.parent_id) return `/${folder.name}`;
+        return `${getFolderPath(folder.parent_id)}/${folder.name}`;
+    }, [fetchedFolders]);
+
+    const allFolderPaths = useMemo(() => {
+        const paths = fetchedFolders.map(f => ({
+            id: f.id,
+            name: f.name,
+            path: getFolderPath(f.id)
+        })).sort((a, b) => a.path.localeCompare(b.path));
+
+        return [{ id: "root", name: "Root", path: "/" }, ...paths];
+    }, [fetchedFolders, getFolderPath]);
+
+    const createNote = async () => {
+        if (!user) return;
+
+        let targetFolderId: string | undefined = undefined;
+        if (noteFolder !== "/") {
+            const targetPathObj = allFolderPaths.find(p => p.path === noteFolder);
+            if (targetPathObj) targetFolderId = targetPathObj.id;
+        }
+
+        const notePayload = {
+            user_id: user.id,
+            title: noteName,
+            description: noteDescription,
+            content: "[]",
+            tags: [],
+            folder_id: targetFolderId
+        };
+
+        const { data, error } = await supabase.from("notes").insert([notePayload]).select().single();
+
+        if (error) {
+            console.error("Error creating note:", error);
+            return;
+        }
+
+        const newNote: Note = {
+            id: String(data.id),
+            title: data.title,
+            description: data.description || "",
+            content: data.content || "",
+            tags: data.tags || [],
+            folder_id: data.folder_id ? String(data.folder_id) : undefined,
+            createdAt: new Date(data.created_at),
+            updatedAt: new Date(data.updated_at)
+        };
+
+        setAccessedNote(newNote);
+        setContent("");
+        setFetchedNotes(prev => [...prev, newNote]);
+        toast.info(`Created ${newNote.title}`, { position: 'bottom-right' });
+        setCreateNoteDialogOpen(false);
+    };
 
     const saveNote = async () => {
         if (!user || !accessedNote) return;
@@ -128,6 +209,52 @@ export default function NotesTab({ accessedNote, setAccessedNote, initialNoteId 
                 </div>
             </div>
             <Editor />
+            {/* Create Note Dialog */}
+            <Dialog open={createNoteDialogOpen} onOpenChange={(open) => {
+                setCreateNoteDialogOpen(open);
+                if (!open && !accessedNote && activeTabId) {
+                    closeTab(activeTabId);
+                }
+            }}>
+                <DialogContent showCloseButton={false} className="w-[40%] pb-24">
+                    <DialogHeader>
+                        <DialogTitle>Create Note</DialogTitle>
+                        <DialogDescription>Create a new note in your workspace</DialogDescription>
+                    </DialogHeader>
+
+                    <Field className="gap-1">
+                        <FieldLabel className="mb-1">Name</FieldLabel>
+                        <Input value={noteName} onChange={(e) => setNoteName(e.target.value)} placeholder="Note Name" maxLength={24} />
+                        <FieldDescription>*Max length is 24 characters</FieldDescription>
+                    </Field>
+
+                    <Field className="gap-1 w-full">
+                        <FieldLabel className="mb-1">Description</FieldLabel>
+                        <Textarea value={noteDescription} onChange={(e) => setNoteDescription(e.target.value)} maxLength={160} placeholder="Note Description" className="resize-none w-full min-h-[80px]" />
+                        <FieldDescription>*Max length is 160 characters</FieldDescription>
+                    </Field>
+
+                    <Field className="flex flex-col gap-1">
+                        <FieldLabel>Folder</FieldLabel>
+                        <Combobox value={noteFolder} onValueChange={(val) => setNoteFolder(val || "/")}>
+                            <ComboboxInput placeholder="Select a folder..." />
+                            <ComboboxContent>
+                                <ComboboxEmpty>No folder found.</ComboboxEmpty>
+                                <ComboboxList>
+                                    {allFolderPaths.map((f) => (
+                                        <ComboboxItem key={f.id} value={f.path}>{f.path}</ComboboxItem>
+                                    ))}
+                                </ComboboxList>
+                            </ComboboxContent>
+                        </Combobox>
+                    </Field>
+
+                    <DialogFooter className="mt-4 gap-2">
+                        <Button variant="outline" onClick={() => { setCreateNoteDialogOpen(false), closeTab(activeTabId!) }}>Cancel</Button>
+                        <Button onClick={createNote} disabled={!noteName.trim()}>Create Note</Button>
+                    </DialogFooter>
+                </DialogContent>
+            </Dialog>
         </div>
     );
 }

@@ -3,7 +3,7 @@ import { useState, createContext, useContext, useCallback } from "react";
 
 // ─── Types ───────────────────────────────────────────────────────────────────
 
-export type TabType = "folder" | "note" | "chat";
+export type TabType = "folder" | "note" | "chat" | "placeholder";
 
 export interface Tab {
     id: string;
@@ -43,6 +43,7 @@ const DEFAULT_TITLE: Record<TabType, string> = {
     folder: "Folders",
     note: "Notes",
     chat: "New Chat",
+    placeholder: "Home",
 };
 
 // ─── Context ─────────────────────────────────────────────────────────────────
@@ -76,7 +77,6 @@ function TabsProvider({ children }: { children: React.ReactNode }) {
 
     const closeTab = useCallback((id: string) => {
         setTabs((prev) => {
-            if (prev.length === 1) return prev; // never close the last tab
             const idx = prev.findIndex((t) => t.id === id);
             const next = prev.filter((t) => t.id !== id);
             // If we closed the active tab, activate adjacent tab
@@ -90,27 +90,35 @@ function TabsProvider({ children }: { children: React.ReactNode }) {
     }, []);
 
     const updateTabTitle = useCallback((id: string, title: string) => {
-        setTabs((prev) =>
-            prev.map((t) => (t.id === id ? { ...t, title } : t))
-        );
+        setTabs((prev) => {
+            const tab = prev.find(t => t.id === id);
+            if (tab && tab.title === title) return prev;
+            return prev.map((t) => (t.id === id ? { ...t, title } : t));
+        });
     }, []);
 
     const updateTabLocation = useCallback((id: string, location: string) => {
-        setTabs((prev) =>
-            prev.map((t) => (t.id === id ? { ...t, location } : t))
-        );
+        setTabs((prev) => {
+            const tab = prev.find(t => t.id === id);
+            if (tab && tab.location === location) return prev;
+            return prev.map((t) => (t.id === id ? { ...t, location } : t));
+        });
     }, []);
 
     const updateTabNoteId = useCallback((id: string, noteId: string | undefined) => {
-        setTabs((prev) =>
-            prev.map((t) => (t.id === id ? { ...t, noteId } : t))
-        );
+        setTabs((prev) => {
+            const tab = prev.find(t => t.id === id);
+            if (tab && tab.noteId === noteId) return prev;
+            return prev.map((t) => (t.id === id ? { ...t, noteId } : t));
+        });
     }, []);
 
     const updateTabChatId = useCallback((id: string, chatId: string | undefined) => {
-        setTabs((prev) =>
-            prev.map((t) => (t.id === id ? { ...t, chatId } : t))
-        );
+        setTabs((prev) => {
+            const tab = prev.find(t => t.id === id);
+            if (tab && tab.chatId === chatId) return prev;
+            return prev.map((t) => (t.id === id ? { ...t, chatId } : t));
+        });
     }, []);
 
     const moveTab = useCallback((fromIndex: number, toIndex: number) => {
