@@ -45,7 +45,6 @@ export default function HomeTab({ setIsNoteOpened, setAccessedNote }: { setIsNot
     return (
         <div className="flex items-center justify-center h-full flex-col">
             <div className="flex flex-col items-center gap-8 bg-popover/40 backdrop-blur-xl px-24 py-16 rounded-[3rem] border border-input shadow-2xl shadow-primary/20 fade-up relative overflow-hidden">
-                <div className="absolute inset-0 bg-gradient-to-b from-primary/10 to-transparent pointer-events-none" />
                 <h1 className="text-3xl font-bold tracking-tight whitespace-pre fade-up z-50">
                     {headingText.slice(0, -1)}
                     <span className="text-primary">{headingText.slice(-1)}</span>
@@ -78,8 +77,6 @@ export default function HomeTab({ setIsNoteOpened, setAccessedNote }: { setIsNot
                     </TooltipTrigger>
                     <TooltipContent><p>Send Message</p></TooltipContent>
                 </Tooltip> */}
-                <div className="absolute bottom-0 w-full h-[30%] bg-gradient-to-t from-primary/50 to-transparent pointer-events-none blur-3xl z-0 animate-pulse" />
-
             </div>
             <div className="flex flex-col gap-2 fade-up mt-12 mb-2">
                 <p className="text-lg font-medium whitespace-pre fade-up text-muted-foreground">
