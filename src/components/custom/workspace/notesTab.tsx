@@ -1,5 +1,6 @@
 import { Button } from "@/components/ui/button";
 import Editor from "./editor";
+import { EditorToolbar } from "./editorToolbar";
 import { Tooltip, TooltipContent, TooltipTrigger } from "@/components/ui/tooltip";
 import { Note } from "@/types/folderStructureTypes";
 import { useUser } from "@/context/userContext";
@@ -18,6 +19,7 @@ import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
 import { Combobox, ComboboxContent, ComboboxEmpty, ComboboxInput, ComboboxItem, ComboboxList } from "@/components/ui/combobox";
 import { useFetchedFolders } from "@/context/fetchedFoldersContext";
+import { EditorProvider } from "@/context/editorContext";
 
 interface NotesTabProps {
     accessedNote: Note | null;
@@ -211,96 +213,105 @@ export default function NotesTab({ accessedNote, setAccessedNote, initialNoteId 
     }, [accessedNote, saveNote]);
 
     return (
-
-        <div className="flex flex-col relative h-full">
-            <div className="flex items-center gap-2 items-center w-full justify-left relative absolute top-0 bg- p-1">
-                <div className="w-fit h-fit flex items-center justify-center bg-popover rounded-3xl border border-border p-1">
-                    <Tooltip>
-                        <TooltipTrigger asChild>
-                            {isRenamingNote ? <Input
-                                value={tempNoteName}
-                                onChange={(e) => setTempNoteName(e.target.value)}
-                                onBlur={() => setIsRenamingNote(false)}
-                                autoFocus
-                                maxLength={34}
-                                onKeyDown={(e) => {
-                                    if (e.key === "Enter") { setIsRenamingNote(false); renameNote(); }
-                                    if (e.key === "Escape") setIsRenamingNote(false);
-                                }}
-                                className="text-center border-none shadow-none text-lg! font-medium focus-visible:ring-0 w-full bg-transparent! w-[364px]"
-                            /> :
-                                <Button variant="ghost" className="max-w-96 text-foreground text-lg truncate" onClick={() => { setRenamingNoteId(accessedNote?.id || null), setIsRenamingNote(true) }}>
-                                    {accessedNote?.title || "New Note"}
-                                </Button>}
-                        </TooltipTrigger>
-                        <TooltipContent><p>Note Title</p></TooltipContent>
-                    </Tooltip>
-                </div>
-                <div className="w-fit h-fit flex items-center justify-center bg-popover rounded-3xl border border-border p-1 absolute right-4">
-                    {isSavedComplete ? (
+        <EditorProvider>
+            <div className="flex flex-col relative h-full">
+                <div className="flex items-center gap-2 w-full relative p-1">
+                    {/* Title pill */}
+                    <div className="w-fit h-fit flex items-center justify-center bg-popover rounded-3xl border border-border p-1 shrink-0">
                         <Tooltip>
                             <TooltipTrigger asChild>
-                                <Button variant="ghost" className="w-10 h-10 p-0 rounded-full" onClick={saveNote} disabled={content === accessedNote?.content}>
-                                    <ArrowBigDown size={24} />
-                                </Button>
+                                {isRenamingNote ? <Input
+                                    value={tempNoteName}
+                                    onChange={(e) => setTempNoteName(e.target.value)}
+                                    onBlur={() => setIsRenamingNote(false)}
+                                    autoFocus
+                                    maxLength={50}
+                                    onKeyDown={(e) => {
+                                        if (e.key === "Enter") { setIsRenamingNote(false); renameNote(); }
+                                        if (e.key === "Escape") setIsRenamingNote(false);
+                                    }}
+                                    className="text-center border-none shadow-none text-lg! font-medium focus-visible:ring-0 w-full bg-transparent! w-[364px]"
+                                /> :
+                                    <Button variant="ghost" className="max-w-96 text-foreground text-lg truncate" onClick={() => { setRenamingNoteId(accessedNote?.id || null), setIsRenamingNote(true) }}>
+                                        {accessedNote?.title || "New Note"}
+                                    </Button>}
                             </TooltipTrigger>
-                            <TooltipContent className="flex items-center gap-2">
-                                <p>Save</p>
-                                <KbdGroup><Kbd>Ctrl + S</Kbd></KbdGroup>
-                            </TooltipContent>
+                            <TooltipContent><p>Note Title</p></TooltipContent>
                         </Tooltip>
-                    ) : (
-                        <div className="w-10 h-10 flex items-center justify-center"><Spinner /></div>
-                    )}
+                    </div>
+
+                    {/* Formatting toolbar — centered between title and save */}
+                    <div className="flex-1 flex justify-center">
+                        <EditorToolbar />
+                    </div>
+
+                    {/* Save button pill */}
+                    <div className="w-fit h-fit flex items-center justify-center bg-popover rounded-3xl border border-border p-1 shrink-0">
+                        {isSavedComplete ? (
+                            <Tooltip>
+                                <TooltipTrigger asChild>
+                                    <Button variant="ghost" className="w-10 h-10 p-0 rounded-full" onClick={saveNote} disabled={content === accessedNote?.content}>
+                                        <ArrowBigDown size={24} />
+                                    </Button>
+                                </TooltipTrigger>
+                                <TooltipContent className="flex items-center gap-2">
+                                    <p>Save</p>
+                                    <KbdGroup><Kbd>Ctrl + S</Kbd></KbdGroup>
+                                </TooltipContent>
+                            </Tooltip>
+                        ) : (
+                            <div className="w-10 h-10 flex items-center justify-center"><Spinner /></div>
+                        )}
+                    </div>
                 </div>
+                <Editor />
+                {/* Create Note Dialog */}
+                <Dialog open={createNoteDialogOpen} onOpenChange={(open) => {
+                    setCreateNoteDialogOpen(open);
+                    if (!open && !accessedNote && activeTabId) {
+                        closeTab(activeTabId);
+                    }
+                }}>
+                    <DialogContent showCloseButton={false} className="w-[40%] pb-24">
+                        <DialogHeader>
+                            <DialogTitle>Create Note</DialogTitle>
+                            <DialogDescription>Create a new note in your workspace</DialogDescription>
+                        </DialogHeader>
+
+                        <Field className="gap-1">
+                            <FieldLabel className="mb-1">Name</FieldLabel>
+                            <Input value={noteName} onChange={(e) => setNoteName(e.target.value)} placeholder="Note Name" maxLength={24} />
+                            <FieldDescription>*Max length is 24 characters</FieldDescription>
+                        </Field>
+
+                        <Field className="gap-1 w-full">
+                            <FieldLabel className="mb-1">Description</FieldLabel>
+                            <Textarea value={noteDescription} onChange={(e) => setNoteDescription(e.target.value)} maxLength={160} placeholder="Note Description" className="resize-none w-full min-h-[80px]" />
+                            <FieldDescription>*Max length is 160 characters</FieldDescription>
+                        </Field>
+
+                        <Field className="flex flex-col gap-1">
+                            <FieldLabel>Folder</FieldLabel>
+                            <Combobox value={noteFolder} onValueChange={(val) => setNoteFolder(val || "/")}>
+                                <ComboboxInput placeholder="Select a folder..." />
+                                <ComboboxContent>
+                                    <ComboboxEmpty>No folder found.</ComboboxEmpty>
+                                    <ComboboxList>
+                                        {allFolderPaths.map((f) => (
+                                            <ComboboxItem key={f.id} value={f.path}>{f.path}</ComboboxItem>
+                                        ))}
+                                    </ComboboxList>
+                                </ComboboxContent>
+                            </Combobox>
+                        </Field>
+
+                        <DialogFooter className="mt-4 gap-2">
+                            <Button variant="outline" onClick={() => { setCreateNoteDialogOpen(false), closeTab(activeTabId!) }}>Cancel</Button>
+                            <Button onClick={createNote} disabled={!noteName.trim()}>Create Note</Button>
+                        </DialogFooter>
+                    </DialogContent>
+                </Dialog>
             </div>
-            <Editor />
-            {/* Create Note Dialog */}
-            <Dialog open={createNoteDialogOpen} onOpenChange={(open) => {
-                setCreateNoteDialogOpen(open);
-                if (!open && !accessedNote && activeTabId) {
-                    closeTab(activeTabId);
-                }
-            }}>
-                <DialogContent showCloseButton={false} className="w-[40%] pb-24">
-                    <DialogHeader>
-                        <DialogTitle>Create Note</DialogTitle>
-                        <DialogDescription>Create a new note in your workspace</DialogDescription>
-                    </DialogHeader>
-
-                    <Field className="gap-1">
-                        <FieldLabel className="mb-1">Name</FieldLabel>
-                        <Input value={noteName} onChange={(e) => setNoteName(e.target.value)} placeholder="Note Name" maxLength={24} />
-                        <FieldDescription>*Max length is 24 characters</FieldDescription>
-                    </Field>
-
-                    <Field className="gap-1 w-full">
-                        <FieldLabel className="mb-1">Description</FieldLabel>
-                        <Textarea value={noteDescription} onChange={(e) => setNoteDescription(e.target.value)} maxLength={160} placeholder="Note Description" className="resize-none w-full min-h-[80px]" />
-                        <FieldDescription>*Max length is 160 characters</FieldDescription>
-                    </Field>
-
-                    <Field className="flex flex-col gap-1">
-                        <FieldLabel>Folder</FieldLabel>
-                        <Combobox value={noteFolder} onValueChange={(val) => setNoteFolder(val || "/")}>
-                            <ComboboxInput placeholder="Select a folder..." />
-                            <ComboboxContent>
-                                <ComboboxEmpty>No folder found.</ComboboxEmpty>
-                                <ComboboxList>
-                                    {allFolderPaths.map((f) => (
-                                        <ComboboxItem key={f.id} value={f.path}>{f.path}</ComboboxItem>
-                                    ))}
-                                </ComboboxList>
-                            </ComboboxContent>
-                        </Combobox>
-                    </Field>
-
-                    <DialogFooter className="mt-4 gap-2">
-                        <Button variant="outline" onClick={() => { setCreateNoteDialogOpen(false), closeTab(activeTabId!) }}>Cancel</Button>
-                        <Button onClick={createNote} disabled={!noteName.trim()}>Create Note</Button>
-                    </DialogFooter>
-                </DialogContent>
-            </Dialog>
-        </div>
+        </EditorProvider>
     );
 }

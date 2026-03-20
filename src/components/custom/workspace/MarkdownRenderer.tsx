@@ -3,7 +3,8 @@ import remarkGfm from "remark-gfm"
 import remarkMath from "remark-math"
 import rehypeKatex from "rehype-katex"
 import rehypeHighlight from "rehype-highlight"
-import { ComponentPropsWithoutRef, ReactNode, isValidElement } from "react"
+import rehypeRaw from "rehype-raw"
+import { ComponentPropsWithoutRef, CSSProperties, ReactNode, isValidElement } from "react"
 
 const extractText = (node: ReactNode): string => {
     if (node == null) return '';
@@ -40,6 +41,7 @@ export function MarkdownRenderer({ content, className = "" }: MarkdownRendererPr
             <ReactMarkdown
                 remarkPlugins={[remarkGfm, remarkMath]}
                 rehypePlugins={[
+                    rehypeRaw,
                     [rehypeKatex, { strict: false, throwOnError: false }],
                     [rehypeHighlight, { detect: true, ignoreMissing: true }]
                 ]}
@@ -148,6 +150,13 @@ export function MarkdownRenderer({ content, className = "" }: MarkdownRendererPr
                     },
                     hr() {
                         return <hr className="h-px bg-foreground/10 my-6" />
+                    },
+                    span({ style, children, ...props }: ComponentPropsWithoutRef<'span'>) {
+                        // Only allow the `color` CSS property from inline styles for security
+                        const safeStyle: CSSProperties | undefined = style
+                            ? { color: (style as CSSProperties).color }
+                            : undefined;
+                        return <span style={safeStyle} {...props}>{children}</span>;
                     }
                 }}
             >

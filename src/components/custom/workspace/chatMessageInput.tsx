@@ -1,6 +1,6 @@
 import { Button } from "@/components/ui/button"
 import { Tooltip, TooltipContent, TooltipTrigger } from "@/components/ui/tooltip"
-import { ArrowUp, Edit, FileImage, FileTypeCorner, Leaf, Lightbulb, Mic, Plus, Square, X, Zap } from "lucide-react"
+import { ArrowUp, Edit, FileImage, FileTypeCorner, Leaf, Lightbulb, Mic, Mic2, MicOff, Plus, Square, Trash2, X, Zap } from "lucide-react"
 import { useState, useRef, useEffect, Dispatch, SetStateAction } from "react"
 import { useChatMessages } from "@/context/chatMessagesContext"
 import { ChatMessage, ChatAttachment, Models, ToolCall, MessagePart } from "@/types/chatType"
@@ -16,6 +16,9 @@ import { cn } from "@/lib/utils"
 import { WORKSPACE_TOOL_DECLARATIONS, executeToolCall } from "@/lib/workspaceTools"
 import { useFetchedNotes } from "@/context/fetchedNotesContext"
 import { useFetchedFolders } from "@/context/fetchedFoldersContext"
+import { useAudioRecorder } from "@/hooks/useAudioRecorder"
+import WaveformAnimation from "@/components/custom/WaveformAnimation"
+import { EDITOR_COLORS } from "@/constants/editorColors"
 
 const models = {
     "gemini-2.5-flash": "Gemini 2.5 Flash",
@@ -39,20 +42,46 @@ export default function ChatMessageInput({ attachments, setAttachments }: ChatMe
     const abortControllerRef = useRef<AbortController | null>(null)
     const { chatMessages, setChatMessages, currentChatId, setCurrentChatId, refreshChats, setChatTitle } = useChatMessages()
 
+    // Audio recording
+    const { recordingState, audioURL, audioBlob, startRecording, stopRecording, uploadRecording, reset: resetRecording, analyserNode } = useAudioRecorder()
+    const isRecording = recordingState === "recording"
+    const hasRecording = !!audioBlob && !isRecording
+    const [recordingDuration, setRecordingDuration] = useState(0)
+    const recordingTimerRef = useRef<ReturnType<typeof setInterval> | null>(null)
+
     // user context
     const { user } = useUser();
-    const systemPromptString = `You are "Orthan AI", Narao's integrated assistant. You help in order to learn and to work mainly, so you use much markdown to highlight things. Narao is a note-taking app that uses AI to help users to learn and to work more efficiently. I am ${user?.username || "the user"}, and my preferences are: I like coding, AI, and technology. I am a student and I am learning about AI. Do not talk about yourself, only talk about the task except if explicitly asked.
+    const systemPromptString = `
+        You are "Orthan AI", Narao's assistant. Focus on helping users learn and work efficiently using rich markdown and colored highlights (default: red). Narao is an AI-powered note-taking app.
 
-    When you use math or physics formulas, ALWAYS wrap them in LaTeX delimiters:
-    - Use "$$" on separate lines for block formulas (e.g., "$$\nE = mc^2\n$$").
-    - Use "$" for inline formulas (e.g., "$E=mc^2$").
-    - NEVER leave LaTeX commands (like \\frac, \\cdot, \\sum) outside of math delimiters.
-    - Avoid common LaTeX errors like double subscripts without braces (use "E_{c_{init}}" instead of "E_c_{init}").
+        User: ${user?.username || "the user"}  
+        Interests: coding, AI, technology. Student learning AI.
 
-    When you use tools:
-    - BEFORE calling a tool, briefly explain in natural language what you are about to do (e.g. "Let me search your workspace for notes about math...").
-    - After getting a tool result, briefly acknowledge what you found before proceeding or calling another tool (e.g. "I found 3 notes. Let me now read the one about algebra.").
-    - At the end, give a complete, helpful answer based on all the information you gathered.`;
+        Rules:
+        - Stay task-focused. Do not talk about yourself unless asked.
+
+        Math/Physics:
+        - Always use LaTeX:
+        - Block: $$ ... $$
+        - Inline: $ ... $
+        - Never leave LaTeX commands outside delimiters.
+        - Avoid syntax errors (e.g., use E_{c_{init}}).
+
+        Tools:
+        - Before: briefly explain the action.
+        - After: briefly summarize results.
+        - End: provide a complete, helpful answer.
+
+        Workspace:
+        - For notes/folders: first fetch structure.
+        - Propose a clear plan before creating/editing.
+        - Follow logical folder organization.
+
+        Text color:
+        - Do not color the title of the note.
+        - Use: <span style="color: #c75d55;">text</span>
+        - Available colors: ${EDITOR_COLORS.map(color => `- ${color.label}: ${color.value}`).join(", ")}
+        `;
 
     // Workspace contexts for tool execution
     const { fetchedNotes, setFetchedNotes } = useFetchedNotes();
@@ -82,6 +111,63 @@ export default function ChatMessageInput({ attachments, setAttachments }: ChatMe
             textareaRef.current?.focus()
         }
     }, [activeTab])
+
+    // Recording duration timer
+    useEffect(() => {
+        if (isRecording) {
+            setRecordingDuration(0)
+            recordingTimerRef.current = setInterval(() => {
+                setRecordingDuration(prev => prev + 1)
+            }, 1000)
+        } else {
+            if (recordingTimerRef.current) {
+                clearInterval(recordingTimerRef.current)
+                recordingTimerRef.current = null
+            }
+        }
+        return () => {
+            if (recordingTimerRef.current) clearInterval(recordingTimerRef.current)
+        }
+    }, [isRecording])
+
+    const formatDuration = (secs: number) => {
+        const m = Math.floor(secs / 60).toString().padStart(2, "0")
+        const s = (secs % 60).toString().padStart(2, "0")
+        return `${m}:${s}`
+    }
+
+    const handleMicToggle = async () => {
+        if (isRecording) {
+            stopRecording()
+        } else if (hasRecording) {
+            // Discard existing recording and start fresh
+            resetRecording()
+            await startRecording()
+        } else {
+            await startRecording()
+        }
+    }
+
+    const handleDiscardRecording = () => {
+        resetRecording()
+        setRecordingDuration(0)
+    }
+
+    const handleSendRecording = async () => {
+        if (!user || !audioBlob) return
+        const result = await uploadRecording(user.id)
+        if (!result) {
+            toast.error("Failed to upload voice recording", { position: "bottom-right" })
+            return
+        }
+        // Create a synthetic File from the blob to re-use the existing attachment flow
+        const ext = audioBlob.type.includes("mp4") ? "mp4" : "webm"
+        const file = new File([audioBlob], `voice-${Date.now()}.${ext}`, { type: audioBlob.type })
+        setAttachments(prev => [...prev, file])
+        resetRecording()
+        setRecordingDuration(0)
+        toast.success("Voice note attached!", { position: "bottom-right", duration: 2000 })
+    }
 
     // When an edit is requested: just populate the input and focus.
     // Deletion happens only when the user actually sends.
@@ -1089,6 +1175,9 @@ export default function ChatMessageInput({ attachments, setAttachments }: ChatMe
                             {file.type.includes("pdf") && (
                                 <FileTypeCorner className="w-4 h-4 text-destructive" />
                             )}
+                            {(file.type.includes("webm") || file.type.includes("mp4") || file.type.includes("ogg") || file.name.startsWith("voice-")) && (
+                                <Mic2 className="w-4 h-4 text-primary" />
+                            )}
                             <span className="max-w-[100px] truncate">{file.name}</span>
                             <button
                                 onClick={() => removeAttachment(index)}
@@ -1150,21 +1239,37 @@ export default function ChatMessageInput({ attachments, setAttachments }: ChatMe
                             </TooltipContent>
                         </Tooltip>
                     </div>
-                    <textarea
-                        ref={textareaRef}
-                        className="w-full resize-none bg-transparent py-3 focus:outline-none outline-none scrollbar-no-bg max-h-[156px] overflow-y-auto"
-                        placeholder="Ask Orthan AI anything..."
-                        maxLength={100000}
-                        rows={1}
-                        value={content}
-                        onChange={(e) => setContent(e.target.value)}
-                        onKeyDown={(e) => {
-                            if (e.key === "Enter" && !e.shiftKey) {
-                                e.preventDefault()
-                                handleSend()
-                            }
-                        }}
-                    />
+                    {isRecording ? (
+                        <div className="flex flex-col items-center justify-center w-full py-1 gap-1">
+                            <WaveformAnimation analyserNode={analyserNode} isRecording={isRecording} barCount={32} />
+                            <span className="text-xs text-destructive font-mono font-semibold animate-pulse">
+                                {formatDuration(recordingDuration)}
+                            </span>
+                        </div>
+                    ) : hasRecording ? (
+                        <div className="flex flex-col items-center justify-center w-full py-1 gap-1.5">
+                            <WaveformAnimation analyserNode={null} isRecording={false} barCount={32} />
+                            {audioURL && (
+                                <audio controls src={audioURL} className="h-7 w-full max-w-[240px] opacity-80" />
+                            )}
+                        </div>
+                    ) : (
+                        <textarea
+                            ref={textareaRef}
+                            className="w-full resize-none bg-transparent py-3 focus:outline-none outline-none scrollbar-no-bg max-h-[156px] overflow-y-auto"
+                            placeholder="Ask Orthan AI anything..."
+                            maxLength={100000}
+                            rows={1}
+                            value={content}
+                            onChange={(e) => setContent(e.target.value)}
+                            onKeyDown={(e) => {
+                                if (e.key === "Enter" && !e.shiftKey) {
+                                    e.preventDefault()
+                                    handleSend()
+                                }
+                            }}
+                        />
+                    )}
                     <div className="flex items-center pb-1 gap-1">
                         <Popover open={isSelectingModelPopoverOpen}>
                             <Tooltip>
@@ -1205,29 +1310,56 @@ export default function ChatMessageInput({ attachments, setAttachments }: ChatMe
                                 </div>
                             </PopoverContent>
                         </Popover>
+                        {hasRecording && (
+                            <Tooltip>
+                                <TooltipTrigger asChild>
+                                    <Button
+                                        variant="ghost"
+                                        size="icon"
+                                        className="h-10 w-10 rounded-full text-destructive hover:text-destructive"
+                                        onClick={handleDiscardRecording}
+                                    >
+                                        <Trash2 size={18} />
+                                    </Button>
+                                </TooltipTrigger>
+                                <TooltipContent><p>Discard recording</p></TooltipContent>
+                            </Tooltip>
+                        )}
                         <Tooltip>
                             <TooltipTrigger asChild>
-                                <Button variant="ghost" size="icon" className="h-10 w-10 rounded-full"><Mic /></Button>
+                                <Button
+                                    variant={isRecording ? "destructive" : "ghost"}
+                                    size="icon"
+                                    className={cn(
+                                        "h-10 w-10 rounded-full transition-all duration-200",
+                                        isRecording && "animate-pulse shadow-lg shadow-destructive/40"
+                                    )}
+                                    onClick={handleMicToggle}
+                                >
+                                    {isRecording ? <MicOff size={18} /> : <Mic size={18} />}
+                                </Button>
                             </TooltipTrigger>
-                            <TooltipContent><p>Dictate</p></TooltipContent>
+                            <TooltipContent>
+                                <p>{isRecording ? "Stop recording" : hasRecording ? "Re-record" : "Voice note"}</p>
+                            </TooltipContent>
                         </Tooltip>
                         <Tooltip>
                             <TooltipTrigger asChild>
                                 <Button
                                     variant="default"
                                     size="icon"
-                                    onClick={isLoading ? handleStop : handleSend}
-                                    disabled={!isLoading && content.length === 0 && attachments.length === 0}
+                                    onClick={hasRecording ? handleSendRecording : isLoading ? handleStop : handleSend}
+                                    disabled={!hasRecording && !isLoading && content.length === 0 && attachments.length === 0}
                                     className="h-10 w-10 rounded-full p-0 flex items-center justify-center"
                                 >
-                                    {isLoading ? (
+                                    {isLoading && !hasRecording ? (
                                         <Square size={20} className="fill-current" />
                                     ) : (
                                         <ArrowUp size={20} />
                                     )}
                                 </Button>
                             </TooltipTrigger>
-                            <TooltipContent><p>{isLoading ? "Stop generating" : "Send Message"}</p></TooltipContent>
+                            <TooltipContent><p>{hasRecording ? "Send voice note" : isLoading ? "Stop generating" : "Send Message"}</p></TooltipContent>
                         </Tooltip>
                     </div>
                 </div>

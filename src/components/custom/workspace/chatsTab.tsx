@@ -332,7 +332,7 @@ export default function ChatsTab({ initialChatId }: ChatsTabProps) {
                         }}
                         className="mt-2 rounded-lg shadow-md"
                     >
-                        <ScrollArea className="flex-1 rounded-lg border border-border px-1 shadow-lg bg-popover/40 backdrop-blur-md h-full max-h-[50vh]">
+                        <ScrollArea className="flex-1 rounded-lg border border-border px-1 shadow-lg bg-popover/40 backdrop-blur-md h-full max-h-[50vh] overflow-y-auto">
                             <div className="h-1" key={"division-scroll"}></div>
                             {chats.length > 0 && chatsFetched ? filteredChats.map((chat, index) => (
                                 <div

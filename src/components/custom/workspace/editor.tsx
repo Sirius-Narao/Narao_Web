@@ -1,6 +1,7 @@
 'use client'
 
 import { useContent } from "@/context/contentContext";
+import { useEditorInstance } from "@/context/editorContext";
 import { useEffect, useState } from "react";
 import { useEditor, EditorContent } from '@tiptap/react';
 import StarterKit from '@tiptap/starter-kit';
@@ -14,9 +15,12 @@ import { Table } from '@tiptap/extension-table';
 import { TableRow } from '@tiptap/extension-table-row';
 import { TableHeader } from '@tiptap/extension-table-header';
 import { TableCell } from '@tiptap/extension-table-cell';
+import { Color } from '@tiptap/extension-color';
+import { TextStyle } from '@tiptap/extension-text-style';
 
 export default function Editor() {
     const { content, setContent } = useContent();
+    const { setEditor } = useEditorInstance();
     const [isMounted, setIsMounted] = useState(false);
 
     useEffect(() => {
@@ -37,6 +41,8 @@ export default function Editor() {
             StarterKit.configure({
                 codeBlock: false,
             }),
+            TextStyle,
+            Color,
             MathAwareCodeBlock,
             MathAwareInlineNode,
             Table.configure({ resizable: true }),
@@ -66,6 +72,13 @@ export default function Editor() {
         },
         immediatelyRender: false,
     });
+
+    // Register editor instance into shared context so toolbar can consume it
+    useEffect(() => {
+        setEditor(editor ?? null);
+        return () => setEditor(null);
+        // eslint-disable-next-line react-hooks/exhaustive-deps
+    }, [editor]);
 
     useEffect(() => {
         if (editor && content && !editor.isFocused) {

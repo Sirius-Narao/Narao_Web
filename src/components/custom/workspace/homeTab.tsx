@@ -7,7 +7,6 @@ import { Note } from "@/types/folderStructureTypes";
 import { useUser } from "@/context/userContext";
 import { supabase } from "@/lib/supabaseClient";
 import { useContent } from "@/context/contentContext";
-import { Tooltip, TooltipContent, TooltipTrigger } from "@/components/ui/tooltip";
 
 export default function HomeTab({ setIsNoteOpened, setAccessedNote }: { setIsNoteOpened: (value: boolean) => void, setAccessedNote: (value: Note) => void }) {
     const headingText = useTypingTextAnimation(["Hey, what would you like to do? ", "Anything to learn or create? ", "Or just a simple chat? ", "I'm getting bored... "], 5000);
@@ -57,7 +56,7 @@ export default function HomeTab({ setIsNoteOpened, setAccessedNote }: { setIsNot
                     </Button>
                     <Button variant="outline" className="rounded-full fade-up cursor-pointer text-lg px-10 py-6 bg-background/50 backdrop-blur-sm border-input hover:border-primary/50 hover:bg-primary/5 transition-all duration-300 group" style={{ animationDelay: `200ms` }} onClick={() => openTab({ type: "note", title: "Notes" })}>
                         <BookOpen className="w-5 h-5 ml-2 group-hover:scale-110 transition-transform" />
-                        <p className="mr-2">Open Note</p>
+                        <p className="mr-2">Create Note</p>
                     </Button>
                     <Button variant="outline" className="rounded-full fade-up cursor-pointer text-lg px-10 py-6 bg-background/50 backdrop-blur-sm border-input hover:border-primary/50 hover:bg-primary/5 transition-all duration-300 group" style={{ animationDelay: `300ms` }} onClick={() => openTab({ type: "chat", title: "New Chat" })}>
                         <MessageCircle className="w-5 h-5 ml-2 group-hover:scale-110 transition-transform" />

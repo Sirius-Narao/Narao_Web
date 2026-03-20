@@ -155,7 +155,7 @@ export const WORKSPACE_TOOL_DECLARATIONS = [
             properties: {
                 title: {
                     type: Type.STRING,
-                    description: "Title of the new note."
+                    description: "Title of the new note (max 50 characters)."
                 },
                 description: {
                     type: Type.STRING,
@@ -203,7 +203,7 @@ export const WORKSPACE_TOOL_DECLARATIONS = [
                 },
                 title: {
                     type: Type.STRING,
-                    description: "The new title of the folder."
+                    description: "The new title of the folder (max 50 characters)."
                 },
             },
             required: ["localisation", "title"]
