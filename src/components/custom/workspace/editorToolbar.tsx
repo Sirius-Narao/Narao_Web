@@ -43,53 +43,51 @@ export function EditorToolbar() {
             const e = ctx.editor;
             if (!e) return null;
             return {
-                isBold:        e.isActive("bold"),
-                isItalic:      e.isActive("italic"),
-                isStrike:      e.isActive("strike"),
-                isCode:        e.isActive("code"),
-                isBlockquote:  e.isActive("blockquote"),
-                isCodeBlock:   e.isActive("codeBlock"),
-                isBulletList:  e.isActive("bulletList"),
+                isBold: e.isActive("bold"),
+                isItalic: e.isActive("italic"),
+                isStrike: e.isActive("strike"),
+                isCode: e.isActive("code"),
+                isBlockquote: e.isActive("blockquote"),
+                isCodeBlock: e.isActive("codeBlock"),
+                isBulletList: e.isActive("bulletList"),
                 isOrderedList: e.isActive("orderedList"),
-                isTable:       e.isActive("table"),
-                isH1:          e.isActive("heading", { level: 1 }),
-                isH2:          e.isActive("heading", { level: 2 }),
-                isH3:          e.isActive("heading", { level: 3 }),
-                activeColor:   EDITOR_COLORS.find(c => e.isActive("textStyle", { color: c.value })) ?? null,
+                isTable: e.isActive("table"),
+                isH1: e.isActive("heading", { level: 1 }),
+                isH2: e.isActive("heading", { level: 2 }),
+                isH3: e.isActive("heading", { level: 3 }),
+                activeColor: EDITOR_COLORS.find(c => e.isActive("textStyle", { color: c.value })) ?? null,
             };
         },
     });
-
-    if (!editor || !editorState) return null;
 
     // ── Inline format buttons ────────────────────────────────────────────────
     const formatButtons = [
         {
             label: "Bold",
             icon: <Bold size={14} />,
-            isActive: editorState.isBold,
-            action: () => editor.chain().focus().toggleBold().run(),
+            isActive: editorState?.isBold,
+            action: () => editor?.chain().focus().toggleBold().run(),
             shortcut: "Ctrl+Shift+B",
         },
         {
             label: "Italic",
             icon: <Italic size={14} />,
-            isActive: editorState.isItalic,
-            action: () => editor.chain().focus().toggleItalic().run(),
+            isActive: editorState?.isItalic,
+            action: () => editor?.chain().focus().toggleItalic().run(),
             shortcut: "Ctrl+I",
         },
         {
             label: "Strikethrough",
             icon: <Strikethrough size={14} />,
-            isActive: editorState.isStrike,
-            action: () => editor.chain().focus().toggleStrike().run(),
+            isActive: editorState?.isStrike,
+            action: () => editor?.chain().focus().toggleStrike().run(),
             shortcut: "Ctrl+Shift+S",
         },
         {
             label: "Inline Code",
             icon: <Code size={14} />,
-            isActive: editorState.isCode,
-            action: () => editor.chain().focus().toggleCode().run(),
+            isActive: editorState?.isCode,
+            action: () => editor?.chain().focus().toggleCode().run(),
             shortcut: "Ctrl+E",
         },
     ];
@@ -99,38 +97,38 @@ export function EditorToolbar() {
         {
             label: "Blockquote",
             icon: <Quote size={14} />,
-            isActive: editorState.isBlockquote,
-            action: () => editor.chain().focus().toggleBlockquote().run(),
+            isActive: editorState?.isBlockquote,
+            action: () => editor?.chain().focus().toggleBlockquote().run(),
             shortcut: "Ctrl+Shift+B",
         },
         {
             label: "Code Block",
             icon: <Code2 size={14} />,
-            isActive: editorState.isCodeBlock,
-            action: () => editor.chain().focus().toggleCodeBlock().run(),
+            isActive: editorState?.isCodeBlock,
+            action: () => editor?.chain().focus().toggleCodeBlock().run(),
             shortcut: "Ctrl+Alt+C",
         },
         {
             label: "Bullet List",
             icon: <List size={14} />,
-            isActive: editorState.isBulletList,
-            action: () => editor.chain().focus().toggleBulletList().run(),
+            isActive: editorState?.isBulletList,
+            action: () => editor?.chain().focus().toggleBulletList().run(),
             shortcut: "Ctrl+Shift+8",
         },
         {
             label: "Numbered List",
             icon: <ListOrdered size={14} />,
-            isActive: editorState.isOrderedList,
-            action: () => editor.chain().focus().toggleOrderedList().run(),
+            isActive: editorState?.isOrderedList,
+            action: () => editor?.chain().focus().toggleOrderedList().run(),
             shortcut: "Ctrl+Shift+7",
         },
     ];
 
     // ── Heading levels ────────────────────────────────────────────────────────
     const headingLevels = [
-        { level: 1 as const, label: "Heading 1", icon: <Heading1 size={14} />, shortcut: "Ctrl+Alt+1", isActive: editorState.isH1 },
-        { level: 2 as const, label: "Heading 2", icon: <Heading2 size={14} />, shortcut: "Ctrl+Alt+2", isActive: editorState.isH2 },
-        { level: 3 as const, label: "Heading 3", icon: <Heading3 size={14} />, shortcut: "Ctrl+Alt+3", isActive: editorState.isH3 },
+        { level: 1 as const, label: "Heading 1", icon: <Heading1 size={14} />, shortcut: "Ctrl+Alt+1", isActive: editorState?.isH1 },
+        { level: 2 as const, label: "Heading 2", icon: <Heading2 size={14} />, shortcut: "Ctrl+Alt+2", isActive: editorState?.isH2 },
+        { level: 3 as const, label: "Heading 3", icon: <Heading3 size={14} />, shortcut: "Ctrl+Alt+3", isActive: editorState?.isH3 },
     ];
 
     const activeHeading = headingLevels.find(h => h.isActive);
@@ -139,7 +137,7 @@ export function EditorToolbar() {
         : <span className="text-[11px] font-medium leading-none">¶</span>;
 
     // ── Color ─────────────────────────────────────────────────────────────────
-    const activeColor = editorState.activeColor;
+    const activeColor = editorState?.activeColor;
 
     const Divider = () => <div className="w-px h-4 mx-0.5 shrink-0 bg-input" />;
 
@@ -171,7 +169,7 @@ export function EditorToolbar() {
                 </Tooltip>
                 <DropdownMenuContent align="start" className="min-w-[180px]">
                     <DropdownMenuItem
-                        onClick={() => editor.chain().focus().setParagraph().run()}
+                        onClick={() => editor?.chain().focus().setParagraph().run()}
                         className={cn("gap-2 text-xs cursor-pointer", !activeHeading && "bg-primary/10 text-primary")}
                     >
                         <span className="text-[11px] font-medium w-4">¶</span>
@@ -181,7 +179,7 @@ export function EditorToolbar() {
                     {headingLevels.map(h => (
                         <DropdownMenuItem
                             key={h.level}
-                            onClick={() => editor.chain().focus().toggleHeading({ level: h.level }).run()}
+                            onClick={() => editor?.chain().focus().toggleHeading({ level: h.level }).run()}
                             className={cn("gap-2 text-xs cursor-pointer", h.isActive && "bg-primary/10 text-primary")}
                         >
                             <span className="w-4 flex items-center justify-center">{h.icon}</span>
@@ -240,21 +238,21 @@ export function EditorToolbar() {
             <Tooltip>
                 <TooltipTrigger asChild>
                     <Toggle
-                        pressed={editorState.isTable}
+                        pressed={editorState?.isTable}
                         onPressedChange={() =>
-                            editorState.isTable
-                                ? editor.chain().focus().deleteTable().run()
-                                : editor.chain().focus().insertTable({ rows: 3, cols: 3, withHeaderRow: true }).run()
+                            editorState?.isTable
+                                ? editor?.chain().focus().deleteTable().run()
+                                : editor?.chain().focus().insertTable({ rows: 3, cols: 3, withHeaderRow: true }).run()
                         }
                         aria-label="Insert Table"
-                        className={cn(toggleClass, editorState.isTable && "bg-primary/20 text-primary")}
+                        className={cn(toggleClass, editorState?.isTable && "bg-primary/20 text-primary")}
 
                     >
                         <Table size={14} />
                     </Toggle>
                 </TooltipTrigger>
                 <TooltipContent className="text-xs">
-                    {editorState.isTable ? "Delete Table" : "Insert Table (3×3)"}
+                    {editorState?.isTable ? "Delete Table" : "Insert Table (3×3)"}
                 </TooltipContent>
             </Tooltip>
 
@@ -265,7 +263,7 @@ export function EditorToolbar() {
                 <TooltipTrigger asChild>
                     <Toggle
                         pressed={false}
-                        onPressedChange={() => editor.chain().focus().unsetAllMarks().run()}
+                        onPressedChange={() => editor?.chain().focus().unsetAllMarks().run()}
                         aria-label="Remove formatting"
                         className="rounded-full cursor-pointer hover:bg-primary/10 hover:text-primary"
                     >
@@ -299,7 +297,7 @@ export function EditorToolbar() {
                             <TooltipTrigger asChild>
                                 <button
                                     aria-label="Default color"
-                                    onClick={() => editor.chain().focus().unsetColor().setTextSelection(editor.state.selection.to).run()}
+                                    onClick={() => editor?.chain().focus().unsetColor().setTextSelection(editor.state.selection.to).run()}
                                     className={cn(
                                         "w-4 h-4 rounded-full border-2 transition-all hover:scale-125 shrink-0",
                                         "bg-gradient-to-br from-foreground/30 to-transparent",
@@ -319,7 +317,7 @@ export function EditorToolbar() {
                                     <TooltipTrigger asChild>
                                         <button
                                             aria-label={color.label}
-                                            onClick={() => editor.chain().focus().setColor(color.value).setTextSelection(editor.state.selection.to).run()}
+                                            onClick={() => editor?.chain().focus().setColor(color.value).setTextSelection(editor.state.selection.to).run()}
                                             className={cn(
                                                 "w-4 h-4 rounded-full border-2 transition-all hover:scale-125 shrink-0",
                                                 isActive
