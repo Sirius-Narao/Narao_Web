@@ -45,7 +45,7 @@ export default function Editor() {
             Color,
             MathAwareCodeBlock,
             MathAwareInlineNode,
-            Table.configure({ resizable: true }),
+            Table.configure({ resizable: false }),
             TableRow,
             TableHeader,
             TableCell,

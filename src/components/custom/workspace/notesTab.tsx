@@ -215,7 +215,7 @@ export default function NotesTab({ accessedNote, setAccessedNote, initialNoteId 
     return (
         <EditorProvider>
             <div className="flex flex-col relative h-full">
-                <div className="flex items-center gap-2 w-full relative p-1">
+                <div className="flex items-center gap-2 w-full relative p-1 sticky top-0 z-10">
                     {/* Title pill */}
                     <div className="w-fit h-fit flex items-center justify-center bg-popover rounded-3xl border border-border p-1 shrink-0">
                         <Tooltip>
@@ -251,7 +251,7 @@ export default function NotesTab({ accessedNote, setAccessedNote, initialNoteId 
                             <Tooltip>
                                 <TooltipTrigger asChild>
                                     <Button variant="ghost" className="w-10 h-10 p-0 rounded-full" onClick={saveNote} disabled={content === accessedNote?.content}>
-                                        <ArrowBigDown size={24} />
+                                        <ArrowBigDown size={24} className="text-primary disabled:text-muted-foreground" />
                                     </Button>
                                 </TooltipTrigger>
                                 <TooltipContent className="flex items-center gap-2">

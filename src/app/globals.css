@@ -467,18 +467,18 @@ body {
 }
 
 .tiptap table {
-  @apply w-full border-collapse border border-border my-6 overflow-hidden rounded-lg bg-secondary/50;
+  @apply w-full border-collapse border border-border my-6 overflow-hidden rounded-lg bg-secondary/50 text-sm;
 }
 
 .tiptap table th,
 .tiptap table td {
-  @apply border border-border px-4 py-2 text-left align-top bg-popover;
+  @apply border-b border-secondary/70 px-4 text-left align-top;
 }
 
 .tiptap table th {
-  @apply bg-muted font-bold text-foreground;
+  @apply bg-secondary/70 py-3 font-bold text-foreground/80;
 }
 
 .tiptap table td {
-  @apply bg-card text-muted-foreground;
+  @apply bg-card py-2.5 text-foreground/70;
 }

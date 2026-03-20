@@ -828,10 +828,10 @@ export default function FoldersTab({ accessedNote, setAccessedNote, setIsNoteOpe
                                         </ContextMenuTrigger>
                                         <ContextMenuContent className="w-48">
                                             <ContextMenuItem onClick={() => startNoteRename(note.id, note.title)} className="gap-2">
-                                                <FolderPen size={14} /> Rename
+                                                <FolderPen size={14} className="hover:text-primary" /> Rename
                                             </ContextMenuItem>
-                                            <ContextMenuItem className="gap-2 text-destructive focus:text-destructive" onClick={() => deleteNote(note.id)}>
-                                                <Trash size={14} /> Delete
+                                            <ContextMenuItem className="gap-2 text-destructive focus:text-destructive dark:hover:bg-destructive/10 hover:bg-destructive/10" onClick={() => deleteNote(note.id)}>
+                                                <Trash size={14} className="text-destructive" /> Delete
                                             </ContextMenuItem>
                                         </ContextMenuContent>
                                     </Tooltip>
