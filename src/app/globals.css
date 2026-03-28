@@ -482,3 +482,180 @@ body {
 .tiptap table td {
   @apply bg-card py-2.5 text-foreground/70;
 }
+
+/* ── @Mention Input System ──────────────────────────────────────────────────── */
+
+/**
+ * .mention-editor — the single contenteditable div that acts as the text input.
+ * Placeholder is rendered via a ::before pseudo-element when [data-empty] is set.
+ */
+
+.mention-editor {
+  font-family: var(--font-sans);
+  font-size: 1rem;
+  line-height: 1.5rem;
+  padding: 0.75rem 0;
+  word-break: break-word;
+  white-space: pre-wrap;
+  overflow-wrap: break-word;
+  min-height: calc(1.5rem + 1.5rem);
+  /* 1 line + vertical padding */
+  max-height: 156px;
+  overflow-y: auto;
+  caret-color: var(--foreground);
+  color: var(--foreground);
+  /* Remove default browser contenteditable outline */
+  outline: none;
+}
+
+/* Placeholder text when the editor is empty */
+.mention-editor:empty::before {
+  content: attr(data-placeholder);
+  color: var(--muted-foreground);
+  pointer-events: none;
+  user-select: none;
+}
+
+/* The @mention chip span injected on confirm */
+.mention-token {
+  background: var(--secondary);
+  color: var(--primary);
+  border-radius: 20px;
+  padding: 2px 8px;
+  font-weight: 550;
+  outline: 1px solid color-mix(in oklch, var(--primary) 35%, transparent);
+  /* contentEditable=false makes it atomic so caret jumps over it */
+  user-select: none;
+  cursor: pointer;
+  transition: all 0.2s ease;
+}
+
+.mention-token:hover {
+  background: color-mix(in oklch, var(--primary) 20%, transparent);
+}
+
+/* ── Suggestion Dropdown ────────────────────────────────────────────────────── */
+
+.mention-suggestions {
+  position: absolute;
+  bottom: calc(100% + 6px);
+  /* float above the textarea */
+  left: 0;
+  right: 0;
+  z-index: 60;
+  background: var(--popover);
+  border: 1px solid var(--border);
+  border-radius: 14px;
+  padding: 6px;
+  box-shadow:
+    0 -4px 20px -4px oklch(0 0 0 / 0.12),
+    0 0 0 1px var(--border);
+  animation: mention-dropdown-in 0.12s cubic-bezier(0.16, 1, 0.3, 1) both;
+  overflow: hidden;
+}
+
+@keyframes mention-dropdown-in {
+  from {
+    opacity: 0;
+    transform: translateY(6px) scale(0.97);
+  }
+
+  to {
+    opacity: 1;
+    transform: translateY(0) scale(1);
+  }
+}
+
+.mention-suggestions-label {
+  font-size: 0.65rem;
+  font-weight: 600;
+  letter-spacing: 0.07em;
+  text-transform: uppercase;
+  color: var(--muted-foreground);
+  padding: 2px 8px 6px;
+}
+
+.mention-suggestion-item {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 7px 10px;
+  border-radius: 9px;
+  cursor: pointer;
+  transition: background 0.08s ease, color 0.08s ease;
+  font-size: 0.85rem;
+}
+
+.mention-suggestion-item:hover,
+.mention-suggestion-item--active {
+  background: color-mix(in oklch, var(--primary) 12%, transparent);
+}
+
+.mention-suggestion-item--active {
+  background: color-mix(in oklch, var(--primary) 15%, transparent);
+}
+
+.mention-suggestion-icon {
+  flex-shrink: 0;
+  opacity: 0.75;
+}
+
+.mention-suggestion-icon--note {
+  color: var(--primary);
+}
+
+.mention-suggestion-icon--folder {
+  color: oklch(0.75 0.14 85);
+}
+
+/* warm amber */
+
+.dark .mention-suggestion-icon--folder {
+  color: oklch(0.82 0.12 85);
+}
+
+.mention-suggestion-title {
+  flex: 1;
+  font-weight: 500;
+  color: var(--foreground);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.mention-suggestion-type {
+  font-size: 0.65rem;
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 0.06em;
+  color: var(--muted-foreground);
+  background: var(--muted);
+  padding: 1px 6px;
+  border-radius: 999px;
+  flex-shrink: 0;
+}
+
+.mention-suggestions-hint {
+  font-size: 0.65rem;
+  color: var(--muted-foreground);
+  padding: 6px 8px 2px;
+  display: flex;
+  gap: 4px;
+  align-items: center;
+}
+
+.mention-suggestions-hint kbd {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  font-family: var(--font-mono);
+  font-size: 0.6rem;
+  background: var(--muted);
+  border: 1px solid var(--border);
+  border-radius: 4px;
+  padding: 0 4px;
+  min-width: 18px;
+  height: 16px;
+  color: var(--foreground);
+  font-weight: 500;
+}

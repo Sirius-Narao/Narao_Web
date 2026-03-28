@@ -1,7 +1,7 @@
 import { Button } from "@/components/ui/button"
 import { Tooltip, TooltipContent, TooltipTrigger } from "@/components/ui/tooltip"
-import { ArrowUp, Edit, FileImage, FileTypeCorner, Leaf, Lightbulb, Mic, Mic2, MicOff, Plus, Square, Trash2, X, Zap } from "lucide-react"
-import { useState, useRef, useEffect, Dispatch, SetStateAction } from "react"
+import { ArrowUp, Edit, FileImage, FileTypeCorner, Leaf, Lightbulb, Mic, Mic2, MicOff, Plus, Square, Trash2, X, Zap, FileText, Folder } from "lucide-react"
+import { useState, useRef, useEffect, useCallback, useMemo, Dispatch, SetStateAction } from "react"
 import { useChatMessages } from "@/context/chatMessagesContext"
 import { ChatMessage, ChatAttachment, Models, ToolCall, MessagePart } from "@/types/chatType"
 import { v4 as uuidv4 } from "uuid"
@@ -20,6 +20,9 @@ import { useAudioRecorder } from "@/hooks/useAudioRecorder"
 import WaveformAnimation from "@/components/custom/WaveformAnimation"
 import { EDITOR_COLORS } from "@/constants/editorColors"
 
+// ── @mention types ──────────────────────────────────────────────────────────
+type MentionItem = { id: string; title: string; type: "note" | "folder"; path?: string; color?: string };
+
 const models = {
     "gemini-2.5-flash": "Gemini 2.5 Flash",
     "gemini-3-flash-preview": "Gemini 3 Flash",
@@ -37,7 +40,7 @@ export default function ChatMessageInput({ attachments, setAttachments }: ChatMe
     const [isThinking, setIsThinking] = useState(false)
     const { isLoading, setIsLoading } = useIsLoading()
 
-    const textareaRef = useRef<HTMLTextAreaElement>(null)
+    const editorRef = useRef<HTMLDivElement>(null)
     const fileInputRef = useRef<HTMLInputElement>(null)
     const abortControllerRef = useRef<AbortController | null>(null)
     const { chatMessages, setChatMessages, currentChatId, setCurrentChatId, refreshChats, setChatTitle } = useChatMessages()
@@ -48,6 +51,12 @@ export default function ChatMessageInput({ attachments, setAttachments }: ChatMe
     const hasRecording = !!audioBlob && !isRecording
     const [recordingDuration, setRecordingDuration] = useState(0)
     const recordingTimerRef = useRef<ReturnType<typeof setInterval> | null>(null)
+
+    // ── @mention state ──────────────────────────────────────────────────────
+    const [mentionQuery, setMentionQuery] = useState<string | null>(null) // null = closed
+    const [mentionStart, setMentionStart] = useState<number>(-1)          // caret pos of "@"
+    const [mentionIndex, setMentionIndex] = useState(0)                   // highlighted item index
+    const mentionListRef = useRef<HTMLDivElement>(null)
 
     // user context
     const { user } = useUser();
@@ -94,21 +103,164 @@ export default function ChatMessageInput({ attachments, setAttachments }: ChatMe
     const [isSelectingModelPopoverOpen, setIsSelectingModelPopoverOpen] = useState(false)
 
     // active tab
-    const { activeTab } = useTabs()
+    const { activeTab, openTab } = useTabs()
 
     // edit message context
     const { pendingEdit, clearEdit, pendingRegenerate, clearRegenerate } = useEditMessage()
 
-    useEffect(() => {
-        if (textareaRef.current) {
-            textareaRef.current.style.height = "auto"
-            textareaRef.current.style.height = `${textareaRef.current.scrollHeight}px`
+    // ── @mention helpers ────────────────────────────────────────────────────
+    const getFolderPath = useCallback((folderId: string): string => {
+        const folder = fetchedFolders.find(f => f.id === folderId);
+        if (!folder) return "/";
+        if (!folder.parent_id) return `/${folder.name}`;
+        return `${getFolderPath(folder.parent_id)}/${folder.name}`;
+    }, [fetchedFolders]);
+
+    // ── @mention derived data ───────────────────────────────────────────────
+    const allMentionItems = useMemo<MentionItem[]>(() => [
+        ...fetchedNotes.map(n => ({ id: n.id, title: n.title, type: "note" as const })),
+        ...fetchedFolders.map(f => ({ id: f.id, title: f.name, path: getFolderPath(f.id), color: f.color, type: "folder" as const })),
+    ], [fetchedNotes, fetchedFolders])
+
+    const mentionSuggestions = useMemo<MentionItem[]>(() => {
+        if (mentionQuery === null) return []
+        const q = mentionQuery.toLowerCase()
+        return allMentionItems
+            .filter(item => item.title.toLowerCase().includes(q))
+            .slice(0, 8)
+    }, [mentionQuery, allMentionItems])
+
+    // Sync highlighted index when suggestions change
+    useEffect(() => { setMentionIndex(0) }, [mentionSuggestions])
+
+    // ── @mention helpers ────────────────────────────────────────────────────
+    const closeMention = useCallback(() => {
+        setMentionQuery(null)
+        setMentionStart(-1)
+    }, [])
+
+    /** Extract plain text from the contenteditable div, normalising <br> → \n */
+    const getEditorText = useCallback((): string => {
+        const el = editorRef.current
+        if (!el) return ""
+        const walk = (node: Node): string => {
+            if (node.nodeType === Node.TEXT_NODE) return node.textContent ?? ""
+            if ((node as Element).tagName === "BR") return "\n"
+            return Array.from(node.childNodes).map(walk).join("")
         }
-    }, [content])
+        return walk(el)
+    }, [])
+
+    /** Get the flat character offset of the current caret inside the editor div */
+    const getCaretOffset = useCallback((): number => {
+        const el = editorRef.current
+        if (!el) return 0
+        const sel = window.getSelection()
+        if (!sel || sel.rangeCount === 0) return 0
+        const range = sel.getRangeAt(0).cloneRange()
+        range.selectNodeContents(el)
+        range.setEnd(sel.getRangeAt(0).endContainer, sel.getRangeAt(0).endOffset)
+        return range.toString().length
+    }, [])
+
+    /**
+     * confirmMention — uses TreeWalker to locate the @query boundaries.
+     * TreeWalker(SHOW_TEXT) visits every text node in document order, making
+     * character counting consistent with getCaretOffset() (which uses range.toString()).
+     */
+    const confirmMention = useCallback((item: MentionItem) => {
+        const el = editorRef.current
+        if (!el) return
+
+        const caretPos = getCaretOffset()
+        // mentionStart is the flat-text offset of "@"
+        // caretPos is where the user's cursor is (right after the query)
+
+        // Walk all text nodes in DOM order and find the boundary nodes
+        const walker = document.createTreeWalker(el, NodeFilter.SHOW_TEXT)
+        let charCount = 0
+        let startNode: Text | null = null
+        let startOffset = 0
+        let endNode: Text | null = null
+        let endOffset = 0
+
+        let node = walker.nextNode() as Text | null
+        while (node) {
+            const len = node.textContent?.length ?? 0
+
+            if (!startNode && charCount + len > mentionStart) {
+                startNode = node
+                startOffset = mentionStart - charCount
+            }
+
+            if (!endNode && charCount + len >= caretPos) {
+                endNode = node
+                endOffset = caretPos - charCount
+                break // both found
+            }
+
+            charCount += len
+            node = walker.nextNode() as Text | null
+        }
+
+        // If start wasn't found yet but end was (edge: @ is at very end), use endNode
+        if (!startNode && endNode) {
+            startNode = endNode
+            startOffset = Math.max(0, endOffset - (caretPos - mentionStart))
+        }
+
+        if (!startNode || !endNode) return
+
+        // Clamp offsets to be safe
+        startOffset = Math.min(startOffset, startNode.length)
+        endOffset = Math.min(endOffset, endNode.length)
+
+        // Delete the @query from the DOM
+        const range = document.createRange()
+        range.setStart(startNode, startOffset)
+        range.setEnd(endNode, endOffset)
+        range.deleteContents()
+
+        // Build the chip span (contentEditable=false → caret jumps over it atomically)
+        const chip = document.createElement("span")
+        chip.className = "mention-token"
+        chip.contentEditable = "false"
+        chip.textContent = `@${item.title}`
+        chip.dataset.mentionId = item.id
+        chip.dataset.mentionType = item.type
+        chip.onclick = () => {
+            if (item.type === "note") {
+                openTab({ type: "note", title: item.title, noteId: item.id })
+            } else if (item.type === "folder") {
+                openTab({ type: "folder", title: item.title, location: item.path || "/" })
+            }
+        }
+
+        // Trailing non-breaking space so the caret can land after the chip
+        const space = document.createTextNode("\u00A0")
+
+        // Insert at the now-collapsed range position
+        range.insertNode(space)
+        range.insertNode(chip)
+
+        // Place caret after the space
+        const sel = window.getSelection()
+        if (sel) {
+            const newRange = document.createRange()
+            newRange.setStartAfter(space)
+            newRange.collapse(true)
+            sel.removeAllRanges()
+            sel.addRange(newRange)
+        }
+
+        setContent(getEditorText())
+        closeMention()
+        editorRef.current?.focus()
+    }, [mentionStart, closeMention, getEditorText, getCaretOffset])
 
     useEffect(() => {
         if (activeTab?.type === "chat") {
-            textareaRef.current?.focus()
+            editorRef.current?.focus()
         }
     }, [activeTab])
 
@@ -173,8 +325,11 @@ export default function ChatMessageInput({ attachments, setAttachments }: ChatMe
     // Deletion happens only when the user actually sends.
     useEffect(() => {
         if (!pendingEdit) return;
+        if (editorRef.current) {
+            editorRef.current.innerText = pendingEdit.content
+        }
         setContent(pendingEdit.content);
-        setTimeout(() => textareaRef.current?.focus(), 50);
+        setTimeout(() => editorRef.current?.focus(), 50);
     }, [pendingEdit]); // intentionally narrow dep — only fires when a new edit is requested
 
     // update chat name
@@ -411,7 +566,7 @@ export default function ChatMessageInput({ attachments, setAttachments }: ChatMe
     // handle send function of the input
     const handleSend = async () => {
         if ((content.trim() === "" && attachments.length === 0) || isLoading) return;
-        textareaRef.current?.focus()
+        editorRef.current?.focus()
 
         setIsLoading(true);
         const controller = new AbortController();
@@ -484,6 +639,7 @@ export default function ChatMessageInput({ attachments, setAttachments }: ChatMe
 
             const currentContent = content;
             setContent("");
+            if (editorRef.current) editorRef.current.innerHTML = ""
             setAttachments([]);
 
             // 3. Prepare Assistant placeholder
@@ -1138,7 +1294,7 @@ export default function ChatMessageInput({ attachments, setAttachments }: ChatMe
 
             if (e.ctrlKey && key === "o" && e.shiftKey && !e.altKey) {
                 e.preventDefault();
-                textareaRef.current?.focus();
+                editorRef.current?.focus();
             }
         };
 
@@ -1155,7 +1311,7 @@ export default function ChatMessageInput({ attachments, setAttachments }: ChatMe
                         <Edit size={12} className="text-primary" />
                         <span>Editing message</span>
                         <button
-                            onClick={() => { clearEdit(); setContent(""); }}
+                            onClick={() => { clearEdit(); setContent(""); if (editorRef.current) editorRef.current.innerHTML = ""; }}
                             className="ml-1 flex items-center justify-center rounded-full hover:text-foreground transition-colors"
                             aria-label="Cancel edit"
                         >
@@ -1254,21 +1410,125 @@ export default function ChatMessageInput({ attachments, setAttachments }: ChatMe
                             )}
                         </div>
                     ) : (
-                        <textarea
-                            ref={textareaRef}
-                            className="w-full resize-none bg-transparent py-3 focus:outline-none outline-none scrollbar-no-bg max-h-[156px] overflow-y-auto"
-                            placeholder="Ask Orthan AI anything..."
-                            maxLength={100000}
-                            rows={1}
-                            value={content}
-                            onChange={(e) => setContent(e.target.value)}
-                            onKeyDown={(e) => {
-                                if (e.key === "Enter" && !e.shiftKey) {
+                        <div className="relative w-full">
+                            {/* Single contenteditable div — no mirror needed */}
+                            <div
+                                ref={editorRef}
+                                contentEditable
+                                suppressContentEditableWarning
+                                role="textbox"
+                                aria-multiline="true"
+                                aria-label="Ask Orthan AI anything..."
+                                data-placeholder="Ask Orthan AI anything..."
+                                className="mention-editor w-full focus:outline-none outline-none scrollbar-no-bg"
+                                onInput={(e) => {
+                                    const el = e.currentTarget
+                                    const walk = (node: Node): string => {
+                                        if (node.nodeType === Node.TEXT_NODE) return node.textContent ?? ""
+                                        if ((node as Element).tagName === "BR") return "\n"
+                                        // For mention-token spans, return their text as-is
+                                        if ((node as HTMLElement).classList?.contains("mention-token")) return node.textContent ?? ""
+                                        return Array.from(node.childNodes).map(walk).join("")
+                                    }
+                                    const text = walk(el)
+                                    setContent(text)
+
+                                    // Detect @mention trigger using caret offset
+                                    const sel = window.getSelection()
+                                    if (!sel || sel.rangeCount === 0) return
+                                    const range = sel.getRangeAt(0).cloneRange()
+                                    range.selectNodeContents(el)
+                                    range.setEnd(sel.getRangeAt(0).endContainer, sel.getRangeAt(0).endOffset)
+                                    const caretOffset = range.toString().length
+
+                                    const slice = text.slice(0, caretOffset)
+                                    const match = slice.match(/@([\w\s.-]*)$/)
+                                    if (match) {
+                                        const atPos = caretOffset - match[0].length
+                                        setMentionStart(atPos)
+                                        setMentionQuery(match[1])
+                                    } else {
+                                        closeMention()
+                                    }
+                                }}
+                                onKeyDown={(e) => {
+                                    // @mention navigation
+                                    if (mentionQuery !== null && mentionSuggestions.length > 0) {
+                                        if (e.key === "ArrowDown") {
+                                            e.preventDefault()
+                                            setMentionIndex(i => (i + 1) % mentionSuggestions.length)
+                                            return
+                                        }
+                                        if (e.key === "ArrowUp") {
+                                            e.preventDefault()
+                                            setMentionIndex(i => (i - 1 + mentionSuggestions.length) % mentionSuggestions.length)
+                                            return
+                                        }
+                                        if (e.key === "Tab" || e.key === "Enter") {
+                                            e.preventDefault()
+                                            confirmMention(mentionSuggestions[mentionIndex])
+                                            return
+                                        }
+                                        if (e.key === "Escape") {
+                                            e.preventDefault()
+                                            closeMention()
+                                            return
+                                        }
+                                    }
+
+                                    if (e.key === "Enter" && !e.shiftKey) {
+                                        e.preventDefault()
+                                        handleSend()
+                                        return
+                                    }
+                                    // Shift+Enter inserts a newline naturally
+                                }}
+                                onBlur={() => {
+                                    // Brief delay so click on suggestion registers first
+                                    setTimeout(() => closeMention(), 150)
+                                }}
+                                onPaste={(e) => {
+                                    // Strip HTML on paste — insert plain text only
                                     e.preventDefault()
-                                    handleSend()
-                                }
-                            }}
-                        />
+                                    const text = e.clipboardData.getData("text/plain")
+                                    document.execCommand("insertText", false, text)
+                                }}
+                            />
+                            {/* @mention suggestion dropdown */}
+                            {mentionQuery !== null && mentionSuggestions.length > 0 && (
+                                <div
+                                    ref={mentionListRef}
+                                    className="mention-suggestions"
+                                    role="listbox"
+                                >
+                                    <p className="mention-suggestions-label">Notes &amp; Folders</p>
+                                    {mentionSuggestions.map((item, idx) => (
+                                        <div
+                                            key={item.id}
+                                            role="option"
+                                            aria-selected={idx === mentionIndex}
+                                            className={cn(
+                                                "mention-suggestion-item",
+                                                idx === mentionIndex && "mention-suggestion-item--active"
+                                            )}
+                                            onMouseDown={(e) => {
+                                                e.preventDefault() // prevent blur
+                                                confirmMention(item)
+                                            }}
+                                            onMouseEnter={() => setMentionIndex(idx)}
+                                        >
+                                            {item.type === "note"
+                                                ? <FileText size={13} className="mention-suggestion-icon mention-suggestion-icon--note" />
+                                                : <Folder size={13} className="mention-suggestion-icon mention-suggestion-icon--folder" />
+                                            }
+                                            <span className="mention-suggestion-title">{item.title}</span>
+                                            <span className="mention-suggestion-type">{item.type}</span>
+                                        </div>
+                                    ))}
+                                    <p className="mention-suggestions-hint"><kbd>Tab</kbd> to confirm · <kbd>↑↓</kbd> to navigate · <kbd>Esc</kbd> to dismiss</p>
+                                </div>
+                            )}
+                        </div>
                     )}
                     <div className="flex items-center pb-1 gap-1">
                         <Popover open={isSelectingModelPopoverOpen}>

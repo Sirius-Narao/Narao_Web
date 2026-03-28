@@ -28,13 +28,27 @@ interface MarkdownRendererProps {
 }
 
 export function MarkdownRenderer({ content, className = "" }: MarkdownRendererProps) {
+    // Unescape double backslashes outside of code blocks so that LaTeX
+    // stored as \\cdot (JSON-escaped) renders correctly as \cdot for KaTeX.
+    // Split on fenced code blocks, unescape only in non-code segments.
+    const unescapeOutsideCode = (str: string): string => {
+        const parts = str.split(/(```[\s\S]*?```|`[^`]*`)/g);
+        return parts.map((part, i) =>
+            i % 2 === 0 ? part.replace(/\\\\/g, '\\') : part
+        ).join('');
+    };
+
     // Normalize LaTeX-style delimiters \[ \] and \( \) to $$ and $
-    // We use a function to avoid replacing delimiters inside code blocks if they are already strings
-    const processedContent = content
+    // Also expand inline $$...$$ (e.g. inside list items) into block display math.
+    // remark-math only recognises display math when $$ is on its own line/block.
+    const processedContent = unescapeOutsideCode(content)
         .replace(/\\\[/g, '\n$$\n')
         .replace(/\\\]/g, '\n$$\n')
         .replace(/\\\(/g, '$')
-        .replace(/\\\)/g, '$');
+        .replace(/\\\)/g, '$')
+        // Convert inline $$...$$ → proper display-math blocks.
+        // Match $$ not already on their own line (greedy=false, no newlines inside).
+        .replace(/\$\$([^$\n]+?)\$\$/g, '\n\n$$\n$1\n$$\n\n');
 
     return (
         <div className={`markdown-content ${className}`}>
