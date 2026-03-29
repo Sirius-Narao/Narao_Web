@@ -3,6 +3,7 @@ import { Alan_Sans, Fira_Mono } from "next/font/google";
 import "./globals.css";
 import { ThemeProvider } from "@/components/theme-provider";
 import { Toaster } from "@/components/ui/sonner";
+import { SettingsProvider } from "@/context/settingsContext";
 
 const alanSans = Alan_Sans({
   variable: "--font-alan-sans",
@@ -53,15 +54,12 @@ export default function RootLayout({
       <body
         className={`${alanSans.variable} ${firaMono.variable} antialiased `}
       >
-        <ThemeProvider
-          attribute="class"
-          defaultTheme="system"
-          enableSystem
-          disableTransitionOnChange
-        >
-          {children}
-          <Toaster />
-        </ThemeProvider>
+        <SettingsProvider>
+          <ThemeProvider>
+            {children}
+            <Toaster />
+          </ThemeProvider>
+        </SettingsProvider>
       </body>
     </html>
   );

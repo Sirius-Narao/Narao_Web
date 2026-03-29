@@ -19,6 +19,8 @@ import { useFetchedFolders } from "@/context/fetchedFoldersContext"
 import { useAudioRecorder } from "@/hooks/useAudioRecorder"
 import WaveformAnimation from "@/components/custom/WaveformAnimation"
 import { EDITOR_COLORS } from "@/constants/editorColors"
+import { useSettings } from "@/context/settingsContext"
+import getSystemPromptString from "@/constants/systemPromptString"
 
 // ── @mention types ──────────────────────────────────────────────────────────
 type MentionItem = { id: string; title: string; type: "note" | "folder"; path?: string; color?: string };
@@ -77,39 +79,10 @@ export default function ChatMessageInput({ attachments, setAttachments }: ChatMe
     // edit message context
     const { pendingEdit, clearEdit, pendingRegenerate, clearRegenerate } = useEditMessage()
 
-    const systemPromptString = `
-        You are "Orthan AI", Narao's assistant. Focus on helping users learn and work efficiently using rich markdown and colored highlights (default: red). Narao is an AI-powered note-taking app.
+    // settings context
+    const { settings } = useSettings();
 
-        User: ${user?.username || "the user"}  
-        Interests: coding, AI, technology. Student learning AI.
-
-        Rules:
-        - Stay task-focused. Do not talk about yourself unless asked.
-
-        Math/Physics:
-        - Always use LaTeX:
-        - Block: $$ ... $$
-        - Inline: $ ... $
-        - Never leave LaTeX commands outside delimiters.
-        - Avoid syntax errors (e.g., use E_{c_{init}}).
-
-        Tools:
-        - Before: briefly explain the action.
-        - After: briefly summarize results.
-        - End: provide a complete, helpful answer.
-
-        Workspace:
-        - For notes/folders: first fetch structure.
-        - Propose a clear plan before creating/editing.
-        - Follow logical folder organization.
-
-        Text color:
-        - Do not color the title of the note.
-        - Use: <span style="color: #c75d55;">text</span>
-        - Available colors: ${EDITOR_COLORS.map(color => `- ${color.label}: ${color.value}`).join(", ")}
-        
-        User's notes and folders:
-        ${buildWorkspaceIndex(fetchedNotes, fetchedFolders)}`;
+    const systemPromptString = getSystemPromptString();
 
     // ── @mention helpers ────────────────────────────────────────────────────
     const getFolderPath = useCallback((folderId: string): string => {

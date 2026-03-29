@@ -33,7 +33,7 @@ export default function MainArea() {
     const { setCurrentChatId, setChatMessages, setChatTitle } = useChatMessages();
     const { setContent } = useContent();
 
-    const { tabs, activeTab, openTab, closeTab, activeTabId } = useTabs();
+    const { tabs, activeTab, openTab, closeTab, activeTabId, setActiveTabId } = useTabs();
 
     // Per-tab state: note/note open state tracked locally per folder tab
     const [accessedNote, setAccessedNote] = useState<Note | null>(null);
@@ -142,6 +142,24 @@ export default function MainArea() {
         setChatTitle("New Chat");
     }, [openTab, setCurrentChatId, setChatMessages, setChatTitle, tabs.length]);
 
+    const openPreviousTab = useCallback(() => {
+        if (activeTabId) {
+            const index = tabs.findIndex(t => t.id === activeTabId);
+            if (index > 0) {
+                setActiveTabId(tabs[index - 1].id);
+            }
+        }
+    }, [activeTabId, setActiveTabId, tabs]);
+
+    const openNextTab = useCallback(() => {
+        if (activeTabId) {
+            const index = tabs.findIndex(t => t.id === activeTabId);
+            if (index < tabs.length - 1) {
+                setActiveTabId(tabs[index + 1].id);
+            }
+        }
+    }, [activeTabId, setActiveTabId, tabs]);
+
     // ─── Global Shortcuts ────────────────────────────────────────────────────
     useEffect(() => {
         const handleKeyDown = (e: KeyboardEvent) => {
@@ -163,11 +181,21 @@ export default function MainArea() {
                 if (activeTabId) {
                     closeTab(activeTabId);
                 }
+            } else if (e.ctrlKey && e.key === "ArrowLeft" && e.shiftKey) {
+                e.preventDefault();
+                if (activeTabId) {
+                    openPreviousTab();
+                }
+            } else if (e.ctrlKey && e.key === "ArrowRight" && e.shiftKey) {
+                e.preventDefault();
+                if (activeTabId) {
+                    openNextTab();
+                }
             }
         };
         window.addEventListener("keydown", handleKeyDown);
         return () => window.removeEventListener("keydown", handleKeyDown);
-    }, [activeTabId, closeTab, setSettingsOpen, handleNewChat, handleNewNote, handleOpenFolders]);
+    }, [activeTabId, closeTab, setSettingsOpen, handleNewChat, handleNewNote, handleOpenFolders, openPreviousTab, openNextTab]);
 
     useEffect(() => {
         if (!activeTab) {

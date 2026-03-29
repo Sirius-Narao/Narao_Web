@@ -2,7 +2,7 @@
 
 import { Sidebar, SidebarContent, SidebarHeader, SidebarTrigger, SidebarFooter, useSidebar } from "@/components/ui/sidebar";
 import Image from "next/image";
-import { User, Settings, X, Sun, Bot, Tags, ArrowUpLeft } from "lucide-react";
+import { User, Settings as SettingsIcon, X, Sun, Bot, Tags, ArrowUpLeft } from "lucide-react";
 import { AnimatePresence, motion } from "framer-motion";
 import { Button } from "@/components/ui/button";
 import { cn } from "@/lib/utils";
@@ -26,6 +26,11 @@ import ProfileType from "@/types/profileType";
 import { Skeleton } from "@/components/ui/skeleton";
 import AnnounceType from "@/types/announceType";
 import { useSettingsOpen } from "@/context/settingOpenContext";
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
+import { Language, Settings, Theme } from "@/types/settingsType";
+import { Input } from "@/components/ui/input";
+import { Textarea } from "@/components/ui/textarea";
+import { useSettings } from "@/context/settingsContext";
 
 export default function SidebarArea() {
     const [userAuth, setUserAuth] = useState<any>(null);
@@ -36,6 +41,12 @@ export default function SidebarArea() {
     const { state } = useSidebar();
     const [settingsTab, setSettingsTab] = useState(0);
     const { settingsOpen, setSettingsOpen } = useSettingsOpen();
+
+    // settings state
+    const { settings, setSettings } = useSettings();
+    const [tempSettings, setTempSettings] = useState<Settings>(settings);
+
+    const [tempPseudo, setTempPseudo] = useState("");
 
     // auth fetch
     useEffect(() => {
@@ -59,6 +70,27 @@ export default function SidebarArea() {
                 console.error(error);
             }
             setUser(profiles?.[0]);
+            setTempPseudo(profiles?.[0].username || "");
+            setSettings(profiles?.[0].settings || {
+                theme: "system",
+                language: "en",
+                customInstructions: {
+                    aboutUser: "",
+                    customPrompt: "",
+                },
+                plan: "free",
+                aiName: "Narao AI",
+            });
+            setTempSettings(profiles?.[0].settings || {
+                theme: "system",
+                language: "en",
+                customInstructions: {
+                    aboutUser: "",
+                    customPrompt: "",
+                },
+                plan: "free",
+                aiName: "Narao AI",
+            });
         };
         fetchUsers();
     }, [userAuth]);
@@ -78,6 +110,20 @@ export default function SidebarArea() {
         };
         fetchAnnounces();
     }, []);
+
+    // update settings
+    const updateSettings = async () => {
+        if (!user) return;
+        const { error } = await supabase
+            .from('profiles')
+            .update({ settings: tempSettings })
+            .eq('id', user.id);
+
+        if (error) {
+            console.error(error);
+        }
+        setSettings(tempSettings);
+    };
 
 
     return (
@@ -176,7 +222,7 @@ export default function SidebarArea() {
                                     {user?.username}
                                 </span> : <Skeleton className="w-full h-full rounded-full" />}
                                 <div className="flex items-center justify-end w-24">
-                                    <Settings size={24} className="group-data-[state=collapsed]:hidden w-full transition-all duration-200" />
+                                    <SettingsIcon size={24} className="group-data-[state=collapsed]:hidden w-full transition-all duration-200" />
                                 </div>
                             </Button>
                         </TooltipTrigger>
@@ -191,34 +237,30 @@ export default function SidebarArea() {
                         <div className="col-span-1 h-full flex flex-col gap-2 relative">
                             <div className={cn("flex items-center justify-center w-full gap-2 p-4 py-2 rounded-lg border border-sidebar-border hover:bg-card/50 cursor-pointer transition-all duration-200 text-left justify-start ", settingsTab === 0 && "bg-card hover:bg-card")}
                                 onClick={() => { setSettingsTab(0) }}>
-                                <Sun size={20} />
+                                <Sun size={16} />
                                 <p className="text-sm font-medium">Preferences</p>
                             </div>
                             <div className={cn("flex items-center justify-center w-full gap-2 p-4 py-2 rounded-lg border border-sidebar-border hover:bg-card/50 cursor-pointer transition-all duration-200 text-left justify-start ", settingsTab === 1 && "bg-card hover:bg-card")}
                                 onClick={() => { setSettingsTab(1) }}>
-                                <User size={20} />
+                                <User size={16} />
                                 <p className="text-sm font-medium">Account</p>
                             </div>
                             <div className={cn("flex items-center justify-center w-full gap-2 p-4 py-2 rounded-lg border border-sidebar-border hover:bg-card/50 cursor-pointer transition-all duration-200 text-left justify-start ", settingsTab === 2 && "bg-card hover:bg-card")}
                                 onClick={() => { setSettingsTab(2) }}>
-                                <Bot size={20} />
+                                <Bot size={16} />
                                 <p className="text-sm font-medium">AI Settings</p>
                             </div>
                             <div className={cn("flex items-center justify-center w-full gap-2 p-4 py-2 rounded-lg border border-sidebar-border hover:bg-card/50 cursor-pointer transition-all duration-200 text-left justify-start ", settingsTab === 3 && "bg-card hover:bg-card")}
                                 onClick={() => { setSettingsTab(3) }}>
-                                <Tags size={20} />
+                                <Tags size={16} />
                                 <p className="text-sm font-medium">Categories</p>
                             </div>
                             <div className={cn("flex items-center justify-center w-full gap-2 p-4 py-2 rounded-lg border bg-card border-sidebar-border hover:bg-card/50 cursor-pointer transition-all duration-200 text-left justify-start absolute bottom-0 left-0 right-0 ")}
                                 // We want it to link to the about page
                                 onClick={() => { }}>
-                                <ArrowUpLeft size={20} />
+                                <ArrowUpLeft size={16} />
                                 <p className="text-sm font-medium">About</p>
                             </div>
-                            {/* <div className={cn("flex items-center justify-center w-full gap-2 p-4 py-2 rounded-lg border bg-primary border-sidebar-border hover:bg-primary/80 cursor-pointer transition-all duration-200 text-left justify-start text-primary-foreground absolute bottom-0 left-0 right-0 ")}>
-                                <Star size={20} />
-                                <p className="text-sm font-medium">Try Narao Pro!</p>
-                            </div> */}
                         </div>
                         <div className="col-span-4 flex flex-col h-full relative px-4">
                             <DialogHeader>
@@ -227,7 +269,140 @@ export default function SidebarArea() {
                                     {settingsTab === 0 ? "Manage your workspace preferences." : settingsTab === 1 ? "Manage your workspace account." : settingsTab === 2 ? "Manage your workspace AI settings." : "Manage your workspace categories."}
                                 </DialogDescription>
                             </DialogHeader>
-                            <p className="text-center text-muted-foreground h-52 flex items-center justify-center">SOON TO COME</p>
+
+                            {settingsTab === 0 && (
+                                <div className="flex flex-col py-6">
+                                    <div className="flex gap-2 justify-between items-center border-t border-b border-border py-4">
+                                        <p className="text-sm font-medium">Appearance</p>
+                                        <Select
+                                            value={tempSettings.theme}
+                                            onValueChange={(value: string) => {
+                                                setTempSettings({
+                                                    ...tempSettings,
+                                                    theme: value as Theme,
+                                                });
+                                            }}
+
+                                        >
+                                            <SelectTrigger className="bg-transparent! border-none hover:bg-card!">
+                                                <SelectValue placeholder="Theme" />
+                                            </SelectTrigger>
+                                            <SelectContent>
+                                                <SelectItem value="light">Light</SelectItem>
+                                                <SelectItem value="dark">Dark</SelectItem>
+                                                <SelectItem value="system">System</SelectItem>
+                                            </SelectContent>
+                                        </Select>
+                                    </div>
+                                    <div className="flex gap-2 justify-between items-center py-4">
+                                        <div className="flex flex-col">
+                                            <p className="text-sm font-medium">Default Language</p>
+                                            <p className="text-xs text-muted-foreground">Check this setting for more relevant responses from the AI.</p>
+                                        </div>
+                                        <Select
+                                            value={tempSettings.language}
+                                            onValueChange={(value: string) => {
+                                                setTempSettings({
+                                                    ...tempSettings,
+                                                    language: value as Language,
+                                                });
+                                            }}
+                                        >
+                                            <SelectTrigger className="bg-transparent! border-none hover:bg-card!">
+                                                <SelectValue placeholder="Language" />
+                                            </SelectTrigger>
+                                            <SelectContent>
+                                                <SelectItem value="en">English</SelectItem>
+                                                <SelectItem value="es">Español</SelectItem>
+                                                <SelectItem value="fr">Français</SelectItem>
+                                                <SelectItem value="de">Deutsch</SelectItem>
+                                                <SelectItem value="it">Italiano</SelectItem>
+                                                <SelectItem value="pt">Português</SelectItem>
+                                                <SelectItem value="ru">Русский</SelectItem>
+                                                <SelectItem value="zh">中文</SelectItem>
+                                                <SelectItem value="ja">日本語</SelectItem>
+                                                <SelectItem value="ko">한국어</SelectItem>
+                                            </SelectContent>
+                                        </Select>
+                                    </div>
+                                </div>
+                            )}
+                            {settingsTab === 1 && (
+                                <div className="flex flex-col py-6">
+                                    <div className="flex flex-col gap-2 border-t border-b border-border py-4">
+                                        <p className="text-sm font-medium">Username</p>
+                                        <Input
+                                            className="w-full focus-visible:border-primary focus-visible:ring-none focus-visible:ring-[0px]!"
+                                            value={tempPseudo}
+                                            onChange={(e) => {
+                                                setTempPseudo(e.target.value);
+                                            }}
+                                            onBlur={() => { if (!tempPseudo) setTempPseudo(user?.username || "") }}
+                                        />
+                                    </div>
+                                    <div className="flex gap-2 py-4 justify-between items-center">
+                                        <p className="text-sm font-medium">Email</p>
+                                        <Tooltip>
+                                            <TooltipTrigger asChild>
+                                                <Button variant="ghost" className="text-sm font-medium text-muted-foreground">
+                                                    <ArrowUpLeft size={16} />
+                                                    {userAuth?.email}
+                                                </Button>
+                                            </TooltipTrigger>
+                                            <TooltipContent side="bottom">
+                                                <p>Change email</p>
+                                            </TooltipContent>
+                                        </Tooltip>
+                                    </div>
+                                </div>
+                            )}
+                            {settingsTab === 2 && (
+                                <div className="flex flex-col py-6">
+                                    <div className="flex flex-col gap-2 border-t border-b border-border py-4">
+                                        <p className="text-sm font-medium">AI name</p>
+                                        <Input
+                                            className="w-full focus-visible:border-primary focus-visible:ring-none focus-visible:ring-[0px]! selection:bg-primary"
+                                            value={tempSettings.aiName}
+                                            onChange={(e) => {
+                                                setTempSettings({ ...tempSettings, aiName: e.target.value });
+                                            }}
+                                            onBlur={() => { if (!tempSettings.aiName) setTempSettings({ ...tempSettings, aiName: "OrthanAI" }) }}
+                                        />
+                                    </div>
+
+                                    <div className="flex flex-col gap-2 border-b border-border py-4">
+                                        <div className="flex flex-col">
+                                            <p className="text-sm font-medium">Custom Instructions</p>
+                                            <p className="text-xs text-muted-foreground">Give the AI instructions on how to respond to you.</p>
+                                        </div>
+                                        <Textarea
+                                            maxLength={500}
+                                            className="w-full focus-visible:border-primary focus-visible:ring-none focus-visible:ring-[0px]! resize-none h-24 scrollbar-hide selection:bg-primary/50"
+                                            value={tempSettings.customInstructions.customPrompt}
+                                            onChange={(e) => {
+                                                setTempSettings({ ...tempSettings, customInstructions: { ...tempSettings.customInstructions, customPrompt: e.target.value } });
+                                            }}
+                                            onBlur={() => { if (!tempSettings.customInstructions.customPrompt) setTempSettings({ ...tempSettings, customInstructions: { ...tempSettings.customInstructions, customPrompt: "" } }) }}
+                                        />
+                                    </div>
+                                    <div className="flex flex-col gap-2 py-4">
+                                        <div className="flex flex-col">
+                                            <p className="text-sm font-medium">About you</p>
+                                            <p className="text-xs text-muted-foreground">Tell the AI about yourself to get answers tailored to you.</p>
+                                        </div>
+                                        <Textarea
+                                            maxLength={500}
+                                            className="w-full focus-visible:border-primary focus-visible:ring-none focus-visible:ring-[0px]! resize-none h-24 scrollbar-hide selection:bg-primary/50"
+                                            value={tempSettings.customInstructions.aboutUser}
+                                            onChange={(e) => {
+                                                setTempSettings({ ...tempSettings, customInstructions: { ...tempSettings.customInstructions, aboutUser: e.target.value } });
+                                            }}
+                                            onBlur={() => { if (!tempSettings.customInstructions.aboutUser) setTempSettings({ ...tempSettings, customInstructions: { ...tempSettings.customInstructions, aboutUser: "" } }) }}
+                                        />
+                                        <p className="text-xs text-muted-foreground">*Max 500 characters.</p>
+                                    </div>
+                                </div>
+                            )}
 
                             {/* For spacing */}
                             <div className="h-24"></div>
@@ -236,7 +411,7 @@ export default function SidebarArea() {
                                 <DialogClose asChild>
                                     <Button variant="ghost" onClick={() => setSettingsOpen(false)}>Close</Button>
                                 </DialogClose>
-                                <Button variant="default" onClick={() => setSettingsOpen(false)}>Save Changes</Button>
+                                <Button variant="default" onClick={() => { updateSettings(); setSettingsOpen(false); }}>Save Changes</Button>
                             </DialogFooter>
                         </div>
                     </DialogContent>

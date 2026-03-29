@@ -15,7 +15,7 @@ import { IsLoadingProvider } from "@/context/isLoadingContext";
 
 export default function Workspace() {
     return (
-        <div className="bg-background h-screen w-screen relative">
+        <div className="bg-background h-screen w-screen relative selection:bg-primary/50">
 
             <SidebarProvider>
                 <TabsProvider>
