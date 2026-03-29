@@ -7,7 +7,7 @@ import { useContent } from "@/context/contentContext";
 import { useChatMessages } from "@/context/chatMessagesContext";
 import { useSidebar } from "@/components/ui/sidebar";
 import { supabase } from "@/lib/supabaseClient";
-import { useEffect, useRef, useState } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
 import { Input } from "@/components/ui/input";
 import { toast } from "sonner";
 import { ChatType } from "@/types/chatType";
@@ -30,7 +30,7 @@ export default function ChatsTab({ initialChatId }: ChatsTabProps) {
     const { state, setOpen } = useSidebar();
     const { user } = useUser();
     const { chatTitle, setChatTitle, setChatMessages, currentChatId, setCurrentChatId, refreshTrigger, refreshChats } = useChatMessages();
-    const { activeTabId, updateTabTitle, updateTabChatId } = useTabs();
+    const { activeTabId, updateTabTitle, updateTabChatId, openTab, tabs } = useTabs();
     const [isRenamingChat, setIsRenamingChat] = useState(false);
     const [tempChatTitle, setTempChatTitle] = useState(chatTitle);
     const [chats, setChats] = useState<ChatType[]>([]);
@@ -133,6 +133,16 @@ export default function ChatsTab({ initialChatId }: ChatsTabProps) {
             refreshChats();
         }
     };
+    const handleNewChat = useCallback(() => {
+        if (tabs.length < 24) {
+            openTab({ type: "chat", title: "New Chat" });
+        } else {
+            toast.error("Too many tabs open", { position: 'bottom-right' });
+        }
+        setCurrentChatId(null);
+        setChatMessages([]);
+        setChatTitle("New Chat");
+    }, [openTab, setCurrentChatId, setChatMessages, setChatTitle, tabs.length]);
 
     // Fetch chats data
     useEffect(() => {
@@ -196,7 +206,7 @@ export default function ChatsTab({ initialChatId }: ChatsTabProps) {
             <div className="absolute right-2 flex items-center gap-1 rounded-3xl p-1 mt-1 z-50 bg-popover/40 backdrop-blur-md shadow-lg">
                 <Tooltip>
                     <TooltipTrigger asChild>
-                        <Button variant="ghost" className="w-10 h-10 p-0 rounded-full">
+                        <Button variant="ghost" className="w-10 h-10 p-0 rounded-full" onClick={() => handleNewChat()}>
                             <PenSquare size={24} color="white" />
                         </Button>
                     </TooltipTrigger>
@@ -229,7 +239,7 @@ export default function ChatsTab({ initialChatId }: ChatsTabProps) {
                         </DropdownMenuItem >
                         <DropdownMenuItem
                             className="text-destructive focus:text-destructive focus:bg-destructive/10 cursor-pointer"
-                            onClick={(e) => { }}
+                            onClick={(e) => handleDeleteChat(e, currentChatId!)}
                         >
                             <Trash2 size={16} className="text-destructive" />
                             Delete Chat

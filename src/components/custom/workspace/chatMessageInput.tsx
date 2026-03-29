@@ -13,7 +13,7 @@ import { useTabs } from "@/context/tabsContext"
 import { useIsLoading } from "@/context/isLoadingContext"
 import { useEditMessage } from "@/context/editMessageContext"
 import { cn } from "@/lib/utils"
-import { WORKSPACE_TOOL_DECLARATIONS, executeToolCall } from "@/lib/workspaceTools"
+import { WORKSPACE_TOOL_DECLARATIONS, buildWorkspaceIndex, executeToolCall } from "@/lib/workspaceTools"
 import { useFetchedNotes } from "@/context/fetchedNotesContext"
 import { useFetchedFolders } from "@/context/fetchedFoldersContext"
 import { useAudioRecorder } from "@/hooks/useAudioRecorder"
@@ -60,6 +60,23 @@ export default function ChatMessageInput({ attachments, setAttachments }: ChatMe
 
     // user context
     const { user } = useUser();
+
+    // Workspace contexts for tool execution
+    const { fetchedNotes, setFetchedNotes } = useFetchedNotes();
+    const { fetchedFolders, setFetchedFolders } = useFetchedFolders();
+
+    // Model Settings
+    const [currentModel, setCurrentModel] = useState<keyof Models>("gemini-2.5-flash")
+
+    // Popover Settings
+    const [isSelectingModelPopoverOpen, setIsSelectingModelPopoverOpen] = useState(false)
+
+    // active tab
+    const { activeTab, openTab } = useTabs()
+
+    // edit message context
+    const { pendingEdit, clearEdit, pendingRegenerate, clearRegenerate } = useEditMessage()
+
     const systemPromptString = `
         You are "Orthan AI", Narao's assistant. Focus on helping users learn and work efficiently using rich markdown and colored highlights (default: red). Narao is an AI-powered note-taking app.
 
@@ -90,23 +107,9 @@ export default function ChatMessageInput({ attachments, setAttachments }: ChatMe
         - Do not color the title of the note.
         - Use: <span style="color: #c75d55;">text</span>
         - Available colors: ${EDITOR_COLORS.map(color => `- ${color.label}: ${color.value}`).join(", ")}
-        `;
-
-    // Workspace contexts for tool execution
-    const { fetchedNotes, setFetchedNotes } = useFetchedNotes();
-    const { fetchedFolders, setFetchedFolders } = useFetchedFolders();
-
-    // Model Settings
-    const [currentModel, setCurrentModel] = useState<keyof Models>("gemini-3-flash-preview")
-
-    // Popover Settings
-    const [isSelectingModelPopoverOpen, setIsSelectingModelPopoverOpen] = useState(false)
-
-    // active tab
-    const { activeTab, openTab } = useTabs()
-
-    // edit message context
-    const { pendingEdit, clearEdit, pendingRegenerate, clearRegenerate } = useEditMessage()
+        
+        User's notes and folders:
+        ${buildWorkspaceIndex(fetchedNotes, fetchedFolders)}`;
 
     // ── @mention helpers ────────────────────────────────────────────────────
     const getFolderPath = useCallback((folderId: string): string => {
@@ -1531,7 +1534,7 @@ export default function ChatMessageInput({ attachments, setAttachments }: ChatMe
                         </div>
                     )}
                     <div className="flex items-center pb-1 gap-1">
-                        <Popover open={isSelectingModelPopoverOpen}>
+                        {/* <Popover open={isSelectingModelPopoverOpen}>
                             <Tooltip>
                                 <TooltipTrigger asChild>
                                     <PopoverTrigger asChild>
@@ -1548,8 +1551,8 @@ export default function ChatMessageInput({ attachments, setAttachments }: ChatMe
                             </Tooltip>
                             <PopoverContent className="w-fit rounded-full p-2">
                                 <div className="flex gap-2">
-                                    {/* <p className="text-xs">Choose Model</p> */}
-                                    {/* <div className="w-full h-[1px] bg-foreground/10"></div> */}
+                                    <p className="text-xs">Choose Model</p>
+                                    <div className="w-full h-[1px] bg-foreground/10"></div>
                                     {(Object.keys(models) as Array<keyof Models>).map((model) => (
                                         <div key={model}>
                                             <Button
@@ -1562,14 +1565,14 @@ export default function ChatMessageInput({ attachments, setAttachments }: ChatMe
                                             >
                                                 {model === "gemini-2.5-flash" && <Zap className="" />}
                                                 {model === "gemini-3-flash-preview" && <Lightbulb className="" />}
-                                                {/* {model === "gemini-3.1-flash-lite-preview" && <Leaf className="" />} */}
+                                                {model === "gemini-3.1-flash-lite-preview" && <Leaf className="" />}
                                                 <p className="text-xs">{models[model]}</p>
                                             </Button>
                                         </div>
                                     ))}
                                 </div>
                             </PopoverContent>
-                        </Popover>
+                        </Popover> */}
                         {hasRecording && (
                             <Tooltip>
                                 <TooltipTrigger asChild>

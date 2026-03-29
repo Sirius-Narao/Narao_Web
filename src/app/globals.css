@@ -399,7 +399,7 @@ body {
 }
 
 .tiptap h1 {
-  @apply my-6 text-2xl font-bold border-b border-border pb-6 text-foreground/90 tracking-tight;
+  @apply my-6 text-2xl font-bold text-foreground/90 tracking-tight;
 }
 
 .tiptap h2 {

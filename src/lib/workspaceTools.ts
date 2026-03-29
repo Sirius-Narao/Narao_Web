@@ -82,7 +82,7 @@ function resolveFolderPath(
 }
 
 /** Build a human-readable workspace index for the search tool. */
-function buildWorkspaceIndex(notes: Note[], folders: Folder[]): string {
+export function buildWorkspaceIndex(notes: Note[], folders: Folder[]): string {
     function getFolderPath(folderId: string): string {
         const folder = folders.find(f => f.id === folderId);
         if (!folder) return "";
@@ -106,15 +106,15 @@ function buildWorkspaceIndex(notes: Note[], folders: Folder[]): string {
 // ─── Declarations ─────────────────────────────────────────────────────────────
 
 export const WORKSPACE_TOOL_DECLARATIONS = [
-    {
-        name: "get_all_notes_and_folders",
-        description: "Returns a list of all notes and folders in the workspace. Use this to discover what exists before reading or modifying.",
-        parameters: {
-            type: Type.OBJECT,
-            properties: {},
-            required: []
-        }
-    },
+    // {
+    //     name: "get_all_notes_and_folders",
+    //     description: "Returns a list of all notes and folders in the workspace. Use this to discover what exists before reading or modifying.",
+    //     parameters: {
+    //         type: Type.OBJECT,
+    //         properties: {},
+    //         required: []
+    //     }
+    // },
     {
         name: "read_note",
         description: "Returns the full markdown content of a note given its absolute path.",
@@ -343,10 +343,10 @@ export async function executeToolCall(
     switch (name) {
 
         // ── get_all_notes_and_folders ───────────────────────────────────────────
-        case "get_all_notes_and_folders": {
-            const index = buildWorkspaceIndex(fetchedNotes, fetchedFolders);
-            return index;
-        }
+        // case "get_all_notes_and_folders": {
+        //     const index = buildWorkspaceIndex(fetchedNotes, fetchedFolders);
+        //     return index;
+        // }
 
         // ── read_note ─────────────────────────────────────────────────────────
         case "read_note": {
