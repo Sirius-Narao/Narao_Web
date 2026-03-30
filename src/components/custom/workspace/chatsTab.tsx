@@ -181,6 +181,23 @@ export default function ChatsTab({ initialChatId }: ChatsTabProps) {
         setFilteredChats([...chats].sort((a, b) => b.updatedAt.getTime() - a.updatedAt.getTime()));
     }, [chats]);
 
+    // ─── Shortcuts ────────────────────────────────────────────────────
+    useEffect(() => {
+        const handleKeyDown = (e: KeyboardEvent) => {
+            const key = e.key.toLowerCase();
+            if (e.ctrlKey && key === "k" && !e.shiftKey) {
+                e.preventDefault();
+                setIsSearchOpen(prev => !prev);
+                setTimeout(() => searchInputRef.current?.focus(), 350);
+            }
+            if (e.key === "Escape" && isSearchOpen) {
+                setIsSearchOpen(false);
+            }
+        };
+        window.addEventListener("keydown", handleKeyDown);
+        return () => window.removeEventListener("keydown", handleKeyDown);
+    }, [setIsSearchOpen, isSearchOpen]);
+
     return (
         <div className="flex flex-col h-full relative">
             <div className="flex items-center absolute top-1 left-0 right-0 z-50 p-1 rounded-3xl w-fit bg-popover/40 backdrop-blur-md shadow-lg mx-auto ">
@@ -207,7 +224,7 @@ export default function ChatsTab({ initialChatId }: ChatsTabProps) {
                 <Tooltip>
                     <TooltipTrigger asChild>
                         <Button variant="ghost" className="w-10 h-10 p-0 rounded-full" onClick={() => handleNewChat()}>
-                            <PenSquare size={24} color="white" />
+                            <PenSquare size={24} />
                         </Button>
                     </TooltipTrigger>
                     <TooltipContent>
@@ -220,7 +237,7 @@ export default function ChatsTab({ initialChatId }: ChatsTabProps) {
                         <TooltipTrigger asChild>
                             <DropdownMenuTrigger asChild>
                                 <Button variant="ghost" className="w-10 h-10 p-0 rounded-full">
-                                    <MoreVertical size={24} color="white" />
+                                    <MoreVertical size={24} />
                                 </Button>
                             </DropdownMenuTrigger>
                         </TooltipTrigger>
@@ -260,7 +277,7 @@ export default function ChatsTab({ initialChatId }: ChatsTabProps) {
                 }}
             >
                 {/* Collapsed: round search button */}
-                <div className="flex items-center justify-center p-1 rounded-3xl w-fit bg-popover/40 backdrop-blur-md shadow-lg absolute top-0 left-0 z-50 border border-border" style={{
+                <div className="flex items-center justify-center p-1 rounded-3xl w-fit bg-popover/40 backdrop-blur-md shadow-lg absolute top-0 left-0 z-50 border border-border " style={{
                     transition: "opacity 200ms ease, transform 200ms ease",
                     opacity: isSearchOpen ? 0 : 1,
                     pointerEvents: isSearchOpen ? "none" : "auto",
@@ -307,7 +324,7 @@ export default function ChatsTab({ initialChatId }: ChatsTabProps) {
                     className="flex flex-col bg-card/30 backdrop-blur-md p-2 rounded-xl shadow-xl border border-border"
                 >
                     {/* Search input row */}
-                    <InputGroup className="w-full shadow-md dark:bg-popover/40 backdrop-blur-md! border-border ">
+                    <InputGroup className="w-full shadow-md dark:bg-popover/40 bg-popover/40 backdrop-blur-md! border-border ">
                         <InputGroupAddon align="inline-end" className="cursor-pointer">
                             <InputGroupText className="bg-transparent cursor-pointer">
                                 <KbdGroup>
@@ -320,7 +337,8 @@ export default function ChatsTab({ initialChatId }: ChatsTabProps) {
                             ref={searchInputRef}
                             placeholder="Look for a chat..."
                             aria-placeholder="Look for a chat..."
-                            className="bg-card cursor-pointer"
+                            className="cursor-pointer"
+                            autoFocus
                             onChange={(e) => setFilteredChats(handleSearch(e.target.value, chats))}
                             onKeyDown={(e) => { if (e.key === "Escape") setIsSearchOpen(false); }}
                         />
@@ -344,7 +362,7 @@ export default function ChatsTab({ initialChatId }: ChatsTabProps) {
                     >
                         <ScrollArea className="flex-1 rounded-lg border border-border px-1 shadow-lg bg-popover/40 backdrop-blur-md h-full max-h-[50vh] overflow-y-auto">
                             <div className="h-1" key={"division-scroll"}></div>
-                            {chats.length > 0 && chatsFetched ? filteredChats.map((chat, index) => (
+                            {chats.length > 0 && chatsFetched ? filteredChats.length > 0 ? filteredChats.map((chat, index) => (
                                 <div
                                     key={index}
                                     className="flex items-center justify-between pl-4 pr-2 py-2 rounded-lg hover:bg-popover cursor-pointer transition-all duration-100 ease-in-out mb-1"
@@ -413,7 +431,12 @@ export default function ChatsTab({ initialChatId }: ChatsTabProps) {
                                         </DropdownMenuContent>
                                     </DropdownMenu>
                                 </div>
-                            )) : chatsFetched ? (
+                            )) : (
+                                <div className="flex flex-col items-center justify-center h-full my-5 text-center">
+                                    <CircleSlash size={48} className="text-muted-foreground mb-2" />
+                                    <p className="font-medium text-muted-foreground">No chats found</p>
+                                </div>
+                            ) : chatsFetched ? (
                                 <div className="flex flex-col items-center justify-center h-full my-5 text-center">
                                     <CircleSlash size={48} className="text-muted-foreground mb-2" />
                                     <p className="font-medium text-muted-foreground">No chats found</p>

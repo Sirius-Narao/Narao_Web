@@ -524,7 +524,7 @@ export default function FoldersTab({ accessedNote, setAccessedNote, setIsNoteOpe
                     <Tooltip>
                         <TooltipTrigger asChild>
                             <Button variant="ghost" className={cn("w-10 h-10 p-0 rounded-full cursor-pointer", path === "/" && "opacity-50")} onClick={goBack} disabled={path === "/"}>
-                                <MoveLeft size={24} color="white" />
+                                <MoveLeft size={24} />
                             </Button>
                         </TooltipTrigger>
                         <TooltipContent className="flex items-center gap-2">
@@ -537,7 +537,7 @@ export default function FoldersTab({ accessedNote, setAccessedNote, setIsNoteOpe
                     <Tooltip>
                         <TooltipTrigger asChild>
                             <Button variant="ghost" className={cn("w-10 h-10 p-0 rounded-full cursor-pointer", pathHistory.length <= 2 && "opacity-50")} onClick={goForward} disabled={pathHistory.length <= 2}>
-                                <MoveRight size={24} color="white" />
+                                <MoveRight size={24} />
                             </Button>
                         </TooltipTrigger>
                         <TooltipContent className="flex items-center gap-2">
@@ -632,7 +632,7 @@ export default function FoldersTab({ accessedNote, setAccessedNote, setIsNoteOpe
                             <TooltipTrigger asChild>
                                 <DropdownMenuTrigger asChild>
                                     <Button variant="ghost" className="w-10 h-10 p-0 rounded-full">
-                                        <Plus size={24} color="white" />
+                                        <Plus size={24} />
                                     </Button>
                                 </DropdownMenuTrigger>
                             </TooltipTrigger>
@@ -657,7 +657,7 @@ export default function FoldersTab({ accessedNote, setAccessedNote, setIsNoteOpe
                             <TooltipTrigger asChild>
                                 <DropdownMenuTrigger asChild>
                                     <Button variant="ghost" className="w-10 h-10 p-0 rounded-full">
-                                        <MoreVertical size={24} color="white" />
+                                        <MoreVertical size={24} />
                                     </Button>
                                 </DropdownMenuTrigger>
                             </TooltipTrigger>

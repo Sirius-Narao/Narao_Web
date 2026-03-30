@@ -71,7 +71,7 @@ export default function ChatMessageInput({ attachments, setAttachments }: ChatMe
     const [currentModel, setCurrentModel] = useState<keyof Models>("gemini-2.5-flash")
 
     // Popover Settings
-    const [isSelectingModelPopoverOpen, setIsSelectingModelPopoverOpen] = useState(false)
+    // const [isSelectingModelPopoverOpen, setIsSelectingModelPopoverOpen] = useState(false)
 
     // active tab
     const { activeTab, openTab } = useTabs()

@@ -157,7 +157,7 @@ export default function SidebarArea() {
 
 
             {/* --------------------------- Content --------------------------- */}
-            <SidebarContent className="bg-background mt-[9px] overflow-hidden">
+            <SidebarContent className="bg-background pt-2 overflow-hidden">
                 {/* Tab navigation moved to mainArea tab bar */}
             </SidebarContent>
 

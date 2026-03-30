@@ -12,6 +12,7 @@ import { cn } from "@/lib/utils";
 import { useIsLoading } from "@/context/isLoadingContext";
 import { EditMessageProvider } from "@/context/editMessageContext";
 import { Spinner } from "@/components/ui/spinner";
+import { useSettings } from "@/context/settingsContext";
 
 const LOADING_PHRASES = [
     "Loading... ",
@@ -20,7 +21,7 @@ const LOADING_PHRASES = [
 ];
 
 export default function Chat() {
-    const { chatMessages, setChatMessages, currentChatId, setCurrentChatId, chatCache, setChatCache } = useChatMessages();
+    const { chatMessages, setChatMessages, currentChatId, chatCache } = useChatMessages();
     const bottomRef = useRef<HTMLDivElement>(null);
     const scrollAreaRef = useRef<HTMLDivElement>(null);
     const [isAtBottom, setIsAtBottom] = useState(true);
@@ -30,7 +31,8 @@ export default function Chat() {
     const [displayText, setDisplayText] = useState("");
     const [phraseIndex, setPhraseIndex] = useState(0);
 
-    const { user } = useUser();
+    // settings
+    const { settings } = useSettings();
 
     // Fetch messages when currentChatId changes
     useEffect(() => {
@@ -177,7 +179,7 @@ export default function Chat() {
                                 ))}
                                 {chatMessages.length === 0 && (
                                     <div className="flex flex-col items-center justify-center h-[50vh]">
-                                        <p className="text-3xl font-medium text-muted-foreground fade-up fade-up-delay-1">Hi, I'm Orthan AI.</p>
+                                        <p className="text-3xl font-medium text-muted-foreground fade-up fade-up-delay-1">Hi, I'm {settings.aiName}.</p>
                                         <p className="text-4xl font-medium fade-up fade-up-delay-2">How can I help you today?</p>
                                     </div>
                                 )}

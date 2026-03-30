@@ -250,8 +250,8 @@ export default function NotesTab({ accessedNote, setAccessedNote, initialNoteId 
                         {isSavedComplete ? (
                             <Tooltip>
                                 <TooltipTrigger asChild>
-                                    <Button variant="ghost" className="w-10 h-10 p-0 rounded-full" onClick={saveNote} disabled={content === accessedNote?.content}>
-                                        <ArrowBigDown size={24} className="text-primary disabled:text-muted-foreground" />
+                                    <Button variant="ghost" className="w-10 h-10 p-0 rounded-full disabled:opacity-50 disabled:text-muted-foreground text-primary" onClick={saveNote} disabled={content === accessedNote?.content}>
+                                        <ArrowBigDown size={24} />
                                     </Button>
                                 </TooltipTrigger>
                                 <TooltipContent className="flex items-center gap-2">
