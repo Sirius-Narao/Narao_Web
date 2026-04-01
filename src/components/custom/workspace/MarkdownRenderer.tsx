@@ -60,14 +60,18 @@ export function MarkdownRenderer({ content, className = "" }: MarkdownRendererPr
                     [rehypeHighlight, { detect: true, ignoreMissing: true }]
                 ]}
                 components={{
-                    code({ className, children, ...props }: ComponentPropsWithoutRef<'code'> & { inline?: boolean }) {
-                        const match = /language-(\w+)/.exec(className || '')
+                    pre({ children, ...props }: ComponentPropsWithoutRef<'pre'>) {
+                        // Extract the language from the nested <code> className
+                        const codeChild = Array.isArray(children) ? children[0] : children;
+                        const codeClassName = isValidElement(codeChild)
+                            ? (codeChild.props as any)?.className ?? ''
+                            : '';
+                        const match = /language-(\w+)/.exec(codeClassName || '');
                         const textContent = extractText(children);
-                        const isInline = !match && !textContent.includes('\n');
 
-                        return !isInline ? (
+                        return (
                             <div className="relative group w-full max-w-full overflow-hidden">
-                                <pre className="my-4 rounded-xl bg-popover p-4 overflow-x-auto border border-border/50 w-full">
+                                <pre className="my-4 rounded-xl bg-popover p-4 overflow-x-auto border border-border/50 w-full" {...props}>
                                     {match && (
                                         <div className="flex items-center justify-between gap-2 pb-2 px-2 border-b border-foreground/10">
                                             <div className="flex flex-row items-center gap-2">
@@ -89,20 +93,30 @@ export function MarkdownRenderer({ content, className = "" }: MarkdownRendererPr
                                             >
                                                 <Copy className="h-4 w-4" />
                                             </Button>
-
                                         </div>
                                     )}
-                                    <code className={cn(className, "rounded-lg bg-popover! whitespace-pre-wrap break-words")} {...props}>
-                                        {children}
-                                    </code>
+                                    {children}
                                 </pre>
                             </div>
-                        ) : (
+                        );
+                    },
+                    code({ className, children, ...props }: ComponentPropsWithoutRef<'code'> & { inline?: boolean }) {
+                        // Block code (inside <pre>) always has a language-* className set by
+                        // rehype-highlight. Inline code has no className.
+                        // Apply the pill/highlight styling only for true inline code.
+                        const isBlock = !!className;
+                        if (isBlock) {
+                            return (
+                                <code className={cn(className, "rounded-lg bg-popover! whitespace-pre-wrap break-words")} {...props}>
+                                    {children}
+                                </code>
+                            );
+                        }
+                        return (
                             <code className="inline-code px-1.5 py-0.5 rounded bg-secondary/80 text-primary font-mono text-sm font-medium" {...props}>
                                 {children}
                             </code>
-                        )
-
+                        );
                     },
                     table({ children }) {
                         return (
@@ -166,7 +180,9 @@ export function MarkdownRenderer({ content, className = "" }: MarkdownRendererPr
                         return <hr className="h-px bg-foreground/10 my-6" />
                     },
                     span({ style, children, ...props }: ComponentPropsWithoutRef<'span'>) {
-                        // Only allow the `color` CSS property from inline styles for security
+                        // Allow `color` CSS property from inline styles for security,
+                        // but pass through all other props (including data-* attributes)
+                        // so KaTeX math spans and other semantic spans are not broken.
                         const safeStyle: CSSProperties | undefined = style
                             ? { color: (style as CSSProperties).color }
                             : undefined;

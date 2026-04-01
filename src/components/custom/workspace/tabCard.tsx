@@ -79,7 +79,7 @@ export default function TabCard({ tab, index }: TabCardProps) {
                     <Button
                         variant="ghost"
                         onClick={handleClose}
-                        className="absolute right-1 w-7 h-7 p-0 rounded-full opacity-0 group-hover:opacity-100 dark:hover:bg-card/60 transition-all duration-100 scale-90"
+                        className="absolute right-1 w-7 h-7 p-0 rounded-full opacity-0 group-hover:opacity-100 dark:hover:bg-card/60 hover:bg-secondary transition-all duration-100 scale-90 cursor-pointer"
                     >
                         <X className="w-4 h-4" />
                     </Button>

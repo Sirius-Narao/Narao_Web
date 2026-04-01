@@ -20,6 +20,10 @@ export async function POST(req: NextRequest) {
             const stream = new ReadableStream({
                 async start(controller) {
                     const encoder = new TextEncoder();
+                    // This variable stores the most-recently-observed totalTokenCount from Gemini.
+                    // The API only populates usageMetadata on the LAST chunk of a stream,
+                    // so we keep overwriting until the loop ends, then emit it once.
+                    let totalTokenCount = 0;
                     try {
                         for await (const chunk of result) {
                             const candidate = chunk.candidates?.[0];
@@ -34,6 +38,14 @@ export async function POST(req: NextRequest) {
                                     }
                                 }
                             }
+                            // Capture usageMetadata every chunk; it will be non-zero only on the last one.
+                            if (chunk.usageMetadata?.totalTokenCount) {
+                                totalTokenCount = chunk.usageMetadata.totalTokenCount;
+                            }
+                        }
+                        // Emit the final token count to the client ONCE, after the stream is done.
+                        if (totalTokenCount > 0) {
+                            controller.enqueue(encoder.encode(JSON.stringify({ type: "usageMetadata", totalTokens: totalTokenCount }) + "\n"));
                         }
                     } catch (e) { controller.error(e); } finally { controller.close(); }
                 }
@@ -117,6 +129,10 @@ export async function POST(req: NextRequest) {
         const stream = new ReadableStream({
             async start(controller) {
                 const encoder = new TextEncoder();
+                // This variable stores the most-recently-observed totalTokenCount from Gemini.
+                // The API only populates usageMetadata on the LAST chunk of a stream,
+                // so we keep overwriting until the loop ends, then emit it once.
+                let totalTokenCount = 0;
                 try {
                     for await (const chunk of result) {
                         const candidate = chunk.candidates?.[0];
@@ -141,6 +157,14 @@ export async function POST(req: NextRequest) {
                                 }
                             }
                         }
+                        // Capture usageMetadata every chunk; it will be non-zero only on the last one.
+                        if (chunk.usageMetadata?.totalTokenCount) {
+                            totalTokenCount = chunk.usageMetadata.totalTokenCount;
+                        }
+                    }
+                    // Emit the final token count to the client ONCE, after the stream is done.
+                    if (totalTokenCount > 0) {
+                        controller.enqueue(encoder.encode(JSON.stringify({ type: "usageMetadata", totalTokens: totalTokenCount }) + "\n"));
                     }
                 } catch (error) {
                     console.error("Stream error:", error);

@@ -39,6 +39,7 @@ interface ChatMessage {
     toolCalls?: ToolCall[];
     messageParts?: MessagePart[];
     isDone?: boolean;
+    creditsUsed?: number;
 }
 
 interface Models {

@@ -5,6 +5,7 @@ type ProfileType = {
     username: string;
     created_at: string;
     settings: Settings;
+    credits_left: number;
 };
 
 export default ProfileType;

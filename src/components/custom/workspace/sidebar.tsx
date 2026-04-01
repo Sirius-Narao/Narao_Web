@@ -2,7 +2,7 @@
 
 import { Sidebar, SidebarContent, SidebarHeader, SidebarTrigger, SidebarFooter, useSidebar } from "@/components/ui/sidebar";
 import Image from "next/image";
-import { User, Settings as SettingsIcon, X, Sun, Bot, Tags, ArrowUpLeft } from "lucide-react";
+import { User, Settings as SettingsIcon, X, Sun, Bot, Tags, ArrowUpLeft, Coins } from "lucide-react";
 import { AnimatePresence, motion } from "framer-motion";
 import { Button } from "@/components/ui/button";
 import { cn } from "@/lib/utils";
@@ -31,6 +31,7 @@ import { Language, Settings, Theme } from "@/types/settingsType";
 import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
 import { useSettings } from "@/context/settingsContext";
+import { useUser } from "@/context/userContext";
 
 export default function SidebarArea() {
     const [userAuth, setUserAuth] = useState<any>(null);
@@ -45,6 +46,10 @@ export default function SidebarArea() {
     // settings state
     const { settings, setSettings } = useSettings();
     const [tempSettings, setTempSettings] = useState<Settings>(settings);
+
+    // Global user context — chatMessageInput optimistically updates credits_left here
+    // after each message, so we read from it for the credits display.
+    const { user: globalUser, setUser: setGlobalUser } = useUser();
 
     const [tempPseudo, setTempPseudo] = useState("");
 
@@ -71,7 +76,7 @@ export default function SidebarArea() {
             }
             setUser(profiles?.[0]);
             setTempPseudo(profiles?.[0].username || "");
-            setSettings(profiles?.[0].settings || {
+            const loadedSettings = profiles?.[0].settings || {
                 theme: "system",
                 language: "en",
                 customInstructions: {
@@ -80,17 +85,15 @@ export default function SidebarArea() {
                 },
                 plan: "free",
                 aiName: "Narao AI",
-            });
-            setTempSettings(profiles?.[0].settings || {
-                theme: "system",
-                language: "en",
-                customInstructions: {
-                    aboutUser: "",
-                    customPrompt: "",
-                },
-                plan: "free",
-                aiName: "Narao AI",
-            });
+            };
+            setSettings(loadedSettings);
+            setTempSettings(loadedSettings);
+            // Seed the global user context with the initial credits_left so
+            // chatMessageInput can start deducting from the correct baseline.
+            setGlobalUser(prev => prev
+                ? { ...prev, credits_left: profiles?.[0]?.credits_left ?? prev.credits_left }
+                : { id: profiles?.[0]?.id, username: profiles?.[0]?.username, created_at: profiles?.[0]?.created_at, credits_left: profiles?.[0]?.credits_left ?? 0 }
+            );
         };
         fetchUsers();
     }, [userAuth]);
@@ -100,7 +103,8 @@ export default function SidebarArea() {
             const { data: announces, error } = await supabase
                 .from('announces')         // your table name
                 .select('*')          // select all columns
-                .limit(1);            // select only the 1rst user
+                .order('created_at', { ascending: false })
+                .limit(1);            // select only the last announce
 
             if (error) {
                 console.error(error);
@@ -119,10 +123,27 @@ export default function SidebarArea() {
             .update({ settings: tempSettings })
             .eq('id', user.id);
 
+        const { error: error2 } = await supabase
+            .from('profiles')
+            .update({ username: tempPseudo })
+            .eq('id', user.id);
+
         if (error) {
             console.error(error);
         }
+        if (error2) {
+            console.error(error2);
+        }
         setSettings(tempSettings);
+        setUser(prev => prev ? { ...prev, username: tempPseudo } : null);
+    };
+
+    // helper to format credits_left
+    const formatCredits = (credits: number) => {
+        if (credits >= 1000) {
+            return (credits / 1000).toFixed(1) + "k";
+        }
+        return credits;
     };
 
 
@@ -237,13 +258,13 @@ export default function SidebarArea() {
                         <div className="col-span-1 h-full flex flex-col gap-2 relative">
                             <div className={cn("flex items-center justify-center w-full gap-2 p-4 py-2 rounded-lg border border-sidebar-border hover:bg-card/50 cursor-pointer transition-all duration-200 text-left justify-start ", settingsTab === 0 && "bg-card hover:bg-card")}
                                 onClick={() => { setSettingsTab(0) }}>
-                                <Sun size={16} />
-                                <p className="text-sm font-medium">Preferences</p>
+                                <User size={16} />
+                                <p className="text-sm font-medium">Account</p>
                             </div>
                             <div className={cn("flex items-center justify-center w-full gap-2 p-4 py-2 rounded-lg border border-sidebar-border hover:bg-card/50 cursor-pointer transition-all duration-200 text-left justify-start ", settingsTab === 1 && "bg-card hover:bg-card")}
                                 onClick={() => { setSettingsTab(1) }}>
-                                <User size={16} />
-                                <p className="text-sm font-medium">Account</p>
+                                <Sun size={16} />
+                                <p className="text-sm font-medium">Preferences</p>
                             </div>
                             <div className={cn("flex items-center justify-center w-full gap-2 p-4 py-2 rounded-lg border border-sidebar-border hover:bg-card/50 cursor-pointer transition-all duration-200 text-left justify-start ", settingsTab === 2 && "bg-card hover:bg-card")}
                                 onClick={() => { setSettingsTab(2) }}>
@@ -271,7 +292,58 @@ export default function SidebarArea() {
                             </DialogHeader>
 
                             {settingsTab === 0 && (
-                                <div className="flex flex-col py-6">
+                                <div className="flex flex-col py-6 min-h-[calc(100vh-500px)] ">
+                                    <div className="flex gap-2 border-t border-b border-border py-4 justify-between items-center">
+                                        <p className="text-sm font-medium">Credits Left</p>
+                                        <Tooltip>
+                                            <TooltipTrigger asChild>
+                                                <p className="text-sm font-medium px-4 py-2 bg-card rounded-full flex items-center font-mono border border-folder-yellow hover:bg-folder-yellow/10 cursor-pointer transition-all duration-200" onClick={() => { }}>
+                                                    <Coins className="w-4 h-4 mr-2 text-folder-yellow" />
+                                            {/* Read credits from global context so optimistic updates from chatMessageInput are reflected instantly */}
+                                        {formatCredits(globalUser?.credits_left ?? user?.credits_left ?? 0)}
+                                                </p>
+                                            </TooltipTrigger>
+                                            <TooltipContent>
+                                                <p>Buy more credits</p>
+                                            </TooltipContent>
+                                        </Tooltip>
+                                    </div>
+                                    <div className="flex flex-col gap-2 border-t border-b border-border py-4">
+                                        <p className="text-sm font-medium">Username</p>
+                                        <Input
+                                            className="w-full focus-visible:border-primary focus-visible:ring-none focus-visible:ring-[0px]!"
+                                            value={tempPseudo}
+                                            onChange={(e) => {
+                                                setTempPseudo(e.target.value);
+                                            }}
+                                            onKeyDown={(e) => {
+                                                if (e.key === "Enter" && tempPseudo.length > 0) {
+                                                    updateSettings();
+                                                }
+                                            }}
+                                            maxLength={20}
+                                            onBlur={() => { if (!tempPseudo) setTempPseudo(user?.username || "") }}
+                                        />
+                                        <p className="text-xs text-muted-foreground">*Max 20 characters</p>
+                                    </div>
+                                    <div className="flex gap-2 py-4 justify-between items-center">
+                                        <p className="text-sm font-medium">Email</p>
+                                        <Tooltip>
+                                            <TooltipTrigger asChild>
+                                                <Button variant="ghost" className="text-sm font-medium text-muted-foreground">
+                                                    <ArrowUpLeft size={16} />
+                                                    {userAuth?.email}
+                                                </Button>
+                                            </TooltipTrigger>
+                                            <TooltipContent side="bottom">
+                                                <p>Change email</p>
+                                            </TooltipContent>
+                                        </Tooltip>
+                                    </div>
+                                </div>
+                            )}
+                            {settingsTab === 1 && (
+                                <div className="flex flex-col py-6 min-h-[calc(100vh-500px)] ">
                                     <div className="flex gap-2 justify-between items-center border-t border-b border-border py-4">
                                         <p className="text-sm font-medium">Appearance</p>
                                         <Select
@@ -327,37 +399,8 @@ export default function SidebarArea() {
                                     </div>
                                 </div>
                             )}
-                            {settingsTab === 1 && (
-                                <div className="flex flex-col py-6">
-                                    <div className="flex flex-col gap-2 border-t border-b border-border py-4">
-                                        <p className="text-sm font-medium">Username</p>
-                                        <Input
-                                            className="w-full focus-visible:border-primary focus-visible:ring-none focus-visible:ring-[0px]!"
-                                            value={tempPseudo}
-                                            onChange={(e) => {
-                                                setTempPseudo(e.target.value);
-                                            }}
-                                            onBlur={() => { if (!tempPseudo) setTempPseudo(user?.username || "") }}
-                                        />
-                                    </div>
-                                    <div className="flex gap-2 py-4 justify-between items-center">
-                                        <p className="text-sm font-medium">Email</p>
-                                        <Tooltip>
-                                            <TooltipTrigger asChild>
-                                                <Button variant="ghost" className="text-sm font-medium text-muted-foreground">
-                                                    <ArrowUpLeft size={16} />
-                                                    {userAuth?.email}
-                                                </Button>
-                                            </TooltipTrigger>
-                                            <TooltipContent side="bottom">
-                                                <p>Change email</p>
-                                            </TooltipContent>
-                                        </Tooltip>
-                                    </div>
-                                </div>
-                            )}
                             {settingsTab === 2 && (
-                                <div className="flex flex-col py-6">
+                                <div className="flex flex-col py-6 min-h-[calc(100vh-500px)] ">
                                     <div className="flex flex-col gap-2 border-t border-b border-border py-4">
                                         <p className="text-sm font-medium">AI name</p>
                                         <Input

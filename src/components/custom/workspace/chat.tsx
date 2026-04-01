@@ -83,6 +83,7 @@ export default function Chat() {
                         toolCalls: msg.tool_calls,
                         createdAt: new Date(msg.created_at),
                         isDone: true,
+                        creditsUsed: msg.credits_used,
                         attachments: attachments?.filter(attachment => attachment.message_id === msg.id)
                     };
                 });
@@ -179,8 +180,8 @@ export default function Chat() {
                                 ))}
                                 {chatMessages.length === 0 && (
                                     <div className="flex flex-col items-center justify-center h-[50vh]">
-                                        <p className="text-3xl font-medium text-muted-foreground fade-up fade-up-delay-1">Hi, I'm {settings.aiName}.</p>
-                                        <p className="text-4xl font-medium fade-up fade-up-delay-2">How can I help you today?</p>
+                                        <p className="text-3xl font-medium text-muted-foreground fade-up fade-up-delay-1 text-center">Hi, I'm {settings.aiName}.</p>
+                                        <p className="text-4xl font-medium fade-up fade-up-delay-2 text-center">How can I help you today?</p>
                                     </div>
                                 )}
 

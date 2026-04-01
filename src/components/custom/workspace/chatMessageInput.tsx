@@ -41,6 +41,9 @@ export default function ChatMessageInput({ attachments, setAttachments }: ChatMe
     const [content, setContent] = useState("")
     const [isThinking, setIsThinking] = useState(false)
     const { isLoading, setIsLoading } = useIsLoading()
+    // out-of-credits mid-stream guard
+    const [outOfCredits, setOutOfCredits] = useState(false)
+    const outOfCreditsRef = useRef(false)
 
     const editorRef = useRef<HTMLDivElement>(null)
     const fileInputRef = useRef<HTMLInputElement>(null)
@@ -60,8 +63,9 @@ export default function ChatMessageInput({ attachments, setAttachments }: ChatMe
     const [mentionIndex, setMentionIndex] = useState(0)                   // highlighted item index
     const mentionListRef = useRef<HTMLDivElement>(null)
 
-    // user context
-    const { user } = useUser();
+    // user context — setUser lets us optimistically update credits_left in the sidebar
+    // without a round-trip re-fetch after each message.
+    const { user, setUser } = useUser();
 
     // Workspace contexts for tool execution
     const { fetchedNotes, setFetchedNotes } = useFetchedNotes();
@@ -263,7 +267,6 @@ export default function ChatMessageInput({ attachments, setAttachments }: ChatMe
         const s = (secs % 60).toString().padStart(2, "0")
         return `${m}:${s}`
     }
-
     const handleMicToggle = async () => {
         if (isRecording) {
             stopRecording()
@@ -275,12 +278,10 @@ export default function ChatMessageInput({ attachments, setAttachments }: ChatMe
             await startRecording()
         }
     }
-
     const handleDiscardRecording = () => {
         resetRecording()
         setRecordingDuration(0)
     }
-
     const handleSendRecording = async () => {
         if (!user || !audioBlob) return
         const result = await uploadRecording(user.id)
@@ -478,6 +479,7 @@ export default function ChatMessageInput({ attachments, setAttachments }: ChatMe
             if (message.thinkingTime != null) payload.thinking_time = message.thinkingTime;
             if (message.messageParts != null) payload.message_parts = message.messageParts;
             if (message.toolCalls != null) payload.tool_calls = message.toolCalls;
+            if (message.creditsUsed != null) payload.credits_used = message.creditsUsed;
 
             console.log("Attempting to insert into chat_messages with payload:", payload);
 
@@ -497,8 +499,13 @@ export default function ChatMessageInput({ attachments, setAttachments }: ChatMe
                 });
                 toast.error(`Failed to save message: ${error.message || error.code || "Unknown Supabase error"}`, { position: "bottom-right" });
             }
-        } catch (e) {
-            console.error("Failed to add message to chat_messages:", e);
+        } catch (e: any) {
+            console.error("Failed to add message to chat_messages:", {
+                message: e?.message,
+                stack: e?.stack,
+                raw: String(e),
+                obj: e
+            });
         }
     };
     const addAttachmentsToChatAttachments = async (messageId: string, attachments: ChatAttachment[]) => {
@@ -542,6 +549,14 @@ export default function ChatMessageInput({ attachments, setAttachments }: ChatMe
     // handle send function of the input
     const handleSend = async () => {
         if ((content.trim() === "" && attachments.length === 0) || isLoading) return;
+
+        // ── Zero-credit guard ────────────────────────────────────────────────
+        // Block sending if the user has no credits left. This check is done against
+        // the local state (optimistically updated after each message), so it's fast.
+        if (user && user.credits_left <= 0) {
+            toast.error("You've run out of credits! Please top up to continue.", { position: "bottom-right" });
+            return;
+        }
         editorRef.current?.focus()
 
         setIsLoading(true);
@@ -556,6 +571,11 @@ export default function ChatMessageInput({ attachments, setAttachments }: ChatMe
         let thinkingDuration: number | undefined = undefined;
         let accumulatedMessageParts: MessagePart[] = [{ type: 'text', content: '' }];
         let accumulatedToolCalls: ToolCall[] = [];
+        // Accumulates the total token count (input + output combined) across ALL
+        // rounds of the tool-call loop. Each round = one generateContentStream call.
+        let totalTokensUsed = 0;
+        // Declared outside try so it's accessible in catch (e.g. for cleanup or partial saving)
+        let userMessage: ChatMessage | undefined = undefined;
 
         try {
             // 0. If this send is completing an edit: remove the original message
@@ -600,7 +620,7 @@ export default function ChatMessageInput({ attachments, setAttachments }: ChatMe
             ]);
 
             // 2. Create and add user message
-            const userMessage: ChatMessage = {
+            userMessage = {
                 id: uuidv4(),
                 role: "user",
                 content: content.trim(),
@@ -722,9 +742,13 @@ export default function ChatMessageInput({ attachments, setAttachments }: ChatMe
                 streamReader: ReadableStreamDefaultReader<Uint8Array>,
                 msgId: string,
                 signal: AbortSignal
-            ): Promise<Array<{ name: string; args: Record<string, any>; thoughtSignature: string | null }>> => {
+            ): Promise<{ functionCalls: Array<{ name: string; args: Record<string, any>; thoughtSignature: string | null }>; tokenCount: number; roundText: string }> => {
                 const functionCalls: Array<{ name: string; args: Record<string, any>; thoughtSignature: string | null }> = [];
+                // tokenCount holds the totalTokenCount emitted by the API at the end of this stream round.
+                // It covers both the prompt tokens (input) and the generated tokens (output) for this call.
+                let tokenCount = 0;
                 let buf = "";
+                let roundText = "";
 
                 while (true) {
                     if (signal.aborted) break;
@@ -749,6 +773,7 @@ export default function ChatMessageInput({ attachments, setAttachments }: ChatMe
                                     thinkingDuration = Date.now() - thinkingStartTime;
                                 }
                                 accumulatedAnswer += data.content;
+                                roundText += data.content;
 
                                 const lastIdx = accumulatedMessageParts.length - 1;
                                 if (accumulatedMessageParts[lastIdx]?.type === 'text') {
@@ -783,13 +808,17 @@ export default function ChatMessageInput({ attachments, setAttachments }: ChatMe
                                         messageParts: accumulatedMessageParts
                                     };
                                 }));
+                            } else if (data.type === "usageMetadata") {
+                                // The API emits this ONCE, as the very last event of the stream.
+                                // It carries the combined token count for this generation round.
+                                tokenCount = data.totalTokens ?? 0;
                             }
                         } catch (e) {
                             console.error("Failed to parse stream line:", line, e);
                         }
                     }
                 }
-                return functionCalls;
+                return { functionCalls, tokenCount, roundText };
             };
 
             if (reader) {
@@ -797,14 +826,37 @@ export default function ChatMessageInput({ attachments, setAttachments }: ChatMe
                 let continueToolLoop = true;
 
                 while (continueToolLoop) {
-                    const functionCalls = await processStreamInline(currentReader, assistantId, controller.signal);
+                    const { functionCalls, tokenCount, roundText } = await processStreamInline(currentReader, assistantId, controller.signal);
+                    // Add this round's tokens to the running total across all tool-call rounds.
+                    totalTokensUsed += tokenCount;
+
+                    // ── Mid-stream credit exhaustion check ───────────────────
+                    // usageMetadata arrives at the END of each round; totalTokensUsed
+                    // already includes this round's tokenCount (added just above).
+                    // We compare the CUMULATIVE cost against the starting balance so
+                    // multi-round tool-call chains are correctly accounted for.
+                    if (user && totalTokensUsed > 0) {
+                        const totalCostSoFar = computeCredits(totalTokensUsed, accumulatedThought.length > 0, (userMessage?.attachments?.length ?? 0) > 0);
+                        if (user.credits_left - totalCostSoFar <= 0) {
+                            outOfCreditsRef.current = true;
+                            setOutOfCredits(true);
+                            controller.abort();
+                            break;
+                        }
+                    }
 
                     if (functionCalls.length > 0) {
                         // Build model turn with thoughtSignatures
-                        const modelFcParts: any[] = functionCalls.map(fc => ({
-                            functionCall: { name: fc.name, args: fc.args },
-                            ...(fc.thoughtSignature ? { thoughtSignature: fc.thoughtSignature } : {})
-                        }));
+                        const modelFcParts: any[] = [];
+                        if (roundText.length > 0) {
+                            modelFcParts.push({ text: roundText });
+                        }
+                        functionCalls.forEach(fc => {
+                            modelFcParts.push({
+                                functionCall: { name: fc.name, args: fc.args },
+                                ...(fc.thoughtSignature ? { thoughtSignature: fc.thoughtSignature } : {})
+                            });
+                        });
                         geminiContents.push({ role: "model", parts: modelFcParts });
 
                         // Execute each tool, update card status as they complete
@@ -880,7 +932,7 @@ export default function ChatMessageInput({ attachments, setAttachments }: ChatMe
                 }
 
                 setChatMessages(prev => prev.map(msg =>
-                    msg.id === assistantId ? { ...msg, isDone: true } : msg
+                    msg.id === assistantId ? { ...msg, isDone: true, creditsUsed: computeCredits(totalTokensUsed, accumulatedThought.length > 0, (userMessage?.attachments?.length ?? 0) > 0) } : msg
                 ));
             }
 
@@ -893,21 +945,31 @@ export default function ChatMessageInput({ attachments, setAttachments }: ChatMe
                     thinkingTime: thinkingDuration,
                     messageParts: accumulatedMessageParts,
                     toolCalls: accumulatedToolCalls,
-                    createdAt: new Date()
+                    createdAt: new Date(),
+                    creditsUsed: computeCredits(totalTokensUsed, accumulatedThought.length > 0, (userMessage?.attachments?.length ?? 0) > 0)
                 });
             }
 
+            // ── Credit deduction (success path) ─────────────────────────────
+            // Rate: 10 tokens = 1 credit (Math.ceil so partial groups still cost 1 credit).
+            await deductCredits(totalTokensUsed, accumulatedThought.length > 0, userMessage.attachments.length > 0);
+
         } catch (error: any) {
             if (error.name === 'AbortError') {
-                console.log('Request aborted by user - saving partial response');
+                console.log('Request aborted - saving partial response');
                 // Mark as done in UI even if aborted
                 setChatMessages(prev => prev.map(msg =>
                     msg.id === assistantId ? {
                         ...msg,
-                        isDone: true
+                        isDone: true,
+                        creditsUsed: computeCredits(totalTokensUsed, accumulatedThought.length > 0, (userMessage?.attachments?.length ?? 0) > 0)
                     } : msg
                 ));
-                toast.warning("Answer stopped!")
+                // Only show the generic "stopped" toast when the user clicked stop.
+                // When credits ran out, the popup handles the messaging instead.
+                if (!outOfCreditsRef.current) {
+                    toast.warning("Answer stopped!");
+                }
 
                 // Save whatever we have to the database
                 if (effectiveChatId) {
@@ -919,10 +981,15 @@ export default function ChatMessageInput({ attachments, setAttachments }: ChatMe
                         thinkingTime: thinkingDuration,
                         messageParts: accumulatedMessageParts,
                         toolCalls: accumulatedToolCalls,
-                        createdAt: new Date()
+                        createdAt: new Date(),
+                        creditsUsed: computeCredits(totalTokensUsed, accumulatedThought.length > 0, (userMessage?.attachments?.length ?? 0) > 0)
                     });
-
                 }
+
+                // ── Credit deduction (abort path) ────────────────────────────
+                // Even if the user stopped the generation, real tokens were consumed
+                // up to the abort point, so we still deduct whatever was counted.
+                await deductCredits(totalTokensUsed, accumulatedThought.length > 0, userMessage.attachments.length > 0);
             } else {
                 console.error("Failed to get streaming Gemini response:", error);
                 const fallbackContent = "We are unable to satisfy the request at the moment, please try again later or consider using another model.";
@@ -947,12 +1014,88 @@ export default function ChatMessageInput({ attachments, setAttachments }: ChatMe
         } finally {
             setIsLoading(false);
             abortControllerRef.current = null;
+            outOfCreditsRef.current = false;
+        }
+    };
+
+    // ── Credit calculation helper ──────────────────────────────────────────────
+    //
+    // Centralises the multiplier logic so every call site is consistent.
+    // Cases (thinking takes priority over attachments):
+    //   thought + attachments → tokens/100 × 1.2
+    //   thought only          → tokens/100 × 1.2
+    //   attachments only      → tokens/100 × 1.5
+    //   regular               → tokens/100
+    const computeCredits = (tokens: number, hasThought: boolean, hasAttachments: boolean): number => {
+        const base = tokens / 100;
+        let multiplier = 1.0;
+
+        if (hasThought && hasAttachments) {
+            multiplier = 1.8; // Charging for both complexity tiers
+        } else if (hasAttachments) {
+            multiplier = 1.5;
+        } else if (hasThought) {
+            multiplier = 1.2;
+        }
+
+        return Math.ceil(base * multiplier);
+    };
+
+
+    // ── Atomic credit deduction helper ────────────────────────────────────────
+    //
+    // "Atomic" means the deduction happens in a SINGLE database operation that
+    // cannot be interrupted or interfered with by another concurrent operation.
+    //
+    // Why does this matter?
+    // If two browser tabs (or two requests) both read credits_left = 1000 at the
+    // same time and both try to subtract 50, a non-atomic approach would do:
+    //   Tab A: reads 1000 → writes 950
+    //   Tab B: reads 1000 → writes 950   ← overwrites Tab A's write!
+    // Result: only 50 credits deducted instead of 100.
+    //
+    // The RPC uses raw SQL: `UPDATE profiles SET credits_left = credits_left - amount`
+    // The subtraction happens INSIDE the database in one statement, so the database
+    // engine serialises it correctly regardless of concurrent reads.
+    const deductCredits = async (totalTokens: number, isThinking: boolean = false, hasAttachments: boolean = false) => {
+        if (!user || totalTokens <= 0) return;
+
+        // Delegate entirely to computeCredits so the multiplier logic is
+        // defined in exactly ONE place and can never diverge.
+        const creditsToDeduct = computeCredits(totalTokens, isThinking, hasAttachments);
+        console.log("Total tokens:", totalTokens, "→ credits to deduct:", creditsToDeduct);
+
+        try {
+            const { error } = await supabase.rpc('decrement_credits', {
+                uid: user.id,
+                amount: creditsToDeduct
+            });
+
+            if (error) {
+                console.error("Failed to deduct credits:", error);
+            } else {
+                // Optimistically update the local user context so the sidebar
+                // reflects the new balance immediately without a round-trip fetch.
+                setUser(prev =>
+                    prev
+                        ? { ...prev, credits_left: Math.max(prev.credits_left - creditsToDeduct, 0) }
+                        : null
+                );
+            }
+        } catch (e) {
+            console.error("Credit deduction error:", e);
         }
     };
 
     // Handle regenerating an assistant answer
     const handleRegenerate = async (assistantMessageId: string) => {
         if (isLoading) return;
+
+        // ── Zero-credit guard ────────────────────────────────────────────────
+        if (user && user.credits_left <= 0) {
+            toast.error("You've run out of credits! Please top up to continue.", { position: "bottom-right" });
+            return;
+        }
 
         // Find the assistant message and the user message before it
         const assistantIndex = chatMessages.findIndex(m => m.id === assistantMessageId);
@@ -994,6 +1137,7 @@ export default function ChatMessageInput({ attachments, setAttachments }: ChatMe
         let thinkingDuration: number | undefined = undefined;
         let accumulatedMessageParts: MessagePart[] = [{ type: 'text', content: '' }];
         let accumulatedToolCalls: ToolCall[] = [];
+        let totalTokensUsed = 0;
 
         // Add new assistant placeholder
         const assistantPlaceholder: ChatMessage = {
@@ -1023,14 +1167,15 @@ export default function ChatMessageInput({ attachments, setAttachments }: ChatMe
             if (!response.ok) {
                 const fallbackContent = "We are unable to satisfy the request at the moment, please try again later or consider using another model.";
                 setChatMessages(prev => prev.map(msg =>
-                    msg.id === newAssistantId ? { ...msg, content: fallbackContent, isDone: true } : msg
+                    msg.id === newAssistantId ? { ...msg, content: fallbackContent, isDone: true, creditsUsed: 0 } : msg
                 ));
                 if (effectiveChatId) {
                     addMessageToChatMessages(effectiveChatId, {
                         id: newAssistantId,
                         role: "assistant",
                         content: fallbackContent,
-                        createdAt: new Date()
+                        createdAt: new Date(),
+                        creditsUsed: 0
                     });
                 }
                 setIsLoading(false);
@@ -1053,9 +1198,11 @@ export default function ChatMessageInput({ attachments, setAttachments }: ChatMe
                 streamReader: ReadableStreamDefaultReader<Uint8Array>,
                 msgId: string,
                 signal: AbortSignal
-            ): Promise<Array<{ name: string; args: Record<string, any>; thoughtSignature: string | null }>> => {
+            ): Promise<{ functionCalls: Array<{ name: string; args: Record<string, any>; thoughtSignature: string | null }>; tokenCount: number; roundText: string }> => {
                 const functionCalls: Array<{ name: string; args: Record<string, any>; thoughtSignature: string | null }> = [];
+                let tokenCount = 0;
                 let buf = "";
+                let roundText = "";
 
                 while (true) {
                     if (signal.aborted) break;
@@ -1080,6 +1227,7 @@ export default function ChatMessageInput({ attachments, setAttachments }: ChatMe
                                     thinkingDuration = Date.now() - thinkingStartTime;
                                 }
                                 accumulatedAnswer += data.content;
+                                roundText += data.content;
 
                                 const lastIdx = accumulatedMessageParts.length - 1;
                                 if (accumulatedMessageParts[lastIdx]?.type === 'text') {
@@ -1112,11 +1260,13 @@ export default function ChatMessageInput({ attachments, setAttachments }: ChatMe
                                         messageParts: accumulatedMessageParts
                                     };
                                 }));
+                            } else if (data.type === "usageMetadata") {
+                                tokenCount = data.totalTokens ?? 0;
                             }
                         } catch (e) { console.error("Failed to parse stream line:", line, e); }
                     }
                 }
-                return functionCalls;
+                return { functionCalls, tokenCount, roundText };
             };
 
             if (reader) {
@@ -1124,13 +1274,33 @@ export default function ChatMessageInput({ attachments, setAttachments }: ChatMe
                 let continueLoop = true;
 
                 while (continueLoop) {
-                    const functionCalls = await processStreamInlineRegen(currentReader, newAssistantId, controller.signal);
+                    const { functionCalls, tokenCount, roundText } = await processStreamInlineRegen(currentReader, newAssistantId, controller.signal);
+                    totalTokensUsed += tokenCount;
+
+                    // ── Mid-stream credit exhaustion check (regenerate) ───────
+                    // Same logic as handleSend: compare cumulative totalTokensUsed
+                    // against the starting balance, not just the current round.
+                    if (user && totalTokensUsed > 0) {
+                        const totalCostSoFar = computeCredits(totalTokensUsed, accumulatedThought.length > 0, (userMessage?.attachments?.length ?? 0) > 0);
+                        if (user.credits_left - totalCostSoFar <= 0) {
+                            outOfCreditsRef.current = true;
+                            setOutOfCredits(true);
+                            controller.abort();
+                            break;
+                        }
+                    }
 
                     if (functionCalls.length > 0) {
-                        const modelFcParts: any[] = functionCalls.map(fc => ({
-                            functionCall: { name: fc.name, args: fc.args },
-                            ...(fc.thoughtSignature ? { thoughtSignature: fc.thoughtSignature } : {})
-                        }));
+                        const modelFcParts: any[] = [];
+                        if (roundText.length > 0) {
+                            modelFcParts.push({ text: roundText });
+                        }
+                        functionCalls.forEach(fc => {
+                            modelFcParts.push({
+                                functionCall: { name: fc.name, args: fc.args },
+                                ...(fc.thoughtSignature ? { thoughtSignature: fc.thoughtSignature } : {})
+                            });
+                        });
                         geminiContents.push({ role: "model", parts: modelFcParts });
 
                         const functionResponses: any[] = [];
@@ -1160,6 +1330,7 @@ export default function ChatMessageInput({ attachments, setAttachments }: ChatMe
                                 return p;
                             }).reverse();
 
+                            // Update the assistant message with the patched tool calls and message parts
                             setChatMessages(prev => prev.map(msg => {
                                 if (msg.id !== newAssistantId) return msg;
                                 return { ...msg, toolCalls: accumulatedToolCalls, messageParts: accumulatedMessageParts };
@@ -1189,7 +1360,7 @@ export default function ChatMessageInput({ attachments, setAttachments }: ChatMe
                     }
                 }
                 setChatMessages(prev => prev.map(msg =>
-                    msg.id === newAssistantId ? { ...msg, isDone: true } : msg
+                    msg.id === newAssistantId ? { ...msg, isDone: true, creditsUsed: computeCredits(totalTokensUsed, accumulatedThought.length > 0, (userMessage?.attachments?.length ?? 0) > 0) } : msg
                 ));
             }
 
@@ -1202,15 +1373,21 @@ export default function ChatMessageInput({ attachments, setAttachments }: ChatMe
                     thinkingTime: thinkingDuration,
                     messageParts: accumulatedMessageParts,
                     toolCalls: accumulatedToolCalls,
-                    createdAt: new Date()
+                    createdAt: new Date(),
+                    creditsUsed: computeCredits(totalTokensUsed, accumulatedThought.length > 0, (userMessage?.attachments?.length ?? 0) > 0)
                 });
             }
+
+            // ── Credit deduction (success path — regenerate) ─────────────────
+            await deductCredits(totalTokensUsed, accumulatedThought.length > 0, userMessage?.attachments?.length > 0);
         } catch (error: any) {
             if (error.name === 'AbortError') {
                 setChatMessages(prev => prev.map(msg =>
                     msg.id === newAssistantId ? { ...msg, isDone: true } : msg
                 ));
-                toast.warning("Answer stopped!");
+                if (!outOfCreditsRef.current) {
+                    toast.warning("Answer stopped!");
+                }
                 if (effectiveChatId) {
                     addMessageToChatMessages(effectiveChatId, {
                         id: newAssistantId,
@@ -1220,9 +1397,12 @@ export default function ChatMessageInput({ attachments, setAttachments }: ChatMe
                         thinkingTime: thinkingDuration,
                         messageParts: accumulatedMessageParts,
                         toolCalls: accumulatedToolCalls,
-                        createdAt: new Date()
+                        createdAt: new Date(),
+                        creditsUsed: computeCredits(totalTokensUsed, accumulatedThought.length > 0, (userMessage?.attachments?.length ?? 0) > 0)
                     });
                 }
+                // ── Credit deduction (abort path — regenerate) ───────────────
+                await deductCredits(totalTokensUsed, accumulatedThought.length > 0, userMessage?.attachments?.length > 0);
             } else {
                 console.error("Failed to get regenerated response:", error);
                 const fallbackContent = "We are unable to satisfy the request at the moment, please try again later or consider using another model.";
@@ -1234,13 +1414,15 @@ export default function ChatMessageInput({ attachments, setAttachments }: ChatMe
                         id: newAssistantId,
                         role: "assistant",
                         content: fallbackContent,
-                        createdAt: new Date()
+                        createdAt: new Date(),
+                        creditsUsed: 0
                     });
                 }
             }
         } finally {
             setIsLoading(false);
             abortControllerRef.current = null;
+            outOfCreditsRef.current = false;
         }
     };
 
@@ -1279,235 +1461,283 @@ export default function ChatMessageInput({ attachments, setAttachments }: ChatMe
     }, [activeTab, content]);
 
     return (
-        <div className="absolute flex flex-col w-[60%] bottom-0 left-[20%] right-[20%] gap-2 z-50" >
-            {/* Edit mode cancel pill */}
-            {pendingEdit && (
-                <div className="flex items-center justify-center animate-in fade-in">
-                    <div className={cn("flex items-center gap-2 bg-popover/60 backdrop-blur-md border border-border px-3 py-1.5 rounded-xl text-xs group relative animate-in fade-in shadow-lg", pendingEdit && "bg-primary/10 border-primary/20")}>
-                        <Edit size={12} className="text-primary" />
-                        <span>Editing message</span>
-                        <button
-                            onClick={() => { clearEdit(); setContent(""); if (editorRef.current) editorRef.current.innerHTML = ""; }}
-                            className="ml-1 flex items-center justify-center rounded-full hover:text-foreground transition-colors"
-                            aria-label="Cancel edit"
-                        >
-                            <X size={12} />
-                        </button>
+        <>
+            {/* ── Out-of-credits popup ─────────────────────────────────────── */}
+            {outOfCredits && (
+                <div
+                    className="fixed inset-0 z-[9999] flex items-center justify-center p-4"
+                    style={{ background: "rgba(0,0,0,0.55)", backdropFilter: "blur(6px)" }}
+                    onClick={() => setOutOfCredits(false)}
+                >
+                    <div
+                        className="relative flex flex-col items-center gap-4 rounded-3xl border border-border bg-popover/80 backdrop-blur-xl shadow-2xl px-8 py-8 max-w-sm w-full animate-in fade-in zoom-in-95 duration-200"
+                        onClick={(e) => e.stopPropagation()}
+                    >
+                        {/* Icon */}
+                        <div className="flex items-center justify-center w-14 h-14 rounded-full bg-destructive/15 border border-destructive/25">
+                            <svg xmlns="http://www.w3.org/2000/svg" width="28" height="28" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className="text-destructive">
+                                <path d="m21.73 18-8-14a2 2 0 0 0-3.48 0l-8 14A2 2 0 0 0 4 21h16a2 2 0 0 0 1.73-3Z" />
+                                <path d="M12 9v4" />
+                                <path d="M12 17h.01" />
+                            </svg>
+                        </div>
+                        {/* Copy */}
+                        <div className="flex flex-col items-center gap-1 text-center">
+                            <h2 className="text-lg font-semibold tracking-tight">You've run out of credits</h2>
+                            <p className="text-sm text-muted-foreground leading-relaxed">
+                                Your answer was cut short because you ran out of credits.
+                                Top up your balance to continue chatting.
+                            </p>
+                        </div>
+                        {/* Gradient rule */}
+                        <div className="w-full h-px bg-gradient-to-r from-transparent via-border to-transparent" />
+                        {/* Actions */}
+                        <div className="flex gap-3 w-full">
+                            <button
+                                onClick={() => setOutOfCredits(false)}
+                                className="flex-1 rounded-xl border border-border bg-background/60 hover:bg-background/80 transition-colors px-4 py-2 text-sm font-medium cursor-pointer"
+                            >
+                                Dismiss
+                            </button>
+                            <button
+                                onClick={() => setOutOfCredits(false)}
+                                className="flex-1 rounded-xl bg-primary text-primary-foreground hover:opacity-90 transition-opacity px-4 py-2 text-sm font-semibold cursor-pointer"
+                            >
+                                Top up
+                            </button>
+                        </div>
                     </div>
                 </div>
             )}
-            {/* Attachment Previews */}
-            {attachments.length > 0 && (
-                <div className="flex flex-row items-center gap-2 px-4 flex-wrap justify-center">
-                    {attachments.map((file, index) => (
-                        <div key={index} className={cn("flex items-center gap-2 bg-popover/60 backdrop-blur-md border border-border px-3 py-1.5 rounded-xl text-xs group relative animate-in fade-in slide-in-from-bottom-2 shadow-lg", pendingEdit && "bg-primary/10 border-primary/20")}>
-                            {(file.type.includes("jpeg") || file.type.includes("png") || file.type.includes("webp")) && (
-                                <FileImage className="w-4 h-4 text-primary" />
-                            )}
-                            {file.type.includes("pdf") && (
-                                <FileTypeCorner className="w-4 h-4 text-destructive" />
-                            )}
-                            {(file.type.includes("webm") || file.type.includes("mp4") || file.type.includes("ogg") || file.name.startsWith("voice-")) && (
-                                <Mic2 className="w-4 h-4 text-primary" />
-                            )}
-                            <span className="max-w-[100px] truncate">{file.name}</span>
+            <div className="absolute flex flex-col w-full sm:w-[90%] lg:w-[60%] bottom-0 left-0 sm:left-[5%] lg:left-[20%] right-0 sm:right-[5%] lg:right-[20%] gap-2 z-50 px-4 sm:px-0 pb-4" >
+                {/* Edit mode cancel pill */}
+                {pendingEdit && (
+                    <div className="flex items-center justify-center animate-in fade-in">
+                        <div className={cn("flex items-center gap-2 bg-popover/60 backdrop-blur-md border border-border px-3 py-1.5 rounded-xl text-xs group relative animate-in fade-in shadow-lg", pendingEdit && "bg-primary/10 border-primary/20")}>
+                            <Edit size={12} className="text-primary" />
+                            <span>Editing message</span>
                             <button
-                                onClick={() => removeAttachment(index)}
-                                className="text-muted-foreground hover:text-foreground transition-colors"
+                                onClick={() => { clearEdit(); setContent(""); if (editorRef.current) editorRef.current.innerHTML = ""; }}
+                                className="ml-1 flex items-center justify-center rounded-full hover:text-foreground transition-colors"
+                                aria-label="Cancel edit"
                             >
-                                <X size={14} />
+                                <X size={12} />
                             </button>
                         </div>
-                    ))}
-                </div>
-            )
-            }
+                    </div>
+                )}
+                {/* Attachment Previews */}
+                {attachments.length > 0 && (
+                    <div className="flex flex-row items-center gap-2 px-4 flex-wrap justify-center">
+                        {attachments.map((file, index) => (
+                            <div key={index} className={cn("flex items-center gap-2 bg-popover/60 backdrop-blur-md border border-border px-3 py-1.5 rounded-xl text-xs group relative animate-in fade-in slide-in-from-bottom-2 shadow-lg", pendingEdit && "bg-primary/10 border-primary/20")}>
+                                {(file.type.includes("jpeg") || file.type.includes("png") || file.type.includes("webp")) && (
+                                    <FileImage className="w-4 h-4 text-primary" />
+                                )}
+                                {file.type.includes("pdf") && (
+                                    <FileTypeCorner className="w-4 h-4 text-destructive" />
+                                )}
+                                {(file.type.includes("webm") || file.type.includes("mp4") || file.type.includes("ogg") || file.name.startsWith("voice-")) && (
+                                    <Mic2 className="w-4 h-4 text-primary" />
+                                )}
+                                <span className="max-w-[100px] truncate">{file.name}</span>
+                                <button
+                                    onClick={() => removeAttachment(index)}
+                                    className="text-muted-foreground hover:text-foreground transition-colors"
+                                >
+                                    <X size={14} />
+                                </button>
+                            </div>
+                        ))}
+                    </div>
+                )
+                }
 
-            < div className="flex gap-2 items-center items-end pb-1" >
-                <div className={cn("rounded-[30px] p-2 border-1 border-border transition-all duration-200 bg-popover/40 backdrop-blur-md shadow-lg", pendingEdit && "bg-primary/10 border-primary/20")}>
-                    <Tooltip>
-                        <TooltipTrigger asChild>
-                            <Button
-                                variant="ghost"
-                                size="icon"
-                                className="h-10 w-10 rounded-full"
-                                disabled={attachments.length >= 3}
-                                onClick={() => { if (attachments.length < 3) fileInputRef.current?.click(); else toast.error("Maximum 3 attachments allowed", { position: "bottom-right", duration: 1000 }) }}
-                            >
-                                <Plus />
-                            </Button>
-                        </TooltipTrigger>
-                        <TooltipContent><p>Attach Image or PDF</p><p className="text-xs text-muted-foreground">Maximum 3 attachments allowed</p></TooltipContent>
-                    </Tooltip>
-                </div>
-                <div className={cn("flex w-full rounded-[30px] border-1 border-border bg-popover/60 backdrop-blur-md shadow-lg px-2 py-1 items-end justify-center gap-2 transition-all duration-200", pendingEdit && "bg-primary/10 border-primary/20")}>
-                    <input
-                        type="file"
-                        ref={fileInputRef}
-                        className="hidden"
-                        multiple
-                        accept="image/*,.pdf"
-                        onChange={(e) => {
-                            setAttachments(prev => [...prev, ...Array.from(e.target.files || [])]);
-                            e.target.value = "";
-                        }}
-                    />
-                    <div className="flex items-center pb-1 gap-1">
-
+                < div className="flex gap-2 items-center items-end pb-1" >
+                    <div className={cn("rounded-[30px] p-2 border-1 border-border transition-all duration-200 bg-popover/40 backdrop-blur-md shadow-lg", pendingEdit && "bg-primary/10 border-primary/20")}>
                         <Tooltip>
                             <TooltipTrigger asChild>
                                 <Button
                                     variant="ghost"
                                     size="icon"
                                     className="h-10 w-10 rounded-full"
-                                    onClick={() => setIsThinking(!isThinking)}
+                                    disabled={attachments.length >= 3}
+                                    onClick={() => { if (attachments.length < 3) fileInputRef.current?.click(); else toast.error("Maximum 3 attachments allowed", { position: "bottom-right", duration: 1000 }) }}
                                 >
-                                    <Lightbulb className={isThinking ? "text-primary transition-all duration-100" : "text-foreground transition-all duration-100"} />
+                                    <Plus />
                                 </Button>
                             </TooltipTrigger>
-                            <TooltipContent>
-                                <p>Think Deeper</p>
-                                <p className="text-xs text-muted-foreground">Improved reasoning, higher latency</p>
-                            </TooltipContent>
+                            <TooltipContent><p>Attach Image or PDF</p><p className="text-xs text-muted-foreground">Maximum 3 attachments allowed</p></TooltipContent>
                         </Tooltip>
                     </div>
-                    {isRecording ? (
-                        <div className="flex flex-col items-center justify-center w-full py-1 gap-1">
-                            <WaveformAnimation analyserNode={analyserNode} isRecording={isRecording} barCount={32} />
-                            <span className="text-xs text-destructive font-mono font-semibold animate-pulse">
-                                {formatDuration(recordingDuration)}
-                            </span>
+                    <div className={cn("flex w-full rounded-[30px] border-1 border-border bg-popover/60 backdrop-blur-md shadow-lg px-2 py-1 items-end justify-center gap-2 transition-all duration-200", pendingEdit && "bg-primary/10 border-primary/20")}>
+                        <input
+                            type="file"
+                            ref={fileInputRef}
+                            className="hidden"
+                            multiple
+                            accept="image/*,.pdf"
+                            onChange={(e) => {
+                                setAttachments(prev => [...prev, ...Array.from(e.target.files || [])]);
+                                e.target.value = "";
+                            }}
+                        />
+                        <div className="flex items-center pb-1 gap-1">
+
+                            <Tooltip>
+                                <TooltipTrigger asChild>
+                                    <Button
+                                        variant="ghost"
+                                        size="icon"
+                                        className="h-10 w-10 rounded-full"
+                                        onClick={() => setIsThinking(!isThinking)}
+                                    >
+                                        <Lightbulb className={isThinking ? "text-primary transition-all duration-100" : "text-foreground transition-all duration-100"} />
+                                    </Button>
+                                </TooltipTrigger>
+                                <TooltipContent>
+                                    <p>Think Deeper</p>
+                                    <p className="text-xs text-muted-foreground">Improved reasoning, higher latency</p>
+                                </TooltipContent>
+                            </Tooltip>
                         </div>
-                    ) : hasRecording ? (
-                        <div className="flex flex-col items-center justify-center w-full py-1 gap-1.5">
-                            <WaveformAnimation analyserNode={null} isRecording={false} barCount={32} />
-                            {audioURL && (
-                                <audio controls src={audioURL} className="h-7 w-full max-w-[240px] opacity-80" />
-                            )}
-                        </div>
-                    ) : (
-                        <div className="relative w-full">
-                            {/* Single contenteditable div — no mirror needed */}
-                            <div
-                                ref={editorRef}
-                                contentEditable
-                                suppressContentEditableWarning
-                                role="textbox"
-                                aria-multiline="true"
-                                aria-label="Ask Orthan AI anything..."
-                                data-placeholder="Ask Orthan AI anything..."
-                                className="mention-editor w-full focus:outline-none outline-none scrollbar-no-bg"
-                                onInput={(e) => {
-                                    const el = e.currentTarget
-                                    const walk = (node: Node): string => {
-                                        if (node.nodeType === Node.TEXT_NODE) return node.textContent ?? ""
-                                        if ((node as Element).tagName === "BR") return "\n"
-                                        // For mention-token spans, return their text as-is
-                                        if ((node as HTMLElement).classList?.contains("mention-token")) return node.textContent ?? ""
-                                        return Array.from(node.childNodes).map(walk).join("")
-                                    }
-                                    const text = walk(el)
-                                    setContent(text)
-
-                                    // Detect @mention trigger using caret offset
-                                    const sel = window.getSelection()
-                                    if (!sel || sel.rangeCount === 0) return
-                                    const range = sel.getRangeAt(0).cloneRange()
-                                    range.selectNodeContents(el)
-                                    range.setEnd(sel.getRangeAt(0).endContainer, sel.getRangeAt(0).endOffset)
-                                    const caretOffset = range.toString().length
-
-                                    const slice = text.slice(0, caretOffset)
-                                    const match = slice.match(/@([\w\s.-]*)$/)
-                                    if (match) {
-                                        const atPos = caretOffset - match[0].length
-                                        setMentionStart(atPos)
-                                        setMentionQuery(match[1])
-                                    } else {
-                                        closeMention()
-                                    }
-                                }}
-                                onKeyDown={(e) => {
-                                    // @mention navigation
-                                    if (mentionQuery !== null && mentionSuggestions.length > 0) {
-                                        if (e.key === "ArrowDown") {
-                                            e.preventDefault()
-                                            setMentionIndex(i => (i + 1) % mentionSuggestions.length)
-                                            return
-                                        }
-                                        if (e.key === "ArrowUp") {
-                                            e.preventDefault()
-                                            setMentionIndex(i => (i - 1 + mentionSuggestions.length) % mentionSuggestions.length)
-                                            return
-                                        }
-                                        if (e.key === "Tab" || e.key === "Enter") {
-                                            e.preventDefault()
-                                            confirmMention(mentionSuggestions[mentionIndex])
-                                            return
-                                        }
-                                        if (e.key === "Escape") {
-                                            e.preventDefault()
-                                            closeMention()
-                                            return
-                                        }
-                                    }
-
-                                    if (e.key === "Enter" && !e.shiftKey) {
-                                        e.preventDefault()
-                                        handleSend()
-                                        return
-                                    }
-                                    // Shift+Enter inserts a newline naturally
-                                }}
-                                onBlur={() => {
-                                    // Brief delay so click on suggestion registers first
-                                    setTimeout(() => closeMention(), 150)
-                                }}
-                                onPaste={(e) => {
-                                    // Strip HTML on paste — insert plain text only
-                                    e.preventDefault()
-                                    const text = e.clipboardData.getData("text/plain")
-                                    document.execCommand("insertText", false, text)
-                                }}
-                            />
-                            {/* @mention suggestion dropdown */}
-                            {mentionQuery !== null && mentionSuggestions.length > 0 && (
+                        {isRecording ? (
+                            <div className="flex flex-col items-center justify-center w-full py-1 gap-1">
+                                <WaveformAnimation analyserNode={analyserNode} isRecording={isRecording} barCount={32} />
+                                <span className="text-xs text-destructive font-mono font-semibold animate-pulse">
+                                    {formatDuration(recordingDuration)}
+                                </span>
+                            </div>
+                        ) : hasRecording ? (
+                            <div className="flex flex-col items-center justify-center w-full py-1 gap-1.5">
+                                <WaveformAnimation analyserNode={null} isRecording={false} barCount={32} />
+                                {audioURL && (
+                                    <audio controls src={audioURL} className="h-7 w-full max-w-[240px] opacity-80" />
+                                )}
+                            </div>
+                        ) : (
+                            <div className="relative w-full">
+                                {/* Single contenteditable div — no mirror needed */}
                                 <div
-                                    ref={mentionListRef}
-                                    className="mention-suggestions"
-                                    role="listbox"
-                                >
-                                    <p className="mention-suggestions-label">Notes &amp; Folders</p>
-                                    {mentionSuggestions.map((item, idx) => (
-                                        <div
-                                            key={item.id}
-                                            role="option"
-                                            aria-selected={idx === mentionIndex}
-                                            className={cn(
-                                                "mention-suggestion-item",
-                                                idx === mentionIndex && "mention-suggestion-item--active"
-                                            )}
-                                            onMouseDown={(e) => {
-                                                e.preventDefault() // prevent blur
-                                                confirmMention(item)
-                                            }}
-                                            onMouseEnter={() => setMentionIndex(idx)}
-                                        >
-                                            {item.type === "note"
-                                                ? <FileText size={13} className="mention-suggestion-icon mention-suggestion-icon--note" />
-                                                : <Folder size={13} className="mention-suggestion-icon mention-suggestion-icon--folder" />
+                                    ref={editorRef}
+                                    contentEditable
+                                    suppressContentEditableWarning
+                                    role="textbox"
+                                    aria-multiline="true"
+                                    aria-label={`Ask ${settings.aiName} anything...`}
+                                    data-placeholder={`Ask ${settings.aiName} anything...`}
+                                    className="mention-editor w-full focus:outline-none outline-none scrollbar-no-bg"
+                                    onInput={(e) => {
+                                        const el = e.currentTarget
+                                        const walk = (node: Node): string => {
+                                            if (node.nodeType === Node.TEXT_NODE) return node.textContent ?? ""
+                                            if ((node as Element).tagName === "BR") return "\n"
+                                            // For mention-token spans, return their text as-is
+                                            if ((node as HTMLElement).classList?.contains("mention-token")) return node.textContent ?? ""
+                                            return Array.from(node.childNodes).map(walk).join("")
+                                        }
+                                        const text = walk(el)
+                                        setContent(text)
+
+                                        // Detect @mention trigger using caret offset
+                                        const sel = window.getSelection()
+                                        if (!sel || sel.rangeCount === 0) return
+                                        const range = sel.getRangeAt(0).cloneRange()
+                                        range.selectNodeContents(el)
+                                        range.setEnd(sel.getRangeAt(0).endContainer, sel.getRangeAt(0).endOffset)
+                                        const caretOffset = range.toString().length
+
+                                        const slice = text.slice(0, caretOffset)
+                                        const match = slice.match(/@([\w\s.-]*)$/)
+                                        if (match) {
+                                            const atPos = caretOffset - match[0].length
+                                            setMentionStart(atPos)
+                                            setMentionQuery(match[1])
+                                        } else {
+                                            closeMention()
+                                        }
+                                    }}
+                                    onKeyDown={(e) => {
+                                        // @mention navigation
+                                        if (mentionQuery !== null && mentionSuggestions.length > 0) {
+                                            if (e.key === "ArrowDown") {
+                                                e.preventDefault()
+                                                setMentionIndex(i => (i + 1) % mentionSuggestions.length)
+                                                return
                                             }
-                                            <span className="mention-suggestion-title">{item.title}</span>
-                                            <span className="mention-suggestion-type">{item.type}</span>
-                                        </div>
-                                    ))}
-                                    <p className="mention-suggestions-hint"><kbd>Tab</kbd> to confirm · <kbd>↑↓</kbd> to navigate · <kbd>Esc</kbd> to dismiss</p>
-                                </div>
-                            )}
-                        </div>
-                    )}
-                    <div className="flex items-center pb-1 gap-1">
-                        {/* <Popover open={isSelectingModelPopoverOpen}>
+                                            if (e.key === "ArrowUp") {
+                                                e.preventDefault()
+                                                setMentionIndex(i => (i - 1 + mentionSuggestions.length) % mentionSuggestions.length)
+                                                return
+                                            }
+                                            if (e.key === "Tab" || e.key === "Enter") {
+                                                e.preventDefault()
+                                                confirmMention(mentionSuggestions[mentionIndex])
+                                                return
+                                            }
+                                            if (e.key === "Escape") {
+                                                e.preventDefault()
+                                                closeMention()
+                                                return
+                                            }
+                                        }
+
+                                        if (e.key === "Enter" && !e.shiftKey) {
+                                            e.preventDefault()
+                                            handleSend()
+                                            return
+                                        }
+                                        // Shift+Enter inserts a newline naturally
+                                    }}
+                                    onBlur={() => {
+                                        // Brief delay so click on suggestion registers first
+                                        setTimeout(() => closeMention(), 150)
+                                    }}
+                                    onPaste={(e) => {
+                                        // Strip HTML on paste — insert plain text only
+                                        e.preventDefault()
+                                        const text = e.clipboardData.getData("text/plain")
+                                        document.execCommand("insertText", false, text)
+                                    }}
+                                />
+                                {/* @mention suggestion dropdown */}
+                                {mentionQuery !== null && mentionSuggestions.length > 0 && (
+                                    <div
+                                        ref={mentionListRef}
+                                        className="mention-suggestions"
+                                        role="listbox"
+                                    >
+                                        <p className="mention-suggestions-label">Notes &amp; Folders</p>
+                                        {mentionSuggestions.map((item, idx) => (
+                                            <div
+                                                key={item.id}
+                                                role="option"
+                                                aria-selected={idx === mentionIndex}
+                                                className={cn(
+                                                    "mention-suggestion-item",
+                                                    idx === mentionIndex && "mention-suggestion-item--active"
+                                                )}
+                                                onMouseDown={(e) => {
+                                                    e.preventDefault() // prevent blur
+                                                    confirmMention(item)
+                                                }}
+                                                onMouseEnter={() => setMentionIndex(idx)}
+                                            >
+                                                {item.type === "note"
+                                                    ? <FileText size={13} className="mention-suggestion-icon mention-suggestion-icon--note" />
+                                                    : <Folder size={13} className="mention-suggestion-icon mention-suggestion-icon--folder" />
+                                                }
+                                                <span className="mention-suggestion-title">{item.title}</span>
+                                                <span className="mention-suggestion-type">{item.type}</span>
+                                            </div>
+                                        ))}
+                                        <p className="mention-suggestions-hint"><kbd>Tab</kbd> to confirm · <kbd>↑↓</kbd> to navigate · <kbd>Esc</kbd> to dismiss</p>
+                                    </div>
+                                )}
+                            </div>
+                        )}
+                        <div className="flex items-center pb-1 gap-1">
+                            {/* <Popover open={isSelectingModelPopoverOpen}>
                             <Tooltip>
                                 <TooltipTrigger asChild>
                                     <PopoverTrigger asChild>
@@ -1546,60 +1776,61 @@ export default function ChatMessageInput({ attachments, setAttachments }: ChatMe
                                 </div>
                             </PopoverContent>
                         </Popover> */}
-                        {hasRecording && (
+                            {hasRecording && (
+                                <Tooltip>
+                                    <TooltipTrigger asChild>
+                                        <Button
+                                            variant="ghost"
+                                            size="icon"
+                                            className="h-10 w-10 rounded-full text-destructive hover:text-destructive"
+                                            onClick={handleDiscardRecording}
+                                        >
+                                            <Trash2 size={18} />
+                                        </Button>
+                                    </TooltipTrigger>
+                                    <TooltipContent><p>Discard recording</p></TooltipContent>
+                                </Tooltip>
+                            )}
                             <Tooltip>
                                 <TooltipTrigger asChild>
                                     <Button
-                                        variant="ghost"
+                                        variant={isRecording ? "destructive" : "ghost"}
                                         size="icon"
-                                        className="h-10 w-10 rounded-full text-destructive hover:text-destructive"
-                                        onClick={handleDiscardRecording}
+                                        className={cn(
+                                            "h-10 w-10 rounded-full transition-all duration-200",
+                                            isRecording && "animate-pulse shadow-lg shadow-destructive/40"
+                                        )}
+                                        onClick={handleMicToggle}
                                     >
-                                        <Trash2 size={18} />
+                                        {isRecording ? <MicOff size={18} /> : <Mic size={18} />}
                                     </Button>
                                 </TooltipTrigger>
-                                <TooltipContent><p>Discard recording</p></TooltipContent>
+                                <TooltipContent>
+                                    <p>{isRecording ? "Stop recording" : hasRecording ? "Re-record" : "Voice note"}</p>
+                                </TooltipContent>
                             </Tooltip>
-                        )}
-                        <Tooltip>
-                            <TooltipTrigger asChild>
-                                <Button
-                                    variant={isRecording ? "destructive" : "ghost"}
-                                    size="icon"
-                                    className={cn(
-                                        "h-10 w-10 rounded-full transition-all duration-200",
-                                        isRecording && "animate-pulse shadow-lg shadow-destructive/40"
-                                    )}
-                                    onClick={handleMicToggle}
-                                >
-                                    {isRecording ? <MicOff size={18} /> : <Mic size={18} />}
-                                </Button>
-                            </TooltipTrigger>
-                            <TooltipContent>
-                                <p>{isRecording ? "Stop recording" : hasRecording ? "Re-record" : "Voice note"}</p>
-                            </TooltipContent>
-                        </Tooltip>
-                        <Tooltip>
-                            <TooltipTrigger asChild>
-                                <Button
-                                    variant="default"
-                                    size="icon"
-                                    onClick={hasRecording ? handleSendRecording : isLoading ? handleStop : handleSend}
-                                    disabled={!hasRecording && !isLoading && content.length === 0 && attachments.length === 0}
-                                    className="h-10 w-10 rounded-full p-0 flex items-center justify-center"
-                                >
-                                    {isLoading && !hasRecording ? (
-                                        <Square size={20} className="fill-current" />
-                                    ) : (
-                                        <ArrowUp size={20} />
-                                    )}
-                                </Button>
-                            </TooltipTrigger>
-                            <TooltipContent><p>{hasRecording ? "Send voice note" : isLoading ? "Stop generating" : "Send Message"}</p></TooltipContent>
-                        </Tooltip>
+                            <Tooltip>
+                                <TooltipTrigger asChild>
+                                    <Button
+                                        variant="default"
+                                        size="icon"
+                                        onClick={hasRecording ? handleSendRecording : isLoading ? handleStop : handleSend}
+                                        disabled={(!hasRecording && !isLoading && content.trim().length === 0 && attachments.length === 0) || user?.credits_left === 0}
+                                        className="h-10 w-10 rounded-full p-0 flex items-center justify-center"
+                                    >
+                                        {isLoading && !hasRecording ? (
+                                            <Square size={20} className="fill-current" />
+                                        ) : (
+                                            <ArrowUp size={20} />
+                                        )}
+                                    </Button>
+                                </TooltipTrigger>
+                                <TooltipContent><p>{hasRecording ? "Send voice note" : isLoading ? "Stop generating" : "Send Message"}</p></TooltipContent>
+                            </Tooltip>
+                        </div>
                     </div>
-                </div>
+                </div >
             </div >
-        </div >
+        </>
     )
 }

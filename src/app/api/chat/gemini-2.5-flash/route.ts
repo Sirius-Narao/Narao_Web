@@ -21,6 +21,7 @@ export async function POST(req: NextRequest) {
             const stream = new ReadableStream({
                 async start(controller) {
                     const encoder = new TextEncoder();
+                    let totalTokenCount = 0;
                     try {
                         for await (const chunk of result) {
                             const candidate = chunk.candidates?.[0];
@@ -35,6 +36,12 @@ export async function POST(req: NextRequest) {
                                     }
                                 }
                             }
+                            if (chunk.usageMetadata?.totalTokenCount) {
+                                totalTokenCount = chunk.usageMetadata.totalTokenCount;
+                            }
+                        }
+                        if (totalTokenCount > 0) {
+                            controller.enqueue(encoder.encode(JSON.stringify({ type: "usageMetadata", totalTokens: totalTokenCount }) + "\n"));
                         }
                     } catch (e) { controller.error(e); } finally { controller.close(); }
                 }
@@ -117,6 +124,7 @@ export async function POST(req: NextRequest) {
         const stream = new ReadableStream({
             async start(controller) {
                 const encoder = new TextEncoder();
+                let totalTokenCount = 0;
                 try {
                     for await (const chunk of result) {
                         const candidate = chunk.candidates?.[0];
@@ -141,6 +149,12 @@ export async function POST(req: NextRequest) {
                                 }
                             }
                         }
+                        if (chunk.usageMetadata?.totalTokenCount) {
+                            totalTokenCount = chunk.usageMetadata.totalTokenCount;
+                        }
+                    }
+                    if (totalTokenCount > 0) {
+                        controller.enqueue(encoder.encode(JSON.stringify({ type: "usageMetadata", totalTokens: totalTokenCount }) + "\n"));
                     }
                 } catch (error) {
                     console.error("Stream error:", error);

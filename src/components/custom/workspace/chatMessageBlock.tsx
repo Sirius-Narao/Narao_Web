@@ -1,6 +1,6 @@
 import { ChatMessage } from "@/types/chatType";
 import { MarkdownRenderer } from "./MarkdownRenderer";
-import { BookOpen, Check, ChevronDown, Copy, Edit, FileImage, FileMinus, FilePen, FilePlus, FileText, FileTypeCorner, FolderMinus, FolderPlus, FolderSearch, Lightbulb, Move, Palette, PenTool, RefreshCcw, Sun, ThumbsDown, ThumbsUp, TriangleAlert, Wrench } from "lucide-react";
+import { BookOpen, Check, ChevronDown, Coins, Copy, Edit, FileImage, FileMinus, FilePen, FilePlus, FileText, FileTypeCorner, FolderMinus, FolderPlus, FolderSearch, Lightbulb, Move, Palette, PenTool, RefreshCcw, Sun, ThumbsDown, ThumbsUp, TriangleAlert, Wrench } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { useState, useEffect } from "react";
 import { cn } from "@/lib/utils";
@@ -288,6 +288,19 @@ export default function ChatMessageBlock({ message }: { message: ChatMessage }) 
                                         <p>Regenerate</p>
                                     </TooltipContent>
                                 </Tooltip>
+                                {message.creditsUsed && (
+                                    <Tooltip>
+                                        <TooltipTrigger asChild>
+                                            <Button variant={"ghost"} className="gap-2 flex">
+                                                <Coins className="w-4 h-4 text-muted-foreground" />
+                                                <p className="text-muted-foreground">{message.creditsUsed.toLocaleString()}</p>
+                                            </Button>
+                                        </TooltipTrigger>
+                                        <TooltipContent>
+                                            <p>Credits used</p>
+                                        </TooltipContent>
+                                    </Tooltip>
+                                )}
                             </div>
                         )}
                     </div>
