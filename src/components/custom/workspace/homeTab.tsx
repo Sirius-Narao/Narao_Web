@@ -7,6 +7,7 @@ import { Note } from "@/types/folderStructureTypes";
 import { useUser } from "@/context/userContext";
 import { supabase } from "@/lib/supabaseClient";
 import { useContent } from "@/context/contentContext";
+import { Skeleton } from "@/components/ui/skeleton";
 
 export default function HomeTab({ setIsNoteOpened, setAccessedNote }: { setIsNoteOpened: (value: boolean) => void, setAccessedNote: (value: Note) => void }) {
     const headingText = useTypingTextAnimation(["Hey, what would you like to do? ", "Anything to learn or create? ", "Or just a simple chat? ", "I'm getting bored... "], 5000);
@@ -14,7 +15,7 @@ export default function HomeTab({ setIsNoteOpened, setAccessedNote }: { setIsNot
     const { user } = useUser();
     const { setContent } = useContent();
 
-    const { fetchedNotes } = useFetchedNotes();
+    const { fetchedNotes, loading: notesLoading } = useFetchedNotes();
 
     const openNote = async (note: Note) => {
         if (!user) return;
@@ -39,7 +40,19 @@ export default function HomeTab({ setIsNoteOpened, setAccessedNote }: { setIsNot
         }
     };
 
-    const mostRecentNotes = fetchedNotes.sort((a, b) => b.updatedAt.getTime() - a.updatedAt.getTime()).slice(0, 5);
+    const mostRecentNotes = () => {
+        if (!notesLoading) return null;
+        if (fetchedNotes.length === 0) return <p className="text-lg font-medium whitespace-pre text-muted-foreground">No notes found</p>;
+        const notes = [...fetchedNotes].sort((a, b) => b.updatedAt.getTime() - a.updatedAt.getTime()).slice(0, 5);
+        return notes.map((note, index) => (
+            <div key={note.id} className="flex items-center gap-2 cursor-pointer fade-up bg-muted-foreground/10 hover:bg-muted-foreground/20 rounded-full px-4 py-2 transition-all duration-200" style={{ animationDelay: `${index * 100}ms` }} onClick={() => openNote(note)}>
+                <FileText className="w-4 h-4 text-muted-foreground" />
+                <p className="text-lg font-medium whitespace-pre text-muted-foreground">
+                    {note.title}
+                </p>
+            </div>
+        ));
+    };
 
     return (
         <div className="flex items-center justify-center h-full flex-col">
@@ -82,16 +95,15 @@ export default function HomeTab({ setIsNoteOpened, setAccessedNote }: { setIsNot
                     Or get back into something you were working on?
                 </p>
             </div>
-            <div className="flex gap-2 max-w-[60%] flex-wrap items-center justify-center">
-                {mostRecentNotes.map((note, index) => (
-                    <div key={note.id} className="flex items-center gap-2 cursor-pointer fade-up bg-muted-foreground/10 hover:bg-muted-foreground/20 rounded-full px-4 py-2 transition-all duration-200" style={{ animationDelay: `${index * 100}ms` }} onClick={() => openNote(note)}>
-                        <FileText className="w-4 h-4 text-muted-foreground" />
-                        <p className="text-lg font-medium whitespace-pre text-muted-foreground">
-                            {note.title}
-                        </p>
-                    </div>
-                ))}
-            </div>
+            {mostRecentNotes() ? <div className="flex gap-2 max-w-[60%] w-full flex-wrap items-center justify-center">
+                {mostRecentNotes()}
+            </div> : <div className="flex gap-2 max-w-[60%] w-full flex-wrap items-center justify-center">
+                <Skeleton className="w-[40%] h-10 rounded-full" />
+                <Skeleton className="w-[30%] h-10 rounded-full" />
+                <Skeleton className="w-[40%] h-10 rounded-full" />
+                <Skeleton className="w-[40%] h-10 rounded-full" />
+                <Skeleton className="w-[40%] h-10 rounded-full" />
+            </div>}
         </div>
     );
 }

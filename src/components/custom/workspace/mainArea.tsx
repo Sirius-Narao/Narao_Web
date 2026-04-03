@@ -40,7 +40,7 @@ export default function MainArea() {
     const [isNoteOpened, setIsNoteOpened] = useState(false);
 
     const [foldersLoaded, setFoldersLoaded] = useState(false);
-    const [notesLoaded, setNotesLoaded] = useState(false);
+    const { loading: notesLoaded, setLoading: setNotesLoaded } = useFetchedNotes();
 
     // ─── Fetch user auth ──────────────────────────────────────────────────────
     useEffect(() => {

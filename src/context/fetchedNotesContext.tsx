@@ -5,6 +5,8 @@ import { Note, FetchedNotes } from "@/types/folderStructureTypes";
 interface FetchedNotesContextType {
     fetchedNotes: FetchedNotes;
     setFetchedNotes: Dispatch<SetStateAction<FetchedNotes>>;
+    loading: boolean;
+    setLoading: Dispatch<SetStateAction<boolean>>;
 }
 
 
@@ -12,10 +14,10 @@ const FetchedNotesContext = createContext<FetchedNotesContextType | undefined>(u
 
 function FetchedNotesProvider({ children }: { children: ReactNode }) {
     const [fetchedNotes, setFetchedNotes] = useState<FetchedNotes>([]);
-
+    const [loading, setLoading] = useState<boolean>(false);
 
     return (
-        <FetchedNotesContext.Provider value={{ fetchedNotes, setFetchedNotes }}>
+        <FetchedNotesContext.Provider value={{ fetchedNotes, setFetchedNotes, loading, setLoading }}>
             {children}
         </FetchedNotesContext.Provider>
     );
