@@ -30,7 +30,7 @@ export default function MainArea() {
     const { setSettingsOpen } = useSettingsOpen();
     const { setFetchedFolders } = useFetchedFolders();
     const { setFetchedNotes } = useFetchedNotes();
-    const { setCurrentChatId, setChatMessages, setChatTitle } = useChatMessages();
+    const { setCurrentChatId, setChatMessages, setChatTitle, removeTabState } = useChatMessages();
     const { setContent } = useContent();
 
     const { tabs, activeTab, openTab, closeTab, activeTabId, setActiveTabId } = useTabs();
@@ -137,10 +137,8 @@ export default function MainArea() {
         } else {
             toast.error("Too many tabs open", { position: 'bottom-right' });
         }
-        setCurrentChatId(null);
-        setChatMessages([]);
-        setChatTitle("New Chat");
-    }, [openTab, setCurrentChatId, setChatMessages, setChatTitle, tabs.length]);
+        // Each ChatsTab now manages its own per-tab state, no global reset needed
+    }, [openTab, tabs.length]);
 
     const openPreviousTab = useCallback(() => {
         if (activeTabId) {
@@ -180,6 +178,7 @@ export default function MainArea() {
                 e.preventDefault();
                 if (activeTabId) {
                     closeTab(activeTabId);
+                    removeTabState(activeTabId);
                 }
             } else if (e.ctrlKey && e.key === "ArrowLeft" && e.shiftKey) {
                 e.preventDefault();
@@ -229,7 +228,7 @@ export default function MainArea() {
             );
         }
         else if (activeTab.type === "chat") {
-            return <ChatsTab initialChatId={activeTab.chatId ?? null} />;
+            return <ChatsTab tabId={activeTab.id} initialChatId={activeTab.chatId ?? null} />;
         } else if (activeTab.type === "home") {
             return <HomeTab setIsNoteOpened={setIsNoteOpened} setAccessedNote={setAccessedNote} />;
         }

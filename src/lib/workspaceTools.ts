@@ -2,6 +2,7 @@ import React from "react";
 import { Type } from "@google/genai";
 import { supabase } from "@/lib/supabaseClient";
 import { Note, Folder } from "@/types/folderStructureTypes";
+import { folderColorClasses } from "@/constants/folderColors";
 
 // ─── Types ────────────────────────────────────────────────────────────────────
 
@@ -186,6 +187,11 @@ export const WORKSPACE_TOOL_DECLARATIONS = [
                 parent_path: {
                     type: Type.STRING,
                     description: "Absolute path of the parent folder (e.g. '/projects'). Write '/' to create at root."
+                },
+                color: {
+                    type: Type.STRING,
+                    enum: Object.keys(folderColorClasses),
+                    description: "The color of the folder (e.g. 'folder-red')."
                 }
             },
             required: ["name", "parent_path"]
@@ -452,7 +458,7 @@ export async function executeToolCall(
                     name: args.name,
                     user_id: userId,
                     parent_id: parentId,
-                    color: "folder-blue",
+                    color: args.color || "folder-blue",
                     created_at: new Date(),
                     updated_at: new Date()
                 }])

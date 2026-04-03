@@ -14,7 +14,7 @@ const SETTINGS_STORAGE_KEY = "narao_settings";
 
 const defaultSettings: SettingsType = {
     theme: "system",
-    language: "en",
+    language: "auto-detect",
     customInstructions: {
         aboutUser: "",
         customPrompt: "",

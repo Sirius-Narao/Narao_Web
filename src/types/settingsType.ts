@@ -1,6 +1,6 @@
 export type Plan = "free" | "pro";
 export type Theme = "light" | "dark" | "system";
-export type Language = "en" | "fr" | "es" | "de" | "it" | "pt" | "zh" | "ja" | "ko";
+export type Language = "en" | "fr" | "es" | "de" | "it" | "pt" | "zh" | "ja" | "ko" | "auto-detect";
 export interface CustomInstructions {
     aboutUser: string;
     customPrompt: string;

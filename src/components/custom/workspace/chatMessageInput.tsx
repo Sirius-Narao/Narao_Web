@@ -48,7 +48,7 @@ export default function ChatMessageInput({ attachments, setAttachments }: ChatMe
     const editorRef = useRef<HTMLDivElement>(null)
     const fileInputRef = useRef<HTMLInputElement>(null)
     const abortControllerRef = useRef<AbortController | null>(null)
-    const { chatMessages, setChatMessages, currentChatId, setCurrentChatId, refreshChats, setChatTitle } = useChatMessages()
+    const { chatMessages, setChatMessages, currentChatId, setCurrentChatId, refreshChats, setChatTitle, setChatCache } = useChatMessages()
 
     // Audio recording
     const { recordingState, audioURL, audioBlob, startRecording, stopRecording, uploadRecording, reset: resetRecording, analyserNode } = useAudioRecorder()
@@ -71,8 +71,8 @@ export default function ChatMessageInput({ attachments, setAttachments }: ChatMe
     const { fetchedNotes, setFetchedNotes } = useFetchedNotes();
     const { fetchedFolders, setFetchedFolders } = useFetchedFolders();
 
-    // Model Settings
-    const [currentModel, setCurrentModel] = useState<keyof Models>("gemini-2.5-flash")
+    // Model Settings+
+    const [currentModel, setCurrentModel] = useState<keyof Models>("gemini-3-flash-preview")
 
     // Popover Settings
     // const [isSelectingModelPopoverOpen, setIsSelectingModelPopoverOpen] = useState(false)
@@ -317,7 +317,7 @@ export default function ChatMessageInput({ attachments, setAttachments }: ChatMe
                 headers: { "Content-Type": "application/json" },
                 body: JSON.stringify({
                     history: [],
-                    userInput: `Summarize this message in MAX 3-5 words to make it a chat title, it has to be as descriptive as possible: "${firstUserContent}". Only return the title, nothing else.`,
+                    userInput: `Summarize this message in MAX 3-5 words to make it a chat title, it has to be as descriptive as possible: "${firstUserContent}". Only return the title, nothing else. ${settings.language === "auto-detect" ? "Detect the language of the user and use it." : `Use the language ${settings.language} if you cannot detect the language of the query.`}`,
                     isThinking: false
                 })
             });
@@ -666,11 +666,21 @@ export default function ChatMessageInput({ attachments, setAttachments }: ChatMe
                 } else if (data) {
                     const newChatId = data.id as string;
                     effectiveChatId = newChatId;
+
+                    // Pre-fill cache before setting currentChatId so that chat.tsx doesn't 
+                    // unnecessarily fetch empty DB state and override our accurate local state.
+                    const finalMessages = [...updatedHistory, assistantMessage];
+                    setChatCache(prev => ({
+                        ...prev,
+                        [newChatId]: { messages: finalMessages, title: "New Chat" }
+                    }));
+
                     setCurrentChatId(newChatId);
+
                     // Save user message for the new chat (must be awaited before attachments)
                     await addMessageToChatMessages(newChatId, userMessage);
                     // Save attachments linked to the user message
-                    addAttachmentsToChatAttachments(userMessage.id, uiAttachments);
+                    await addAttachmentsToChatAttachments(userMessage.id, uiAttachments);
                     // Rename and describe the chat in the background
                     updateChatName(newChatId, currentContent);
                     updateChatDescription(newChatId, currentContent);
@@ -678,7 +688,7 @@ export default function ChatMessageInput({ attachments, setAttachments }: ChatMe
             } else if (effectiveChatId) {
                 // Save user message for existing chat (must be awaited before attachments)
                 await addMessageToChatMessages(effectiveChatId, userMessage);
-                addAttachmentsToChatAttachments(userMessage.id, uiAttachments);
+                await addAttachmentsToChatAttachments(userMessage.id, uiAttachments);
             }
 
             // 4. Call Streaming API
@@ -825,6 +835,9 @@ export default function ChatMessageInput({ attachments, setAttachments }: ChatMe
                 let currentReader = reader;
                 let continueToolLoop = true;
 
+                let currentFetchedNotes = [...fetchedNotes];
+                let currentFetchedFolders = [...fetchedFolders];
+
                 while (continueToolLoop) {
                     const { functionCalls, tokenCount, roundText } = await processStreamInline(currentReader, assistantId, controller.signal);
                     // Add this round's tokens to the running total across all tool-call rounds.
@@ -871,10 +884,16 @@ export default function ChatMessageInput({ attachments, setAttachments }: ChatMe
                             try {
                                 result = await executeToolCall(fc.name, fc.args, {
                                     userId: user!.id,
-                                    fetchedNotes,
-                                    fetchedFolders,
-                                    setFetchedNotes,
-                                    setFetchedFolders
+                                    fetchedNotes: currentFetchedNotes,
+                                    fetchedFolders: currentFetchedFolders,
+                                    setFetchedNotes: (action) => {
+                                        currentFetchedNotes = typeof action === 'function' ? action(currentFetchedNotes) : action;
+                                        setFetchedNotes(action);
+                                    },
+                                    setFetchedFolders: (action) => {
+                                        currentFetchedFolders = typeof action === 'function' ? action(currentFetchedFolders) : action;
+                                        setFetchedFolders(action);
+                                    }
                                 });
                             } catch (err: any) {
                                 result = `Error: ${err?.message || "unknown error"}`;
@@ -1273,6 +1292,9 @@ export default function ChatMessageInput({ attachments, setAttachments }: ChatMe
                 let currentReader = reader;
                 let continueLoop = true;
 
+                let currentFetchedNotes = [...fetchedNotes];
+                let currentFetchedFolders = [...fetchedFolders];
+
                 while (continueLoop) {
                     const { functionCalls, tokenCount, roundText } = await processStreamInlineRegen(currentReader, newAssistantId, controller.signal);
                     totalTokensUsed += tokenCount;
@@ -1309,7 +1331,17 @@ export default function ChatMessageInput({ attachments, setAttachments }: ChatMe
                             let status: 'done' | 'error' = 'done';
                             try {
                                 result = await executeToolCall(fc.name, fc.args, {
-                                    userId: user!.id, fetchedNotes, fetchedFolders, setFetchedNotes, setFetchedFolders
+                                    userId: user!.id,
+                                    fetchedNotes: currentFetchedNotes,
+                                    fetchedFolders: currentFetchedFolders,
+                                    setFetchedNotes: (action) => {
+                                        currentFetchedNotes = typeof action === 'function' ? action(currentFetchedNotes) : action;
+                                        setFetchedNotes(action);
+                                    },
+                                    setFetchedFolders: (action) => {
+                                        currentFetchedFolders = typeof action === 'function' ? action(currentFetchedFolders) : action;
+                                        setFetchedFolders(action);
+                                    }
                                 });
                             } catch (err: any) {
                                 result = `Error: ${err?.message}`;

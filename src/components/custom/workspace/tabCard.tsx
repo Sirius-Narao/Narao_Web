@@ -5,6 +5,7 @@ import { cn } from "@/lib/utils";
 import { BookOpen, FolderIcon, Home, MessageCircle, X } from "lucide-react";
 import { useRef } from "react";
 import { useTabs, Tab } from "@/context/tabsContext";
+import { useChatMessages } from "@/context/chatMessagesContext";
 import { Tooltip, TooltipContent, TooltipTrigger } from "@/components/ui/tooltip";
 
 interface TabCardProps {
@@ -14,6 +15,7 @@ interface TabCardProps {
 
 export default function TabCard({ tab, index }: TabCardProps) {
     const { activeTabId, setActiveTabId, closeTab, moveTab, tabs } = useTabs();
+    const { removeTabState } = useChatMessages();
     const isActive = tab.id === activeTabId;
 
     // ─── Drag-to-reorder ──────────────────────────────────────────────────────
@@ -47,6 +49,7 @@ export default function TabCard({ tab, index }: TabCardProps) {
     const handleClose = (e: React.MouseEvent) => {
         e.stopPropagation();
         closeTab(tab.id);
+        removeTabState(tab.id);
     };
 
     // ─── Title ────────────────────────────────────────────────────────────────

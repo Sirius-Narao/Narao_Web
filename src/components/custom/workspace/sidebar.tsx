@@ -299,8 +299,8 @@ export default function SidebarArea() {
                                             <TooltipTrigger asChild>
                                                 <p className="text-sm font-medium px-4 py-2 bg-card rounded-full flex items-center font-mono border border-folder-yellow hover:bg-folder-yellow/10 cursor-pointer transition-all duration-200" onClick={() => { }}>
                                                     <Coins className="w-4 h-4 mr-2 text-folder-yellow" />
-                                            {/* Read credits from global context so optimistic updates from chatMessageInput are reflected instantly */}
-                                        {formatCredits(globalUser?.credits_left ?? user?.credits_left ?? 0)}
+                                                    {/* Read credits from global context so optimistic updates from chatMessageInput are reflected instantly */}
+                                                    {formatCredits(globalUser?.credits_left ?? user?.credits_left ?? 0)}
                                                 </p>
                                             </TooltipTrigger>
                                             <TooltipContent>
@@ -384,6 +384,7 @@ export default function SidebarArea() {
                                                 <SelectValue placeholder="Language" />
                                             </SelectTrigger>
                                             <SelectContent>
+                                                <SelectItem value="auto-detect">Auto-detect</SelectItem>
                                                 <SelectItem value="en">English</SelectItem>
                                                 <SelectItem value="es">Español</SelectItem>
                                                 <SelectItem value="fr">Français</SelectItem>
@@ -409,7 +410,7 @@ export default function SidebarArea() {
                                             onChange={(e) => {
                                                 setTempSettings({ ...tempSettings, aiName: e.target.value });
                                             }}
-                                            onBlur={() => { if (!tempSettings.aiName) setTempSettings({ ...tempSettings, aiName: "OrthanAI" }) }}
+                                            onBlur={() => { if (!tempSettings.aiName) setTempSettings({ ...tempSettings, aiName: settings.aiName || "Narao AI" }) }}
                                         />
                                     </div>
 

@@ -23,16 +23,16 @@ type ToolName = keyof typeof TOOL_NAMES
 const TOOL_NAMES = {
     "get_all_notes_and_folders": { loading: "Getting All Notes and Folders...", done: "Get All Notes and Folders", icon: <FolderSearch className="w-3 h-3 shrink-0 text-primary/70" /> },
     "read_note": { loading: "Reading Note...", done: "Read Note", icon: <BookOpen className="w-3 h-3 shrink-0 text-primary/70" /> },
-    "create_note": { loading: "Creating Note...", done: "Create Note", icon: <FilePlus className="w-3 h-3 shrink-0 text-primary/70" /> },
-    "delete_note": { loading: "Deleting Note...", done: "Delete Note", icon: <FileMinus className="w-3 h-3 shrink-0 text-primary/70" /> },
-    "rename_note": { loading: "Renaming Note...", done: "Rename Note", icon: <PenTool className="w-3 h-3 shrink-0 text-primary/70" /> },
-    "move_note": { loading: "Moving Note...", done: "Move Note", icon: <Move className="w-3 h-3 shrink-0 text-primary/70" /> },
-    "modify_note": { loading: "Modifying Note...", done: "Modify Note", icon: <FilePen className="w-3 h-3 shrink-0 text-primary/70" /> },
-    "create_folder": { loading: "Creating Folder...", done: "Create Folder", icon: <FolderPlus className="w-3 h-3 shrink-0 text-primary/70" /> },
-    "delete_folder": { loading: "Deleting Folder...", done: "Delete Folder", icon: <FolderMinus className="w-3 h-3 shrink-0 text-primary/70" /> },
-    "rename_folder": { loading: "Renaming Folder...", done: "Rename Folder", icon: <PenTool className="w-3 h-3 shrink-0 text-primary/70" /> },
-    "move_folder": { loading: "Moving Folder...", done: "Move Folder", icon: <Move className="w-3 h-3 shrink-0 text-primary/70" /> },
-    "change_color_folder": { loading: "Changing Folder Color...", done: "Change Folder Color", icon: <Palette className="w-3 h-3 shrink-0 text-primary/70" /> },
+    "create_note": { loading: "Creating Note...", done: "Created Note", icon: <FilePlus className="w-3 h-3 shrink-0 text-primary/70" /> },
+    "delete_note": { loading: "Deleting Note...", done: "Deleted Note", icon: <FileMinus className="w-3 h-3 shrink-0 text-primary/70" /> },
+    "rename_note": { loading: "Renaming Note...", done: "Renamed Note", icon: <PenTool className="w-3 h-3 shrink-0 text-primary/70" /> },
+    "move_note": { loading: "Moving Note...", done: "Moved Note", icon: <Move className="w-3 h-3 shrink-0 text-primary/70" /> },
+    "modify_note": { loading: "Modifying Note...", done: "Modified Note", icon: <FilePen className="w-3 h-3 shrink-0 text-primary/70" /> },
+    "create_folder": { loading: "Creating Folder...", done: "Created Folder", icon: <FolderPlus className="w-3 h-3 shrink-0 text-primary/70" /> },
+    "delete_folder": { loading: "Deleting Folder...", done: "Deleted Folder", icon: <FolderMinus className="w-3 h-3 shrink-0 text-primary/70" /> },
+    "rename_folder": { loading: "Renaming Folder...", done: "Renamed Folder", icon: <PenTool className="w-3 h-3 shrink-0 text-primary/70" /> },
+    "move_folder": { loading: "Moving Folder...", done: "Moved Folder", icon: <Move className="w-3 h-3 shrink-0 text-primary/70" /> },
+    "change_color_folder": { loading: "Changing Folder Color...", done: "Changed Folder Color", icon: <Palette className="w-3 h-3 shrink-0 text-primary/70" /> },
 }
 
 export default function ChatMessageBlock({ message }: { message: ChatMessage }) {
@@ -288,19 +288,19 @@ export default function ChatMessageBlock({ message }: { message: ChatMessage }) 
                                         <p>Regenerate</p>
                                     </TooltipContent>
                                 </Tooltip>
-                                {message.creditsUsed && (
-                                    <Tooltip>
-                                        <TooltipTrigger asChild>
-                                            <Button variant={"ghost"} className="gap-2 flex">
-                                                <Coins className="w-4 h-4 text-muted-foreground" />
-                                                <p className="text-muted-foreground">{message.creditsUsed.toLocaleString()}</p>
-                                            </Button>
-                                        </TooltipTrigger>
-                                        <TooltipContent>
-                                            <p>Credits used</p>
-                                        </TooltipContent>
-                                    </Tooltip>
-                                )}
+
+                                <Tooltip>
+                                    <TooltipTrigger asChild>
+                                        <Button variant={"ghost"} className="gap-2 flex">
+                                            <Coins className="w-4 h-4 text-muted-foreground" />
+                                            <p className="text-muted-foreground font-mono">{message.creditsUsed === null ? "0" : message.creditsUsed.toLocaleString()}</p>
+                                        </Button>
+                                    </TooltipTrigger>
+                                    <TooltipContent>
+                                        <p>Credits used</p>
+                                    </TooltipContent>
+                                </Tooltip>
+
                             </div>
                         )}
                     </div>

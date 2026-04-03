@@ -32,7 +32,7 @@ export default function NotesTab({ accessedNote, setAccessedNote, initialNoteId 
     const { content, setContent } = useContent();
     const [isSavedComplete, setIsSavedComplete] = useState(true);
     const { activeTabId, updateTabTitle, closeTab } = useTabs();
-    const { setFetchedNotes } = useFetchedNotes();
+    const { setFetchedNotes, fetchedNotes } = useFetchedNotes();
     const { fetchedFolders } = useFetchedFolders();
 
     // dialog state
@@ -200,6 +200,16 @@ export default function NotesTab({ accessedNote, setAccessedNote, initialNoteId 
         setIsRenamingNote(false);
         if (error) console.error("Error renaming note:", error);
     };
+
+    // useEffect to update accessedNote when fetchedNotes or fetchedFolders changes
+    useEffect(() => {
+        if (accessedNote) {
+            const updatedNote = fetchedNotes.find(n => n.id === accessedNote.id);
+            if (updatedNote) {
+                setAccessedNote(updatedNote);
+            }
+        }
+    }, [fetchedNotes]);
 
     useEffect(() => {
         const handleKeyDown = (e: KeyboardEvent) => {

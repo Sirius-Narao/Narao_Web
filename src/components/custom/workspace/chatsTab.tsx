@@ -23,14 +23,22 @@ import handleSearch from "@/lib/handleSearch";
 import { useTabs } from "@/context/tabsContext";
 
 interface ChatsTabProps {
+    tabId: string;
     initialChatId: string | null;
 }
 
-export default function ChatsTab({ initialChatId }: ChatsTabProps) {
+export default function ChatsTab({ tabId, initialChatId }: ChatsTabProps) {
     const { state, setOpen } = useSidebar();
     const { user } = useUser();
-    const { chatTitle, setChatTitle, setChatMessages, currentChatId, setCurrentChatId, refreshTrigger, refreshChats } = useChatMessages();
-    const { activeTabId, updateTabTitle, updateTabChatId, openTab, tabs } = useTabs();
+    const {
+        chatTitle, setChatTitle, setChatMessages, currentChatId, setCurrentChatId,
+        refreshTrigger, refreshChats,
+        chatCache,
+        activeTabId, setActiveTabId,
+        initTabState, getTabState, setTabState,
+    } = useChatMessages();
+    const { activeTabId: tabsActiveTabId, updateTabTitle, updateTabChatId, openTab, tabs } = useTabs();
+
     const [isRenamingChat, setIsRenamingChat] = useState(false);
     const [tempChatTitle, setTempChatTitle] = useState(chatTitle);
     const [chats, setChats] = useState<ChatType[]>([]);
@@ -38,64 +46,70 @@ export default function ChatsTab({ initialChatId }: ChatsTabProps) {
     const [isSearchOpen, setIsSearchOpen] = useState(false);
     const searchInputRef = useRef<HTMLInputElement>(null);
 
-    // Sync tab title with chat title
+    // ── On mount: initialise this tab's slot and make it the active tab ────────
     useEffect(() => {
-        if (!activeTabId || !currentChatId) return;
-        // Don't sync if we haven't finished loading the correct chat for this tab yet
-        if (initialChatId && currentChatId !== initialChatId) return;
+        initTabState(tabId);
+        setActiveTabId(tabId);
 
-        updateTabTitle(activeTabId, chatTitle || "New Chat");
-        updateTabChatId(activeTabId, currentChatId);
-    }, [chatTitle, currentChatId, activeTabId, initialChatId, updateTabTitle, updateTabChatId]);
+        // Restore from initialChatId if the slot is still fresh (no chatId set yet)
+        const slotState = getTabState(tabId);
+        if (!slotState?.chatId && initialChatId) {
+            // Restore from cache or DB
+            if (chatCache[initialChatId]) {
+                const cached = chatCache[initialChatId];
+                setTabState(tabId, { chatId: initialChatId, messages: cached.messages, title: cached.title });
+            } else {
+                // Load chat metadata from DB
+                const loadChat = async () => {
+                    const { data: chatData, error } = await supabase
+                        .from("chats")
+                        .select("*")
+                        .eq("id", initialChatId)
+                        .single();
 
-    // Restore chat from initialChatId on mount
-    const { chatCache } = useChatMessages();
-
-    useEffect(() => {
-        if (!initialChatId) {
-            setCurrentChatId(null);
-            setChatMessages([]);
-            setChatTitle("New Chat");
-            return;
-        }
-
-        // If we already have this chat open, don't do anything
-        if (currentChatId === initialChatId) return;
-
-        // Check cache first
-        if (chatCache[initialChatId]) {
-            const cached = chatCache[initialChatId];
-            setCurrentChatId(initialChatId);
-            setChatTitle(cached.title);
-            setChatMessages(cached.messages);
-            return;
-        }
-
-        // Load just the chat metadata from DB
-        const loadChat = async () => {
-            const { data: chatData, error } = await supabase
-                .from("chats")
-                .select("*")
-                .eq("id", initialChatId)
-                .single();
-
-            if (chatData) {
-                setChatTitle(chatData.title);
-                setCurrentChatId(initialChatId);
-            } else if (error) {
-                console.error("Error loading chat:", error);
-                toast.error("Failed to load chat");
+                    if (chatData) {
+                        setTabState(tabId, { chatId: initialChatId, title: chatData.title });
+                    } else if (error) {
+                        console.error("Error loading chat:", error);
+                        toast.error("Failed to load chat");
+                    }
+                };
+                loadChat();
             }
-        };
-        loadChat();
-        // eslint-disable-next-line react-hooks/exhaustive-deps
-    }, [initialChatId]);
+        }
 
-    // Filtered chats state
+        // On unmount: deactivate. Don't destroy the slot so state persists.
+        return () => {
+            setActiveTabId(prev => (prev === tabId ? null : prev));
+        };
+        // eslint-disable-next-line react-hooks/exhaustive-deps
+    }, [tabId]);
+
+    // ── When this tab becomes visible (user clicks its tab card), make it active ─
+    useEffect(() => {
+        if (tabsActiveTabId === tabId) {
+            setActiveTabId(tabId);
+        }
+    }, [tabsActiveTabId, tabId, setActiveTabId]);
+
+    // Sync tab bar title with this tab's chat title
+    useEffect(() => {
+        if (tabsActiveTabId !== tabId) return;
+        const slot = getTabState(tabId);
+        if (!slot) return;
+        updateTabTitle(tabId, slot.title || "New Chat");
+        updateTabChatId(tabId, slot.chatId ?? undefined);
+    }, [tabsActiveTabId, tabId, getTabState, updateTabTitle, updateTabChatId]);
+
+    // Keep tempChatTitle in sync when chatTitle changes
+    useEffect(() => {
+        if (!isRenamingChat) setTempChatTitle(chatTitle);
+    }, [chatTitle, isRenamingChat]);
+
+    // ── Filtered chats state ───────────────────────────────────────────────────
     const [filteredChats, setFilteredChats] = useState<ChatType[]>([]);
 
-
-    // Chat side functions
+    // ── Chat side functions ────────────────────────────────────────────────────
     const handleRenameChat = async () => {
         if (!user) return;
         setTempChatTitle(chatTitle);
@@ -114,7 +128,6 @@ export default function ChatsTab({ initialChatId }: ChatsTabProps) {
     };
     const handleDeleteChat = async (e: React.MouseEvent, chatId: string) => {
         e.stopPropagation();
-        // if (!confirm("Are you sure you want to delete this chat?")) return;
 
         const { error } = await supabase
             .from('chats')
@@ -139,12 +152,9 @@ export default function ChatsTab({ initialChatId }: ChatsTabProps) {
         } else {
             toast.error("Too many tabs open", { position: 'bottom-right' });
         }
-        setCurrentChatId(null);
-        setChatMessages([]);
-        setChatTitle("New Chat");
-    }, [openTab, setCurrentChatId, setChatMessages, setChatTitle, tabs.length]);
+    }, [openTab, tabs.length]);
 
-    // Fetch chats data
+    // ── Fetch chats data ───────────────────────────────────────────────────────
     useEffect(() => {
         if (!user) return;
 
@@ -373,13 +383,10 @@ export default function ChatsTab({ initialChatId }: ChatsTabProps) {
                                                 if (chat.id && chat.id !== currentChatId) {
                                                     const cached = chatCache[chat.id];
                                                     if (cached) {
-                                                        setChatMessages(cached.messages);
-                                                        setChatTitle(cached.title);
+                                                        setTabState(tabId, { chatId: chat.id, messages: cached.messages, title: cached.title });
                                                     } else {
-                                                        setChatMessages([]);
-                                                        setChatTitle(chat.title);
+                                                        setTabState(tabId, { chatId: chat.id, messages: [], title: chat.title });
                                                     }
-                                                    setCurrentChatId(chat.id);
                                                 }
                                                 setIsSearchOpen(false);
                                             }}>
