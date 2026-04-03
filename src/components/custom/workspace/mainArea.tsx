@@ -263,25 +263,25 @@ export default function MainArea() {
                             </TooltipContent>
                         </Tooltip>
                         <DropdownMenuContent align="start" className="p-2">
-                            <DropdownMenuItem className="group cursor-pointer" onClick={handleOpenFolders}>
+                            <DropdownMenuItem className="group cursor-pointer relative min-w-[240px]" onClick={handleOpenFolders}>
                                 <Folders size={16} className="text-muted-foreground group-hover:text-accent-foreground" />
                                 Open Folders
                                 <KbdGroup>
-                                    <Kbd className="bg-card text-foreground">Ctrl + Shift + U</Kbd>
+                                    <Kbd className="bg-card text-foreground absolute right-2">Ctrl + Shift + U</Kbd>
                                 </KbdGroup>
                             </DropdownMenuItem>
-                            <DropdownMenuItem className="group cursor-pointer" onClick={handleNewNote}>
+                            <DropdownMenuItem className="group cursor-pointer relative" onClick={handleNewNote}>
                                 <Pen size={16} className="text-muted-foreground group-hover:text-accent-foreground" />
                                 New Note
                                 <KbdGroup>
-                                    <Kbd className="bg-card text-foreground">Ctrl + Shift + I</Kbd>
+                                    <Kbd className="bg-card text-foreground absolute right-2">Ctrl + Shift + I</Kbd>
                                 </KbdGroup>
                             </DropdownMenuItem>
-                            <DropdownMenuItem className="group cursor-pointer" onClick={handleNewChat}>
+                            <DropdownMenuItem className="group cursor-pointer relative" onClick={handleNewChat}>
                                 <MessageCircle size={16} className="text-muted-foreground group-hover:text-accent-foreground" />
                                 New Chat
                                 <KbdGroup>
-                                    <Kbd className="bg-card text-foreground">Ctrl + Shift + O</Kbd>
+                                    <Kbd className="bg-card text-foreground absolute right-2">Ctrl + Shift + O</Kbd>
                                 </KbdGroup>
                             </DropdownMenuItem>
                         </DropdownMenuContent>
