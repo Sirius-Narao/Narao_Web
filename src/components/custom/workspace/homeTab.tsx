@@ -10,7 +10,7 @@ import { useContent } from "@/context/contentContext";
 
 export default function HomeTab({ setIsNoteOpened, setAccessedNote }: { setIsNoteOpened: (value: boolean) => void, setAccessedNote: (value: Note) => void }) {
     const headingText = useTypingTextAnimation(["Hey, what would you like to do? ", "Anything to learn or create? ", "Or just a simple chat? ", "I'm getting bored... "], 5000);
-    const { openTab } = useTabs();
+    const { openTab, closeTab, activeTabId } = useTabs();
     const { user } = useUser();
     const { setContent } = useContent();
 
@@ -50,15 +50,15 @@ export default function HomeTab({ setIsNoteOpened, setAccessedNote }: { setIsNot
                 </h1>
 
                 <div className="flex gap-2 z-50">
-                    <Button variant="outline" className="rounded-full fade-up cursor-pointer text-lg px-10 py-6 bg-background/50 backdrop-blur-sm border-input hover:border-primary/50 hover:bg-primary/5 transition-all duration-300 group" style={{ animationDelay: `100ms` }} onClick={() => openTab({ type: "folder", title: "Folders" })}>
+                    <Button variant="outline" className="rounded-full fade-up cursor-pointer text-lg px-10 py-6 bg-background/50 backdrop-blur-sm border-input hover:border-primary/50 hover:bg-primary/5 transition-all duration-300 group" style={{ animationDelay: `100ms` }} onClick={() => { openTab({ type: "folder", title: "Folders" }), closeTab(activeTabId!) }}>
                         <FolderOpen className="w-5 h-5 ml-2 group-hover:scale-110 transition-transform" />
                         <p className="mr-2">Open Folder</p>
                     </Button>
-                    <Button variant="outline" className="rounded-full fade-up cursor-pointer text-lg px-10 py-6 bg-background/50 backdrop-blur-sm border-input hover:border-primary/50 hover:bg-primary/5 transition-all duration-300 group" style={{ animationDelay: `200ms` }} onClick={() => openTab({ type: "note", title: "Notes" })}>
+                    <Button variant="outline" className="rounded-full fade-up cursor-pointer text-lg px-10 py-6 bg-background/50 backdrop-blur-sm border-input hover:border-primary/50 hover:bg-primary/5 transition-all duration-300 group" style={{ animationDelay: `200ms` }} onClick={() => { openTab({ type: "note", title: "Notes" }), closeTab(activeTabId!) }}>
                         <BookOpen className="w-5 h-5 ml-2 group-hover:scale-110 transition-transform" />
                         <p className="mr-2">Create Note</p>
                     </Button>
-                    <Button variant="outline" className="rounded-full fade-up cursor-pointer text-lg px-10 py-6 bg-background/50 backdrop-blur-sm border-input hover:border-primary/50 hover:bg-primary/5 transition-all duration-300 group" style={{ animationDelay: `300ms` }} onClick={() => openTab({ type: "chat", title: "New Chat" })}>
+                    <Button variant="outline" className="rounded-full fade-up cursor-pointer text-lg px-10 py-6 bg-background/50 backdrop-blur-sm border-input hover:border-primary/50 hover:bg-primary/5 transition-all duration-300 group" style={{ animationDelay: `300ms` }} onClick={() => { openTab({ type: "chat", title: "New Chat" }), closeTab(activeTabId!) }}>
                         <MessageCircle className="w-5 h-5 ml-2 group-hover:scale-110 transition-transform" />
                         <p className="mr-2">New Chat</p>
                     </Button>
