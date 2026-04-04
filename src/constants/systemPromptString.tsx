@@ -30,10 +30,18 @@ export default function getSystemPromptString() {
 
             Math/Physics:
             - Always use LaTeX:
-            - Block: $$ ... $$
-            - Inline: $ ... $
+            - Block (display): wrap on its own line, blank line before and after:
+              (blank line)
+              $$
+              E = mc^2
+              $$
+              (blank line)
+            - Inline: $ ... $ (e.g. $E = mc^2$)
             - Never leave LaTeX commands outside delimiters.
             - Avoid syntax errors (e.g., use E_{c_{init}}).
+            - CRITICAL: Never put inline $...$ math INSIDE a <span style="…"> tag.
+              Write the span and the math on separate lines instead:
+              <span style="color: #c75d55;">La distance est</span> $\frac{2\sqrt{5}}{5}$ unités.
 
             Tools:
             - Before: briefly explain the action.
@@ -68,10 +76,18 @@ export default function getSystemPromptString() {
 
             Math/Physics:
             - Always use LaTeX:
-            - Block: $$ ... $$
-            - Inline: $ ... $
+            - Block (display): wrap on its own line, blank line before and after:
+              (blank line)
+              $$
+              E = mc^2
+              $$
+              (blank line)
+            - Inline: $ ... $ (e.g. $E = mc^2$)
             - Never leave LaTeX commands outside delimiters.
             - Avoid syntax errors (e.g., use E_{c_{init}}).
+            - CRITICAL: Never put inline $...$ math INSIDE a <span style="…"> tag.
+              Write the span and the math on separate lines instead:
+              <span style="color: #c75d55;">La distance est</span> $\frac{2\sqrt{5}}{5}$ unités.
 
             Tools:
             - Before: briefly explain the action.
@@ -106,10 +122,18 @@ export default function getSystemPromptString() {
 
             Maths/Physique :
             - Utilise toujours LaTeX :
-            - Bloc : $$ ... $$
-            - En ligne : $ ... $
+            - Bloc (display) : sur sa propre ligne, avec une ligne vide avant et après :
+              (ligne vide)
+              $$
+              E = mc^2
+              $$
+              (ligne vide)
+            - En ligne : $ ... $ (ex : $E = mc^2$)
             - Ne laisse jamais de commandes LaTeX en dehors des délimiteurs.
             - Évite les erreurs de syntaxe (ex : utilise E_{c_{init}}).
+            - CRITIQUE : Ne mets JAMAIS de math $...$ à l'intérieur d'un <span style="…">.
+              Écris le span et le math sur des lignes séparées :
+              <span style="color: #c75d55;">La distance est</span> $\frac{2\sqrt{5}}{5}$ unités.
 
             Outils :
             - Avant : explique brièvement l'action.
@@ -144,10 +168,18 @@ export default function getSystemPromptString() {
 
             Mate/Física:
             - Usa siempre LaTeX:
-            - Bloque: $$ ... $$
-            - En línea: $ ... $
+            - Bloque (display): en su propia línea, con línea en blanco antes y después:
+              (línea en blanco)
+              $$
+              E = mc^2
+              $$
+              (línea en blanco)
+            - En línea: $ ... $ (ej. $E = mc^2$)
             - Nunca dejes comandos LaTeX fuera de los delimitadores.
             - Evita errores de sintaxis (p. ej., usa E_{c_{init}}).
+            - CRÍTICO: Nunca pongas math $...$ DENTRO de un <span style="…">.
+              Escribe el span y el math en líneas separadas:
+              <span style="color: #c75d55;">La distancia es</span> $\frac{2\sqrt{5}}{5}$ unidades.
 
             Herramientas:
             - Antes: explica brevemente la acción.
@@ -182,10 +214,18 @@ export default function getSystemPromptString() {
 
             Mathe/Physik:
             - Verwende immer LaTeX:
-            - Block: $$ ... $$
-            - Inline: $ ... $
+            - Block (display): auf eigener Zeile, Leerzeile davor und danach:
+              (Leerzeile)
+              $$
+              E = mc^2
+              $$
+              (Leerzeile)
+            - Inline: $ ... $ (z.B. $E = mc^2$)
             - Lassen Sie LaTeX-Befehle niemals außerhalb von Begrenzern.
             - Vermeiden Sie Syntaxfehler (z. B. verwenden Sie E_{c_{init}}).
+            - KRITISCH: Verwenden Sie niemals $...$ Mathe INNERHALB eines <span style="…">-Tags.
+              Schreiben Sie den Span und die Mathe in separaten Zeilen:
+              <span style="color: #c75d55;">Der Abstand beträgt</span> $\frac{2\sqrt{5}}{5}$ Einheiten.
 
             Tools:
             - Vorher: Erkläre kurz die Aktion.
@@ -220,10 +260,18 @@ export default function getSystemPromptString() {
 
             Matematica/Fisica:
             - Usa sempre LaTeX:
-            - Blocco: $$ ... $$
-            - In linea: $ ... $
+            - Blocco (display): sulla propria riga, con riga vuota prima e dopo:
+              (riga vuota)
+              $$
+              E = mc^2
+              $$
+              (riga vuota)
+            - In linea: $ ... $ (es. $E = mc^2$)
             - Non lasciare mai comandi LaTeX fuori dai delimitatori.
             - Evita errori di sintassi (es. usa E_{c_{init}}).
+            - CRITICO: Non mettere mai math $...$ DENTRO a un <span style="…">.
+              Scrivi lo span e il math su righe separate:
+              <span style="color: #c75d55;">La distanza è</span> $\frac{2\sqrt{5}}{5}$ unità.
 
             Strumenti:
             - Prima: spiega brevemente l'azione.
@@ -258,10 +306,18 @@ export default function getSystemPromptString() {
 
             Matemática/Física:
             - Use sempre LaTeX:
-            - Bloco: $$ ... $$
-            - Inline: $ ... $
+            - Bloco (display): na sua própria linha, com linha em branco antes e depois:
+              (linha em branco)
+              $$
+              E = mc^2
+              $$
+              (linha em branco)
+            - Inline: $ ... $ (ex: $E = mc^2$)
             - Nunca deixe comandos LaTeX fora dos delimitadores.
             - Evite erros de sintaxe (ex: use E_{c_{init}}).
+            - CRÍTICO: Nunca coloque math $...$ DENTRO de uma tag <span style="…">.
+              Escreva o span e o math em linhas separadas:
+              <span style="color: #c75d55;">A distância é</span> $\frac{2\sqrt{5}}{5}$ unidades.
 
             Ferramentas:
             - Antes: explique brevemente a ação.
@@ -296,10 +352,18 @@ export default function getSystemPromptString() {
 
             数学/物理：
             - 始终使用 LaTeX：
-            - 区块：$$ ... $$
-            - 行内：$ ... $
+            - 块（display）：单独一行，前后各留一个空行：
+              （空行）
+              $$
+              E = mc^2
+              $$
+              （空行）
+            - 行内：$ ... $（如 $E = mc^2$）
             - 绝不要将 LaTeX 命令放在分隔符之外。
             - 避免语法错误（例如，使用 E_{c_{init}}）。
+            - 关键：绝不要将 $...$ 数学放在 <span style="…"> 标签内。
+              将 span 和数学放在单独的行上：
+              <span style="color: #c75d55;">距离为</span> $\frac{2\sqrt{5}}{5}$ 单位。
 
             工具：
             - 执行前：简要说明操作。
@@ -334,10 +398,18 @@ export default function getSystemPromptString() {
 
             数学/物理：
             - 常にLaTeXを使用してください：
-            - ブロック：$$ ... $$
-            - インライン：$ ... $
+            - ブロック（display）：独立した行に、前後に空行を入れる：
+              （空行）
+              $$
+              E = mc^2
+              $$
+              （空行）
+            - インライン：$ ... $（例：$E = mc^2$）
             - LaTeXコマンドをデリミタの外に残さないでください。
             - 構文エラーを避けてください（例：E_{c_{init}}を使用）。
+            - 重要：$...$ の数学を <span style="…"> タグの内部に入れないでください。
+              spanと数学は別の行に書いてください：
+              <span style="color: #c75d55;">距離は</span> $\frac{2\sqrt{5}}{5}$ 単位です。
 
             ツール：
             - 実行前：アクションを簡単に説明します。
@@ -372,10 +444,18 @@ export default function getSystemPromptString() {
 
             수학/물리:
             - 항상 LaTeX를 사용하세요:
-            - 블록: $$ ... $$
-            - 인라인: $ ... $
+            - 블록 (display): 단독 줄에, 앞뒤로 빈 줄 포함:
+              (빈 줄)
+              $$
+              E = mc^2
+              $$
+              (빈 줄)
+            - 인라인: $ ... $ (예: $E = mc^2$)
             - LaTeX 명령을 구분 기호 밖에 두지 마세요.
             - 구문 오류를 피하세요 (예: E_{c_{init}} 사용).
+            - 중요: $...$ 수식을 <span style="…"> 태그 안에 넣지 마세요.
+              span과 수식은 별도의 줄에 작성하세요:
+              <span style="color: #c75d55;">거리는</span> $\frac{2\sqrt{5}}{5}$ 단위입니다.
 
             도구:
             - 전: 작업을 간략하게 설명합니다.

@@ -5,6 +5,7 @@ import rehypeKatex from "rehype-katex"
 import rehypeHighlight from "rehype-highlight"
 import rehypeRaw from "rehype-raw"
 import { ComponentPropsWithoutRef, CSSProperties, ReactNode, isValidElement } from "react"
+import katex from "katex"
 
 const extractText = (node: ReactNode): string => {
     if (node == null) return '';
@@ -28,27 +29,52 @@ interface MarkdownRendererProps {
 }
 
 export function MarkdownRenderer({ content, className = "" }: MarkdownRendererProps) {
-    // Unescape double backslashes outside of code blocks so that LaTeX
-    // stored as \\cdot (JSON-escaped) renders correctly as \cdot for KaTeX.
-    // Split on fenced code blocks, unescape only in non-code segments.
-    const unescapeOutsideCode = (str: string): string => {
-        const parts = str.split(/(```[\s\S]*?```|`[^`]*`)/g);
-        return parts.map((part, i) =>
-            i % 2 === 0 ? part.replace(/\\\\/g, '\\') : part
-        ).join('');
+    /**
+     * Pre-process the markdown string so that remark-math can reliably pick up
+     * all LaTeX delimiters regardless of how the AI wrote them.
+     *
+     * Steps (each applied outside fenced code spans):
+     *  1. Convert ```math ... ``` fences → $$ ... $$ blocks
+     *     (notes store math this way after being read by the AI tool)
+     *  2. Unescape double backslashes (\\) → single (\) so KaTeX sees proper LaTeX
+     *  3. Convert \[ ... \] → $$ ... $$ (display math)
+     *  4. Convert \( ... \) → $ ... $ (inline math)
+     *  5. Promote same-line $$ ... $$ to block display math for remark-math
+     */
+    const processContent = (raw: string): string => {
+        // Helper: split on fenced code spans and only transform even-indexed (non-code) parts
+        const outsideCode = (str: string, fn: (s: string) => string): string => {
+            const parts = str.split(/(```[\s\S]*?```|`[^`]*`)/g);
+            return parts.map((part, i) => (i % 2 === 0 ? fn(part) : part)).join('');
+        };
+
+        // Step 1 — Convert ```math ... ``` fences to $$ ... $$ BEFORE splitting
+        // (we do this globally because the fence IS the code span boundary)
+        let result = raw.replace(/```math\r?\n([\s\S]*?)\r?\n```/g, '\n$$\n$1\n$$\n');
+
+        // Step 2 — Unescape double backslashes outside code blocks
+        result = outsideCode(result, s => s.replace(/\\\\/g, '\\'));
+
+        // Step 3 — \[ ... \] → $$ ... $$ (display math)
+        result = outsideCode(result, s =>
+            s.replace(/\\\[/g, '\n$$\n').replace(/\\\]/g, '\n$$\n')
+        );
+
+        // Step 4 — \( ... \) → $ ... $ (inline math)
+        result = outsideCode(result, s =>
+            s.replace(/\\\(/g, '$').replace(/\\\)/g, '$')
+        );
+
+        // Step 5 — Same-line $$ ... $$ (both delimiters on one line, no newline inside)
+        // → promote to proper block display math that remark-math understands
+        result = outsideCode(result, s =>
+            s.replace(/\$\$([^$\n]+?)\$\$/g, '\n\n$$\n$1\n$$\n\n')
+        );
+
+        return result;
     };
 
-    // Normalize LaTeX-style delimiters \[ \] and \( \) to $$ and $
-    // Also expand inline $$...$$ (e.g. inside list items) into block display math.
-    // remark-math only recognises display math when $$ is on its own line/block.
-    const processedContent = unescapeOutsideCode(content)
-        .replace(/\\\[/g, '\n$$\n')
-        .replace(/\\\]/g, '\n$$\n')
-        .replace(/\\\(/g, '$')
-        .replace(/\\\)/g, '$')
-        // Convert inline $$...$$ → proper display-math blocks.
-        // Match $$ not already on their own line (greedy=false, no newlines inside).
-        .replace(/\$\$([^$\n]+?)\$\$/g, '\n\n$$\n$1\n$$\n\n');
+    const processedContent = processContent(content);
 
     return (
         <div className={`markdown-content ${className}`}>
@@ -101,10 +127,31 @@ export function MarkdownRenderer({ content, className = "" }: MarkdownRendererPr
                         );
                     },
                     code({ className, children, ...props }: ComponentPropsWithoutRef<'code'> & { inline?: boolean }) {
-                        // Block code (inside <pre>) always has a language-* className set by
-                        // rehype-highlight. Inline code has no className.
-                        // Apply the pill/highlight styling only for true inline code.
                         const isBlock = !!className;
+                        const isMath = className === 'language-math';
+
+                        // Render ```math ... ``` fences that slipped through (e.g. from note
+                        // content echoed by the AI) directly with KaTeX instead of as a code block.
+                        if (isMath) {
+                            const latex = extractText(children).trim();
+                            let html = '';
+                            try {
+                                html = katex.renderToString(latex, {
+                                    displayMode: true,
+                                    throwOnError: false,
+                                    strict: false,
+                                });
+                            } catch {
+                                html = `<span class="text-destructive font-mono">${latex}</span>`;
+                            }
+                            return (
+                                <div
+                                    className="my-4 overflow-x-auto text-center"
+                                    dangerouslySetInnerHTML={{ __html: html }}
+                                />
+                            );
+                        }
+
                         if (isBlock) {
                             return (
                                 <code className={cn(className, "rounded-lg bg-popover! whitespace-pre-wrap break-words")} {...props}>
@@ -180,9 +227,12 @@ export function MarkdownRenderer({ content, className = "" }: MarkdownRendererPr
                         return <hr className="h-px bg-foreground/10 my-6" />
                     },
                     span({ style, children, ...props }: ComponentPropsWithoutRef<'span'>) {
-                        // Allow `color` CSS property from inline styles for security,
-                        // but pass through all other props (including data-* attributes)
-                        // so KaTeX math spans and other semantic spans are not broken.
+                        // Pass through ALL props and styles so that:
+                        //   • KaTeX-generated spans (with class / aria- / data- attributes) render correctly
+                        //   • Colored <span style="color: …"> from the AI render correctly
+                        // We only restrict style to the `color` property for security on
+                        // user-visible coloured text spans; KaTeX spans that come from
+                        // rehype-katex don't carry a `style` prop at all (they use className).
                         const safeStyle: CSSProperties | undefined = style
                             ? { color: (style as CSSProperties).color }
                             : undefined;

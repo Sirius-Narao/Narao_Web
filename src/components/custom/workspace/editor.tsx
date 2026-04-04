@@ -18,6 +18,76 @@ import { TableCell } from '@tiptap/extension-table-cell';
 import { Color } from '@tiptap/extension-color';
 import { TextStyle } from '@tiptap/extension-text-style';
 
+/** Decode HTML entities in a string (e.g. &lt; → <, &gt; → >, &amp; → &) */
+const decodeHtmlEntities = (s: string) =>
+    s.replace(/&lt;/g, '<').replace(/&gt;/g, '>').replace(/&amp;/g, '&').replace(/&quot;/g, '"');
+
+/** Encode a LaTeX string so it is safe to place inside an HTML attribute value. */
+const encodeLatex = (s: string) =>
+    s.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;');
+
+/**
+ * Heal a markdown string that may contain `<span data-type="inlineMath" data-latex="L">` tags
+ * (produced by a broken previous serialiser) by converting them back to `$L$`.
+ * Also converts `<span data-type="inlineMath" data-latex="L"></span>` (self-closing style).
+ */
+const healInlineMathSpans = (str: string): string =>
+    str.replace(
+        /<span[^>]*data-type="inlineMath"[^>]*data-latex="([^"]*)"[^>]*>(?:<\/span>)?/g,
+        (_, latex) => `$${decodeHtmlEntities(latex)}$`
+    );
+
+/**
+ * Convert the markdown/DB content into the format that tiptap-markdown + our
+ * custom extensions expect:
+ *   $$\n…\n$$  →  ```math\n…\n```   (for MathAwareCodeBlock)
+ *   $…$        →  <span data-type="inlineMath" …>  (for MathAwareInlineNode)
+ *
+ * Inline-HTML spans are NOT used for $…$ here because tiptap-markdown's
+ * marked.js tokeniser does not parse inline <span> as ProseMirror nodes.
+ * Instead we rely on tiptap-markdown's ability to call each extension's
+ * parseHTML rules when the content goes through ProseMirror's DOMParser.
+ *
+ * To keep things consistent:
+ *  - heal any pre-existing <span data-type="inlineMath"> back to $…$ first
+ *  - then let tiptap-markdown / ProseMirror parse the clean markdown
+ */
+const prepareContent = (raw: string): string => {
+    // Step 0 – heal old DB content that has HTML-encoded inline math spans
+    let result = healInlineMathSpans(raw);
+
+    // Step 1 – block math $$\n…\n$$ → ```math\n…\n```
+    // Handle both LF and CRLF line endings
+    result = result.replace(/\$\$\r?\n([\s\S]*?)\r?\n\$\$/g, '```math\n$1\n```');
+
+    // Step 2 – inline math $…$ → <span data-type="inlineMath" …>
+    // Only transform text that is NOT inside an HTML tag (e.g. don't touch
+    // style="color: …" attributes that may contain $ signs).
+    result = result
+        .split(/(<[^>]*>)/g)          // split, keeping HTML tags as odd tokens
+        .map((part, i) => {
+            if (i % 2 !== 0) return part;   // HTML tag → leave untouched
+            return part.replace(/(?<!\$)\$([^$\n]+?)\$(?!\$)/g, (_, latex) =>
+                `<span data-type="inlineMath" data-latex="${encodeLatex(latex)}" data-evaluate="no" data-display="no"></span>`
+            );
+        })
+        .join('');
+
+    return result;
+};
+
+/**
+ * Sanitise the markdown produced by getMarkdown():
+ *  - convert ```math back to $$
+ *  - heal any <span data-type="inlineMath"> that the serialiser failed to
+ *    convert to $…$ (fallback, keeps DB clean)
+ */
+const sanitiseMarkdown = (md: string): string => {
+    let result = md.replace(/```math\r?\n([\s\S]*?)\r?\n```/g, '$$\n$1\n$$');
+    result = healInlineMathSpans(result);
+    return result;
+};
+
 export default function Editor() {
     const { content, setContent } = useContent();
     const { setEditor } = useEditorInstance();
@@ -26,15 +96,6 @@ export default function Editor() {
     useEffect(() => {
         setIsMounted(true);
     }, []);
-
-    // Transform $$ blocks to ```math blocks for tiptap-markdown parser
-    // Also transform inline $math$ to <span data-type="inlineMath" ...></span> for HTML parsing
-    const encodeLatex = (str: string) => str.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;');
-
-    let parsedContent = content.replace(/\$\$\n([\s\S]*?)\n\$\$/g, '```math\n$1\n```');
-    parsedContent = parsedContent.replace(/(?<!\$)\$([^$\n]+?)\$(?!\$)/g, (match, latex) => {
-        return `<span data-type="inlineMath" data-latex="${encodeLatex(latex)}" data-evaluate="no" data-display="no"></span>`;
-    });
 
     const editor = useEditor({
         extensions: [
@@ -58,17 +119,15 @@ export default function Editor() {
                 placeholder: 'Start typing your note here...',
             })
         ],
-        content: parsedContent,
+        content: prepareContent(content),
         editorProps: {
             attributes: {
                 class: "w-full min-h-[50vh] bg-transparent border-none outline-none resize-none text-foreground text-lg leading-relaxed font-sans focus:outline-none",
             },
         },
         onUpdate: ({ editor }) => {
-            let md = (editor.storage as any).markdown.getMarkdown();
-            // Transform ```math blocks back to $$ blocks for database storage
-            md = md.replace(/```math\n([\s\S]*?)\n```/g, '$$\n$1\n$$');
-            setContent(md);
+            const raw = (editor.storage as any).markdown.getMarkdown();
+            setContent(sanitiseMarkdown(raw));
         },
         immediatelyRender: false,
     });
@@ -80,15 +139,12 @@ export default function Editor() {
         // eslint-disable-next-line react-hooks/exhaustive-deps
     }, [editor]);
 
+    // Sync external content changes (e.g. AI tool writes the note) into the editor
     useEffect(() => {
         if (editor && content && !editor.isFocused) {
-            const currentMd = (editor.storage as any).markdown.getMarkdown().replace(/```math\n([\s\S]*?)\n```/g, '$$\n$1\n$$');
+            const currentMd = sanitiseMarkdown((editor.storage as any).markdown.getMarkdown());
             if (content !== currentMd) {
-                let newParsed = content.replace(/\$\$\n([\s\S]*?)\n\$\$/g, '```math\n$1\n```');
-                newParsed = newParsed.replace(/(?<!\$)\$([^$\n]+?)\$(?!\$)/g, (match, latex) => {
-                    return `<span data-type="inlineMath" data-latex="${encodeLatex(latex)}" data-evaluate="no" data-display="no"></span>`;
-                });
-                editor.commands.setContent(newParsed);
+                editor.commands.setContent(prepareContent(content));
             }
         }
     }, [content, editor]);
