@@ -69,7 +69,8 @@ export default function MainArea() {
                     parent_id: f.parent_id ? String(f.parent_id) : undefined,
                     color: f.color,
                     createdAt: new Date(f.created_at),
-                    updatedAt: new Date(f.updated_at)
+                    updatedAt: new Date(f.updated_at),
+                    is_reviewed: f.is_reviewed,
                 }));
                 setFetchedFolders(mappedFolders);
             }
@@ -89,7 +90,8 @@ export default function MainArea() {
                     tags: n.tags || [],
                     folder_id: n.folder_id ? String(n.folder_id) : undefined,
                     createdAt: new Date(n.created_at),
-                    updatedAt: new Date(n.updated_at)
+                    updatedAt: new Date(n.updated_at),
+                    is_reviewed: n.is_reviewed,
                 }));
                 setFetchedNotes(mappedNotes);
             }
@@ -253,7 +255,7 @@ export default function MainArea() {
                         <Tooltip>
                             <TooltipTrigger asChild>
                                 <DropdownMenuTrigger asChild>
-                                    <Button variant="ghost" className="w-10 h-10 p-0 rounded-full">
+                                    <Button variant="ghost" className="w-10 h-10 p-0 rounded-full cursor-pointer">
                                         <Plus size={24} />
                                     </Button>
                                 </DropdownMenuTrigger>

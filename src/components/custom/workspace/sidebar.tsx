@@ -2,7 +2,7 @@
 
 import { Sidebar, SidebarContent, SidebarHeader, SidebarTrigger, SidebarFooter, useSidebar } from "@/components/ui/sidebar";
 import Image from "next/image";
-import { User, Settings as SettingsIcon, X, Sun, Bot, Tags, ArrowUpLeft, Coins } from "lucide-react";
+import { User, Settings as SettingsIcon, X, Sun, Bot, Tags, ArrowUpLeft, Coins, InboxIcon, ChevronDown, CircleOff } from "lucide-react";
 import { AnimatePresence, motion } from "framer-motion";
 import { Button } from "@/components/ui/button";
 import { cn } from "@/lib/utils";
@@ -13,7 +13,7 @@ import {
     CardHeader,
     CardTitle,
 } from "@/components/ui/card"
-import { useEffect, useState } from "react";
+import { useCallback, useEffect, useState } from "react";
 import {
     Tooltip,
     TooltipContent,
@@ -32,6 +32,11 @@ import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
 import { useSettings } from "@/context/settingsContext";
 import { useUser } from "@/context/userContext";
+import ReviewItem from "./reviewItem";
+import { ReviewItemType } from "@/types/reviewItemType";
+import { useFetchedNotes } from "@/context/fetchedNotesContext";
+import { useFetchedFolders } from "@/context/fetchedFoldersContext";
+import { Folder, Note } from "@/types/folderStructureTypes";
 
 export default function SidebarArea() {
     const [userAuth, setUserAuth] = useState<any>(null);
@@ -39,7 +44,7 @@ export default function SidebarArea() {
     const [announce, setAnnounce] = useState<AnnounceType | null>(null);
     const [announceFetched, setAnnounceFetched] = useState(false);
     const [showAnnounce, setShowAnnounce] = useState(true);
-    const { state } = useSidebar();
+    const { state, setOpen } = useSidebar();
     const [settingsTab, setSettingsTab] = useState(0);
     const { settingsOpen, setSettingsOpen } = useSettingsOpen();
 
@@ -52,6 +57,16 @@ export default function SidebarArea() {
     const { user: globalUser, setUser: setGlobalUser } = useUser();
 
     const [tempPseudo, setTempPseudo] = useState("");
+
+    // Inbox expand state
+    const [inboxExpanded, setInboxExpanded] = useState(true);
+
+    // reviews state
+    const [reviews, setReviews] = useState<ReviewItemType[]>([]);
+
+    // fetched notes and folders state
+    const { fetchedNotes, setFetchedNotes } = useFetchedNotes();
+    const { fetchedFolders, setFetchedFolders } = useFetchedFolders();
 
     // auth fetch
     useEffect(() => {
@@ -114,7 +129,23 @@ export default function SidebarArea() {
         };
         fetchAnnounces();
     }, []);
+    // Fetch reviews data
+    useEffect(() => {
+        const fetchReviews = async () => {
+            if (!user?.id) return;
 
+            const { data: reviews, error } = await supabase
+                .from('review_items')         // your table name
+                .select('*')          // select all columns
+                .eq('user_id', user.id);
+
+            if (error) {
+                console.error(error);
+            }
+            setReviews(reviews ?? []);
+        };
+        fetchReviews();
+    }, [user]);
     // update settings
     const updateSettings = async () => {
         if (!user) return;
@@ -146,16 +177,157 @@ export default function SidebarArea() {
         return credits;
     };
 
+    // ----------------- Helper functions for folder and note paths ----------------- 
+    const getFolderPath = useCallback((folderId: string): string => {
+        const folder = fetchedFolders.find(f => f.id === folderId);
+        if (!folder) return "/";
+        if (!folder.parent_id) return `/${folder.name}`;
+        return `${getFolderPath(folder.parent_id)}/${folder.name}`;
+    }, [fetchedFolders]);
+    const getNotePath = (noteId: string): string => {
+        const note = fetchedNotes.find(n => n.id === noteId);
+        if (!note || !note.folder_id) return "/";
+        return getFolderPath(note.folder_id);
+    };
+    // note json to readable text
+    const noteJsonToReadableText = (note: Note) => {
+        let text = "Note: ";
+        text += note.title + "\n";
+        text += "Content: " + note.content + "\n";
+        text += "Path: " + getNotePath(note.id);
+        return text;
+    };
+    // folder json to readable text
+    const folderJsonToReadableText = (folder: Folder) => {
+        let text = "Folder: ";
+        text += folder.name + "\n";
+        text += "Path: " + getFolderPath(folder.id) + "\n";
+        text += "Notes in this folder: " + (fetchedNotes.filter(note => note.folder_id === folder.id).length > 0 ? fetchedNotes.filter(note => note.folder_id === folder.id).map(note => note.title).join(", ") : "None") + "\n";
+        text += "Folders in this folder: " + (fetchedFolders.filter(f => f.parent_id === folder.id).length > 0 ? fetchedFolders.filter(f => f.parent_id === folder.id).map(f => f.name).join(", ") : "None") + "\n";
+        return text;
+    };
+    // function to decide randomly which note/folder to review and return it as a string with their content using noteJsonToReadableText and folderJsonToReadableText
+    const decideWhichToReview = () => {
+        const notes = fetchedNotes.filter(note => !note.is_reviewed);
+        const folders = fetchedFolders.filter(folder => !folder.is_reviewed);
+        const notesToReview = notes.length;
+        const foldersToReview = folders.length;
+        const totalToReview = notesToReview + foldersToReview;
+        const random = Math.random() * totalToReview;
+        if (random < notesToReview) {
+            return { note: notes[Math.floor(random)], text: noteJsonToReadableText(notes[Math.floor(random)]) };
+        } else {
+            return { folder: folders[Math.floor(random - notesToReview)], text: folderJsonToReadableText(folders[Math.floor(random - notesToReview)]) };
+        }
+    };
+
+    // ----------------- Function for fetching AI reviews using the API ----------------- 
+    const fetchAIReviews = async () => {
+        if (!user) return;
+        if (fetchedNotes.length === 0 && fetchedFolders.length === 0) return;
+
+        const reviewElement = decideWhichToReview();
+        if (!reviewElement) return;
+        console.log("Fetching AI reviews...");
+        console.log(reviewElement);
+        // 1. Call the API just like normal
+        const response = await fetch("/api/chat/review-gemini-3.1-flash-lite-preview", {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({
+                systemPrompt: "You review workspace notes of plain text and folders. Make your reviews user friendly and easy to understand. Do not consider this workspace as a codespace. Analyze the content to find typos, unclear phrasing, structural issues, and improvement opportunities. Suggest concise, actionable fixes. Ask relevant questions only if they help improve clarity, completeness, or future usefulness. Focus on high-value insights. Avoid obvious or low-impact comments. Be precise, structured, and concise in all outputs. Adapt to the context (note or folder, content type, and path). Use available workspace memory if provided to improve relevance. Output only structured review items. If no meaningful issues, suggestions, or questions are found, return nothing. Aim to continuously refine understanding of the workspace to improve future reviews. Also match the language of the note or folder. Always give an example of how you would improve the note or folder. Do not use the word README.md in your response." + (user.workspace_memory ? "\n\n" + "Workspace memory: " + user.workspace_memory : ""),
+                userInput: "Give me a single review for this note: " + reviewElement.text
+            }),
+        });
+
+        if (!response.ok) {
+            console.error("Review generation failed");
+            return;
+        }
+
+        // 2. Parse the fetch response 
+        const data = await response.json();
+        // Under the hood, data.content is a raw JSON string that perfectly matches our schema
+
+        // 3. Parse the structured output back into a javascript object
+        const structuredData = JSON.parse(data.content);
+
+        if (!structuredData.reviews) {
+            console.error("No reviews found in the response");
+            return;
+        }
+        // 4. Use it directly! 
+        // structuredData.reviews is guaranteed to be an array formatted perfectly for ReviewItemType
+        console.log(`Found ${structuredData.reviews.length} reviews.`);
+        structuredData.reviews.forEach((review) => {
+            console.log(`[${review.type.toUpperCase()}] ${review.title}`);
+            console.log(`Location: ${review.location}\n`);
+            console.log(`Importance: ${review.importance}\n`);
+            console.log(`Query context: "${review.query}"\n`);
+        });
+
+        if (structuredData.reviews.length === 0) {
+            return;
+        }
+
+        // 5. Save the reviews to the database
+        const payload = structuredData.reviews.map((review: ReviewItemType) => ({
+            ...review,
+            user_id: user.id,
+        }));
+        const { data: insertedReviews, error } = await supabase
+            .from('review_items')
+            .insert(payload)
+            .select();
+
+        if (error) {
+            console.error("Error saving reviews:", error);
+            return;
+        }
+
+        // 6. Update the local state
+        if (insertedReviews) {
+            setReviews([...reviews, ...(insertedReviews as ReviewItemType[])]);
+        }
+
+        // 7. Mark the reviewed note/folder as reviewed
+        if (reviewElement.note) {
+            const { error } = await supabase
+                .from('notes')
+                .update({ is_reviewed: true })
+                .eq('id', reviewElement.note.id);
+            if (error) {
+                console.error("Error marking note as reviewed:", error);
+            }
+        } else {
+            const { error } = await supabase
+                .from('folders')
+                .update({ is_reviewed: true })
+                .eq('id', reviewElement.folder.id);
+            if (error) {
+                console.error("Error marking folder as reviewed:", error);
+            }
+        }
+
+        // 8. Update the local state
+        if (reviewElement.note) {
+            setFetchedNotes(fetchedNotes.map(note => note.id === reviewElement.note.id ? { ...note, is_reviewed: true } : note));
+        } else {
+            setFetchedFolders(fetchedFolders.map(folder => folder.id === reviewElement.folder.id ? { ...folder, is_reviewed: true } : folder));
+        }
+
+        return insertedReviews;
+    };
 
     return (
-        <Sidebar variant="inset" className="bg-background">
+        <Sidebar variant="inset" className="bg-transparent">
             {/* --------------------------- Header --------------------------- */}
-            <SidebarHeader className="bg-background">
-                <header className="flex items-center">
+            <SidebarHeader className="bg-background px-0">
+                <header className="flex items-center p-0  group-data-[state=collapsed]:px-1">
                     {/* Logo and Narao text */}
                     <div className={cn(
-                        "flex items-center gap-2 w-fit min-w-10 border border-sidebar-border rounded-full p-1 px-4 bg-card shadow-lg transition-all duration-200",
-                        "group-data-[state=collapsed]:w-10 group-data-[state=collapsed]:h-10"
+                        "flex items-center gap-2 w-fit min-w-10 border border-sidebar-border rounded-full p-1 px-4 bg-card transition-all duration-200",
+                        "group-data-[state=collapsed]:w-10 group-data-[state=collapsed]:h-10 group-data-[state=collapsed]:p-2"
                     )}>
                         <Image src="/favicon.ico" alt="Logo" width={24} height={24} className="group-data-[state=collapsed]:hidden transition-all duration-200" />
                         <span className="text-xl font-bold transition-all duration-200 group-data-[state=collapsed]:hidden">
@@ -166,7 +338,7 @@ export default function SidebarArea() {
             </SidebarHeader>
             <Tooltip>
                 <TooltipTrigger asChild>
-                    <SidebarTrigger className="absolute top-4 right-2.5" />
+                    <SidebarTrigger className="absolute top-4 right-3.5" />
                 </TooltipTrigger>
                 <TooltipContent side="bottom" className="flex items-center gap-2">
                     <p>{state === "collapsed" ? "Open" : "Close"}</p>
@@ -178,8 +350,70 @@ export default function SidebarArea() {
 
 
             {/* --------------------------- Content --------------------------- */}
-            <SidebarContent className="bg-background pt-2 overflow-hidden">
-                {/* Tab navigation moved to mainArea tab bar */}
+            <SidebarContent className="bg-background overflow-hidden pt-[2.5px] relative justify-start">
+                {/* New feature: AI reviews */}
+                {state === "collapsed" ? (
+                    <Tooltip>
+                        <TooltipTrigger asChild>
+                            <Button
+                                variant="ghost"
+                                size="icon"
+                                className="flex items-center justify-center p-3 bg-card rounded-full border border-sidebar-border w-fit h-fit mx-auto transition-all duration-200 relative absolute top-0 left-1"
+                                onClick={() => { setOpen(true); setInboxExpanded(true) }}
+                            >
+                                <InboxIcon className="h-6 w-6" />
+                                {reviews.length > 0 && <div className="absolute top-2.5 right-2.5 w-2 h-2 rounded-full bg-primary" />}
+                            </Button>
+                        </TooltipTrigger>
+                        <TooltipContent side="right" className="flex items-center gap-2">
+                            <p>Open Inbox</p>
+                        </TooltipContent>
+                    </Tooltip>
+                ) : (
+                    <div className={cn("flex flex-col items-center justify-center w-full gap-2 p-2 py-2 rounded-lg border border-sidebar-border transition-all duration-200 text-left justify-start bg-card transition-all duration-200", !inboxExpanded && "rounded-xl")}>
+                        <Tooltip>
+                            <TooltipTrigger asChild>
+                                <Button variant="ghost" className="flex items-center justify-between w-full border border-border p-2 rounded-lg bg-popover gap-2 transition-all duration-200" onClick={() => { setInboxExpanded(!inboxExpanded); fetchAIReviews() }}>
+                                    <div className="flex items-center gap-2">
+                                        <InboxIcon className="h-6 w-6" />
+                                        <p className="text-sm font-medium w-full ">Inbox</p>
+                                        <p className="text-xs text-muted-foreground p-2 py-0 rounded-full bg-primary/10 text-primary border border-primary/20">
+                                            {reviews.length > 99 ? "99+" : reviews.length}
+                                        </p>
+                                    </div>
+                                    <ChevronDown className={cn("h-6 w-6 transition-all duration-200", inboxExpanded && "rotate-180")} />
+                                </Button>
+                            </TooltipTrigger>
+                            <TooltipContent side="right" className="flex items-center gap-2">
+                                <p>{inboxExpanded ? "Close" : "Open"} Inbox</p>
+                            </TooltipContent>
+                        </Tooltip>
+                        <AnimatePresence>
+                            {inboxExpanded && (
+                                <motion.div
+                                    initial={{ height: 0, opacity: 0 }}
+                                    animate={{ height: "auto", opacity: 1 }}
+                                    exit={{ height: 0, opacity: 0 }}
+                                    transition={{ duration: 0.2, ease: "easeInOut" }}
+                                    className="w-full overflow-hidden"
+                                >
+                                    <div className="flex items-center gap-1 flex-col w-full overflow-auto max-h-124 scrollbar-hide! scrollbar-no-bg!">
+                                        {reviews.length === 0 ? (
+                                            <div className="flex flex-col items-center justify-center w-full h-full p-4 gap-2">
+                                                <CircleOff className="h-12 w-12 text-muted-foreground" />
+                                                <p className="text-sm text-muted-foreground italic">No reviews yet.</p>
+                                            </div>
+                                        ) : (
+                                            reviews.sort((a, b) => a.importance - b.importance).map((review) => (
+                                                <ReviewItem key={review.id} review={review} />
+                                            ))
+                                        )}
+                                    </div>
+                                </motion.div>
+                            )}
+                        </AnimatePresence>
+                    </div>
+                )}
             </SidebarContent>
 
 
@@ -198,7 +432,7 @@ export default function SidebarArea() {
                             transition={{ type: "spring", stiffness: 300, damping: 25 }}
                             className="group-data-[state=collapsed]:hidden"
                         >
-                            <Card className="p-4 pt-6 shadow-lg gap-2 border-sidebar-border bg-card">
+                            <Card className="p-4 pt-6 gap-2 border-sidebar-border bg-card shadow-none">
                                 <CardHeader className="p-0 m-0">
                                     <CardTitle className="text-sm font-semibold">{announce?.title}</CardTitle>
                                     <CardDescription className="text-xs">{announce?.description}</CardDescription>
@@ -233,12 +467,12 @@ export default function SidebarArea() {
                         <TooltipTrigger asChild>
 
                             <Button variant="ghost" className={cn(
-                                "flex items-center justify-center z-30 gap-2 w-full h-10 border border-sidebar-border rounded-full px-2 bg-card shadow-lg overflow-hidden",
+                                "flex items-center justify-center z-30 gap-2 w-full h-10 border border-sidebar-border rounded-full px-2 bg-card overflow-hidden",
                                 "group-data-[state=collapsed]:w-10 group-data-[state=collapsed]:h-10 group-data-[state=collapsed]:items-center group-data-[state=collapsed]:justify-center group-data-[state=collapsed]:gap-0"
                             )}
-                                onClick={() => setSettingsOpen(true)}
+                                onClick={() => { setSettingsOpen(true), setSettingsTab(0) }}
                             >
-                                <User size={24} className="w-24 h-24" />
+                                <User />
                                 {user ? <span className="text-lg font-bold transition-all duration-200 group-data-[state=collapsed]:hidden truncate w-full text-left pl-2">
                                     {user?.username}
                                 </span> : <Skeleton className="w-full h-full rounded-full" />}
@@ -271,11 +505,11 @@ export default function SidebarArea() {
                                 <Bot size={16} />
                                 <p className="text-sm font-medium">AI Settings</p>
                             </div>
-                            <div className={cn("flex items-center justify-center w-full gap-2 p-4 py-2 rounded-lg border border-sidebar-border hover:bg-card/50 cursor-pointer transition-all duration-200 text-left justify-start ", settingsTab === 3 && "bg-card hover:bg-card")}
+                            {/* <div className={cn("flex items-center justify-center w-full gap-2 p-4 py-2 rounded-lg border border-sidebar-border hover:bg-card/50 cursor-pointer transition-all duration-200 text-left justify-start ", settingsTab === 3 && "bg-card hover:bg-card")}
                                 onClick={() => { setSettingsTab(3) }}>
                                 <Tags size={16} />
                                 <p className="text-sm font-medium">Categories</p>
-                            </div>
+                            </div> */}
                             <div className={cn("flex items-center justify-center w-full gap-2 p-4 py-2 rounded-lg border bg-card border-sidebar-border hover:bg-card/50 cursor-pointer transition-all duration-200 text-left justify-start absolute bottom-0 left-0 right-0 ")}
                                 // We want it to link to the about page
                                 onClick={() => { }}>

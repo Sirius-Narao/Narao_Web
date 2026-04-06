@@ -6,6 +6,7 @@ type ProfileType = {
     created_at: string;
     settings: Settings;
     credits_left: number;
+    workspace_memory?: string;
 };
 
 export default ProfileType;

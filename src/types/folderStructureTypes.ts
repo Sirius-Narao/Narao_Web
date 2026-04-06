@@ -14,6 +14,7 @@ export type Note = {
     updatedAt: Date;
     tags?: string[];
     folder_id?: string;
+    is_reviewed?: boolean;
 }
 
 export type Folder = {
@@ -24,6 +25,7 @@ export type Folder = {
     updatedAt: Date;
     parent_id?: string;
     color?: FolderColor;
+    is_reviewed?: boolean;
 }
 
 export type FolderColor = "folder-red" | "folder-blue" | "folder-green" | "folder-yellow" | "folder-purple" | "folder-orange" | "folder-pink" | "folder-cyan" | "folder-lime" | "folder-teal" | "folder-indigo" | "folder-rose" | "folder-amber" | "folder-brown" | "folder-slate" | "folder-gray" | "folder-black" | "folder-white";
