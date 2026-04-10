@@ -12,6 +12,7 @@ import { UserProvider } from "@/context/userContext";
 import { FetchedFoldersProvider } from "@/context/fetchedFoldersContext";
 import { FetchedNotesProvider } from "@/context/fetchedNotesContext";
 import { IsLoadingProvider } from "@/context/isLoadingContext";
+import { ReviewProvider } from "@/context/reviewContext";
 
 export default function Workspace() {
     return (
@@ -27,8 +28,10 @@ export default function Workspace() {
                                         <FetchedFoldersProvider>
                                             <FetchedNotesProvider>
                                                 <IsLoadingProvider>
-                                                    <SidebarArea />
-                                                    <MainArea />
+                                                    <ReviewProvider>
+                                                        <SidebarArea />
+                                                        <MainArea />
+                                                    </ReviewProvider>
                                                 </IsLoadingProvider>
                                             </FetchedNotesProvider>
                                         </FetchedFoldersProvider>

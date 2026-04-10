@@ -40,6 +40,8 @@ interface ChatMessage {
     messageParts?: MessagePart[];
     isDone?: boolean;
     creditsUsed?: number;
+    isLiked?: boolean | null;
+    isDisliked?: boolean | null;
 }
 
 interface Models {

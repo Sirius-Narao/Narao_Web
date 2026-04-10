@@ -177,7 +177,7 @@ export default function ChatsTab({ tabId, initialChatId }: ChatsTabProps) {
                     description: item.description || "",
                     // Handle both camelCase (if mapped) and snake_case (raw DB)
                     createdAt: new Date(item.created_at || item.createdAt || new Date()),
-                    updatedAt: new Date(item.updated_at || item.updatedAt || new Date())
+                    updatedAt: new Date(item.updated_at || item.updatedAt || new Date()),
                 }));
                 setChats(mappedChats);
             }

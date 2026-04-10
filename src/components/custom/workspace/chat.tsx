@@ -84,7 +84,9 @@ export default function Chat() {
                         createdAt: new Date(msg.created_at),
                         isDone: true,
                         creditsUsed: msg.credits_used,
-                        attachments: attachments?.filter(attachment => attachment.message_id === msg.id)
+                        attachments: attachments?.filter(attachment => attachment.message_id === msg.id),
+                        isLiked: msg.is_liked,
+                        isDisliked: !msg.is_liked,
                     };
                 });
 

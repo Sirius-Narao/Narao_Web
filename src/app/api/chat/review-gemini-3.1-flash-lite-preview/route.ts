@@ -54,7 +54,7 @@ export async function POST(req: NextRequest) {
                             items: {
                                 type: "object",
                                 properties: {
-                                    title: { type: "string", description: "A short, concise title for the review item." },
+                                    title: { type: "string", description: "A short, concise title for the review item. Max 5 words." },
                                     query: { type: "string", description: "What you will ask the user to do, e.g. 'Correct the typo in the first sentence'." },
                                     importance: { type: "integer", description: "Priority level of this item: 1 (high/critical), 2 (medium), or 3 (low)." },
                                     type: { type: "string", enum: ["typo", "suggestion", "question"], description: "The category of the review." },

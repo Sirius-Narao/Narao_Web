@@ -21,6 +21,7 @@ import WaveformAnimation from "@/components/custom/WaveformAnimation"
 import { EDITOR_COLORS } from "@/constants/editorColors"
 import { useSettings } from "@/context/settingsContext"
 import getSystemPromptString from "@/constants/systemPromptString"
+import { useReviews } from "@/context/reviewContext"
 
 // ── @mention types ──────────────────────────────────────────────────────────
 type MentionItem = { id: string; title: string; type: "note" | "folder"; path?: string; color?: string };
@@ -81,10 +82,13 @@ export default function ChatMessageInput({ attachments, setAttachments }: ChatMe
     const { activeTab, openTab } = useTabs()
 
     // edit message context
-    const { pendingEdit, clearEdit, pendingRegenerate, clearRegenerate } = useEditMessage()
+    const { pendingEdit, clearEdit, pendingRegenerate, clearRegenerate, pendingQuickSend, clearQuickSend } = useEditMessage()
 
     // settings context
     const { settings } = useSettings();
+
+    // review context
+    const { reviews, setReviews } = useReviews();
 
     const systemPromptString = getSystemPromptString();
 
@@ -547,8 +551,9 @@ export default function ChatMessageInput({ attachments, setAttachments }: ChatMe
     };
 
     // handle send function of the input
-    const handleSend = async () => {
-        if ((content.trim() === "" && attachments.length === 0) || isLoading) return;
+    const handleSend = async (contentOverride?: string) => {
+        const effectiveContent = contentOverride ?? content;
+        if ((effectiveContent.trim() === "" && attachments.length === 0) || isLoading) return;
 
         // ── Zero-credit guard ────────────────────────────────────────────────
         // Block sending if the user has no credits left. This check is done against
@@ -623,7 +628,7 @@ export default function ChatMessageInput({ attachments, setAttachments }: ChatMe
             userMessage = {
                 id: uuidv4(),
                 role: "user",
-                content: content.trim(),
+                content: effectiveContent.trim(),
                 attachments: uiAttachments,
                 createdAt: new Date(),
                 isDone: true
@@ -633,7 +638,7 @@ export default function ChatMessageInput({ attachments, setAttachments }: ChatMe
             const updatedHistory = [...baseMessages, userMessage];
             setChatMessages(updatedHistory);
 
-            const currentContent = content;
+            const currentContent = effectiveContent;
             setContent("");
             if (editorRef.current) editorRef.current.innerHTML = ""
             setAttachments([]);
@@ -1034,6 +1039,20 @@ export default function ChatMessageInput({ attachments, setAttachments }: ChatMe
             setIsLoading(false);
             abortControllerRef.current = null;
             outOfCreditsRef.current = false;
+
+            for (const review of reviews) {
+                if (review.chatId === currentChatId) {
+                    setReviews(prev => prev.filter(r => r.id !== review.id));
+
+                    const { error } = await supabase
+                        .from("review_items")
+                        .delete()
+                        .eq("id", review.id);
+                    if (error) {
+                        console.error("Error deleting review:", error);
+                    }
+                }
+            }
         }
     };
 
@@ -1465,6 +1484,14 @@ export default function ChatMessageInput({ attachments, setAttachments }: ChatMe
         // eslint-disable-next-line react-hooks/exhaustive-deps
     }, [pendingRegenerate]);
 
+    // Trigger handleSend when a quick-send is requested (e.g. proceed/refuse buttons)
+    useEffect(() => {
+        if (!pendingQuickSend) return;
+        clearQuickSend();
+        handleSend(pendingQuickSend);
+        // eslint-disable-next-line react-hooks/exhaustive-deps
+    }, [pendingQuickSend]);
+
     const handleStop = () => {
         if (abortControllerRef.current) {
             abortControllerRef.current.abort();
@@ -1846,7 +1873,7 @@ export default function ChatMessageInput({ attachments, setAttachments }: ChatMe
                                     <Button
                                         variant="default"
                                         size="icon"
-                                        onClick={hasRecording ? handleSendRecording : isLoading ? handleStop : handleSend}
+                                        onClick={() => hasRecording ? handleSendRecording() : isLoading ? handleStop() : handleSend()}
                                         disabled={(!hasRecording && !isLoading && content.trim().length === 0 && attachments.length === 0) || user?.credits_left === 0}
                                         className="h-10 w-10 rounded-full p-0 flex items-center justify-center"
                                     >

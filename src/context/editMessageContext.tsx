@@ -13,6 +13,9 @@ interface EditMessageContextType {
     pendingRegenerate: string | null; // assistantMessageId to regenerate
     requestRegenerate: (assistantMessageId: string) => void;
     clearRegenerate: () => void;
+    pendingQuickSend: string | null; // pre-filled content to immediately send
+    requestQuickSend: (content: string) => void;
+    clearQuickSend: () => void;
 }
 
 const EditMessageContext = createContext<EditMessageContextType | undefined>(undefined);
@@ -20,6 +23,7 @@ const EditMessageContext = createContext<EditMessageContextType | undefined>(und
 function EditMessageProvider({ children }: { children: ReactNode }) {
     const [pendingEdit, setPendingEdit] = useState<PendingEdit | null>(null);
     const [pendingRegenerate, setPendingRegenerate] = useState<string | null>(null);
+    const [pendingQuickSend, setPendingQuickSend] = useState<string | null>(null);
 
     const requestEdit = (messageId: string, content: string) => {
         setPendingEdit({ messageId, content });
@@ -37,8 +41,16 @@ function EditMessageProvider({ children }: { children: ReactNode }) {
         setPendingRegenerate(null);
     };
 
+    const requestQuickSend = (content: string) => {
+        setPendingQuickSend(content);
+    };
+
+    const clearQuickSend = () => {
+        setPendingQuickSend(null);
+    };
+
     return (
-        <EditMessageContext.Provider value={{ pendingEdit, requestEdit, clearEdit, pendingRegenerate, requestRegenerate, clearRegenerate }}>
+        <EditMessageContext.Provider value={{ pendingEdit, requestEdit, clearEdit, pendingRegenerate, requestRegenerate, clearRegenerate, pendingQuickSend, requestQuickSend, clearQuickSend }}>
             {children}
         </EditMessageContext.Provider>
     );

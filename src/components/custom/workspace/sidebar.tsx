@@ -37,6 +37,7 @@ import { ReviewItemType } from "@/types/reviewItemType";
 import { useFetchedNotes } from "@/context/fetchedNotesContext";
 import { useFetchedFolders } from "@/context/fetchedFoldersContext";
 import { Folder, Note } from "@/types/folderStructureTypes";
+import { useReviews } from "@/context/reviewContext";
 
 export default function SidebarArea() {
     const [userAuth, setUserAuth] = useState<any>(null);
@@ -62,7 +63,7 @@ export default function SidebarArea() {
     const [inboxExpanded, setInboxExpanded] = useState(true);
 
     // reviews state
-    const [reviews, setReviews] = useState<ReviewItemType[]>([]);
+    const { reviews, setReviews } = useReviews();
 
     // fetched notes and folders state
     const { fetchedNotes, setFetchedNotes } = useFetchedNotes();
@@ -142,7 +143,18 @@ export default function SidebarArea() {
             if (error) {
                 console.error(error);
             }
-            setReviews(reviews ?? []);
+            // Map snake_case DB columns to camelCase JS properties
+            const mapped: ReviewItemType[] = (reviews ?? []).map((r: any) => ({
+                id: r.id,
+                title: r.title,
+                query: r.query,
+                createdAt: new Date(r.created_at || r.createdAt || new Date()),
+                importance: r.importance,
+                type: r.type,
+                location: r.location,
+                chatId: r.chat_id || r.chatId,
+            }));
+            setReviews(mapped);
         };
         fetchReviews();
     }, [user]);
@@ -270,10 +282,64 @@ export default function SidebarArea() {
             return;
         }
 
-        // 5. Save the reviews to the database
+        // 5. Create the chat first so we have a chat_id for the review
+        const firstReview = structuredData.reviews[0];
+        const { data: newChat, error: chatError } = await supabase
+            .from('chats')
+            .insert({
+                user_id: user.id,
+                title: "Review: " + (firstReview.title || "Untitled"),
+                description: `Review for ${reviewElement.note?.title || reviewElement.folder?.name}`,
+            })
+            .select()
+            .single();
+
+        if (chatError) {
+            console.error("Error creating chat:", chatError);
+            return;
+        }
+
+        // 6. Create the chat message with the review content
+        const { data: newMessage, error: messageError } = await supabase
+            .from('chat_messages')
+            .insert({
+                chat_id: newChat.id,
+                role: "assistant",
+                content: `# ${firstReview.title}\n\n${firstReview.query}. In ${firstReview.location}. \n\n---\n\nDo you want to proceed now?`,
+                credits_used: 150,
+            })
+            .select()
+            .single();
+
+        if (messageError) {
+            console.error("Error creating message:", messageError);
+            return;
+        }
+
+        // 7. Update the user's credits
+        const { data: updatedUser, error: userError } = await supabase
+            .from('profiles')
+            .update({ credits_left: user.credits_left - 150 })
+            .eq('id', user.id)
+            .select()
+            .single();
+
+        if (userError) {
+            console.error("Error updating user credits:", userError);
+            return;
+        }
+        setUser(updatedUser);
+        setGlobalUser(updatedUser);
+
+        // 8. Save the reviews to the database WITH the chat_id
         const payload = structuredData.reviews.map((review: ReviewItemType) => ({
-            ...review,
+            title: review.title,
+            query: review.query,
+            importance: review.importance,
+            type: review.type,
+            location: review.location,
             user_id: user.id,
+            chat_id: newChat.id,
         }));
         const { data: insertedReviews, error } = await supabase
             .from('review_items')
@@ -285,12 +351,7 @@ export default function SidebarArea() {
             return;
         }
 
-        // 6. Update the local state
-        if (insertedReviews) {
-            setReviews([...reviews, ...(insertedReviews as ReviewItemType[])]);
-        }
-
-        // 7. Mark the reviewed note/folder as reviewed
+        // 8. Mark the reviewed note/folder as reviewed
         if (reviewElement.note) {
             const { error } = await supabase
                 .from('notes')
@@ -309,15 +370,42 @@ export default function SidebarArea() {
             }
         }
 
-        // 8. Update the local state
+        // 9. Update the local state
         if (reviewElement.note) {
             setFetchedNotes(fetchedNotes.map(note => note.id === reviewElement.note.id ? { ...note, is_reviewed: true } : note));
         } else {
             setFetchedFolders(fetchedFolders.map(folder => folder.id === reviewElement.folder.id ? { ...folder, is_reviewed: true } : folder));
         }
 
+        // 10. Update the local reviews state with proper camelCase mapping
+        if (insertedReviews) {
+            const mappedInserted: ReviewItemType[] = insertedReviews.map((r: any) => ({
+                id: r.id,
+                title: r.title,
+                query: r.query,
+                createdAt: new Date(r.created_at || new Date()),
+                importance: r.importance,
+                type: r.type,
+                location: r.location,
+                chatId: r.chat_id || newChat.id,
+            }));
+            setReviews(prev => [...prev, ...mappedInserted]);
+        }
+
         return insertedReviews;
     };
+
+    // Fetch AI reviews each 10 minutes when the user is active
+    useEffect(() => {
+        // Check if there are any notes or folders that are not reviewed
+        const unreviewedItems = [...fetchedNotes, ...fetchedFolders].filter(item => !item.is_reviewed);
+        if (unreviewedItems.length === 0) return;
+        if (!user) return;
+        const interval = setInterval(() => {
+            fetchAIReviews();
+        }, 10 * 60 * 1000);
+        return () => clearInterval(interval);
+    }, [user, fetchedNotes, fetchedFolders, reviews]);
 
     return (
         <Sidebar variant="inset" className="bg-transparent">
@@ -373,10 +461,10 @@ export default function SidebarArea() {
                     <div className={cn("flex flex-col items-center justify-center w-full gap-2 p-2 py-2 rounded-lg border border-sidebar-border transition-all duration-200 text-left justify-start bg-card transition-all duration-200", !inboxExpanded && "rounded-xl")}>
                         <Tooltip>
                             <TooltipTrigger asChild>
-                                <Button variant="ghost" className="flex items-center justify-between w-full border border-border p-2 rounded-lg bg-popover gap-2 transition-all duration-200" onClick={() => { setInboxExpanded(!inboxExpanded); fetchAIReviews() }}>
+                                <Button variant="ghost" className="flex items-center justify-between w-full border border-border p-2 rounded-lg bg-popover gap-2 transition-all duration-200" onClick={() => { setInboxExpanded(!inboxExpanded) }}>
                                     <div className="flex items-center gap-2">
                                         <InboxIcon className="h-6 w-6" />
-                                        <p className="text-sm font-medium w-full ">Inbox</p>
+                                        <p className="text-sm font-medium w-full ">Inbox <span className="text-xs text-primary">Beta</span></p>
                                         <p className="text-xs text-muted-foreground p-2 py-0 rounded-full bg-primary/10 text-primary border border-primary/20">
                                             {reviews.length > 99 ? "99+" : reviews.length}
                                         </p>
@@ -404,7 +492,7 @@ export default function SidebarArea() {
                                                 <p className="text-sm text-muted-foreground italic">No reviews yet.</p>
                                             </div>
                                         ) : (
-                                            reviews.sort((a, b) => a.importance - b.importance).map((review) => (
+                                            [...reviews].sort((a, b) => a.importance - b.importance).map((review) => (
                                                 <ReviewItem key={review.id} review={review} />
                                             ))
                                         )}

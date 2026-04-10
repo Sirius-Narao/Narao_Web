@@ -1,6 +1,6 @@
 import { ChatMessage } from "@/types/chatType";
 import { MarkdownRenderer } from "./MarkdownRenderer";
-import { BookOpen, Check, ChevronDown, Coins, Copy, Edit, FileImage, FileMinus, FilePen, FilePlus, FileText, FileTypeCorner, FolderMinus, FolderPlus, FolderSearch, Lightbulb, Move, Palette, PenTool, RefreshCcw, Sun, ThumbsDown, ThumbsUp, TriangleAlert, Wrench } from "lucide-react";
+import { BookOpen, Check, ChevronDown, Coins, Copy, Edit, FileImage, FileMinus, FilePen, FilePlus, FileTypeCorner, FolderMinus, FolderPlus, FolderSearch, Lightbulb, Move, Palette, PenTool, RefreshCcw, ThumbsDown, ThumbsUp, TriangleAlert, Wrench } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { useState, useEffect } from "react";
 import { cn } from "@/lib/utils";
@@ -10,6 +10,7 @@ import { toast } from "sonner";
 import { useIsLoading } from "@/context/isLoadingContext";
 import { useEditMessage } from "@/context/editMessageContext";
 import { useChatMessages } from "@/context/chatMessagesContext";
+import { supabase } from "@/lib/supabaseClient";
 
 const THINKING_PHRASES = [
     "Let me think about it... ",
@@ -38,10 +39,14 @@ const TOOL_NAMES = {
 export default function ChatMessageBlock({ message }: { message: ChatMessage }) {
     const [isThoughtExpanded, setIsThoughtExpanded] = useState(false);
     const { isLoading } = useIsLoading();
-    const { requestEdit, requestRegenerate } = useEditMessage();
+    const { requestEdit, requestRegenerate, requestQuickSend } = useEditMessage();
     const [phraseIndex, setPhraseIndex] = useState(0);
     const { chatMessages } = useChatMessages()
     const [displayText, setDisplayText] = useState("");
+
+    // isLiked state
+    const [isLiked, setIsLiked] = useState(message.isLiked);
+    const [isDisliked, setIsDisliked] = useState(message.isDisliked);
 
     useEffect(() => {
         if (!isLoading) {
@@ -65,6 +70,45 @@ export default function ChatMessageBlock({ message }: { message: ChatMessage }) 
         }, 20);
         return () => clearInterval(interval);
     }, [isLoading, phraseIndex]);
+
+    const proceed = () => requestQuickSend("Okay, let's proceed!");
+    const refuse = () => requestQuickSend("Do not proceed.");
+
+    const likeMessage = async () => {
+        if (isLiked) return;
+        const { data, error } = await supabase
+            .from('chat_messages')
+            .update({ is_liked: true })
+            .eq('id', message.id)
+            .select()
+            .single();
+
+        if (error) {
+            toast.error("Failed to like message");
+            return;
+        }
+
+        setIsDisliked(false);
+        setIsLiked(true);
+    }
+
+    const dislikeMessage = async () => {
+        if (isDisliked) return;
+        const { data, error } = await supabase
+            .from('chat_messages')
+            .update({ is_liked: false })
+            .eq('id', message.id)
+            .select()
+            .single();
+
+        if (error) {
+            toast.error("Failed to dislike message");
+            return;
+        }
+
+        setIsLiked(false);
+        setIsDisliked(true);
+    }
 
     return (
         <div className={`flex flex-col relative w-full h-fit mb-8 fade-up ${message.role === "user" ? "items-end" : "items-start"}`}>
@@ -187,6 +231,12 @@ export default function ChatMessageBlock({ message }: { message: ChatMessage }) 
                                         </div>
                                     ) : null
                                 )}
+                                {!isLoading && message.content.endsWith("Do you want to proceed now?") && (
+                                    <div className="w-fit p-2 flex flex-row gap-2">
+                                        <Button variant="ghost" className="hover:bg-folder-green/20 hover:text-foreground bg-folder-green/20 cursor-pointer hover:bg-folder-green/50 dark:hover:bg-folder-green/50" onClick={() => { proceed() }}>Okay, let's proceed!</Button>
+                                        <Button variant="ghost" className="hover:bg-folder-red/20 hover:text-foreground bg-folder-red/20 cursor-pointer hover:bg-folder-red/50 dark:hover:bg-folder-red/50" onClick={() => { refuse() }}>Do not proceed</Button>
+                                    </div>
+                                )}
                             </div>
 
                         ) : (
@@ -238,6 +288,12 @@ export default function ChatMessageBlock({ message }: { message: ChatMessage }) 
                                 <div className="flex w-full h-fit max-w-[90%] items-start">
                                     <MarkdownRenderer content={message.content} className="text-foreground w-full p-2" />
                                 </div>
+                                {!isLoading && message.content.endsWith("Do you want to proceed now?") && (
+                                    <div className="w-fit p-2 flex flex-row gap-2">
+                                        <Button variant="ghost" className="hover:bg-folder-green/20 hover:text-foreground bg-folder-green/20 cursor-pointer hover:bg-folder-green/50 dark:hover:bg-folder-green/50" onClick={() => { proceed() }}>Okay, let's proceed!</Button>
+                                        <Button variant="ghost" className="hover:bg-folder-red/20 hover:text-foreground bg-folder-red/20 cursor-pointer hover:bg-folder-red/50 dark:hover:bg-folder-red/50" onClick={() => { refuse() }}>Do not proceed</Button>
+                                    </div>
+                                )}
                             </>
                         )}
                         {(message.isDone && !message.content) && (
@@ -260,8 +316,8 @@ export default function ChatMessageBlock({ message }: { message: ChatMessage }) 
                                 </Tooltip>
                                 <Tooltip>
                                     <TooltipTrigger asChild>
-                                        <Button size={"icon"} variant={"ghost"}>
-                                            <ThumbsUp className="w-4 h-4 text-muted-foreground" />
+                                        <Button size={"icon"} variant={"ghost"} onClick={likeMessage} className={cn(isLiked && "hover:bg-folder-green/20 dark:hover:bg-folder-green/20")}>
+                                            <ThumbsUp className={cn("w-4 h-4 text-muted-foreground", isLiked ? "text-folder-green" : "")} />
                                         </Button>
                                     </TooltipTrigger>
                                     <TooltipContent>
@@ -270,8 +326,8 @@ export default function ChatMessageBlock({ message }: { message: ChatMessage }) 
                                 </Tooltip>
                                 <Tooltip>
                                     <TooltipTrigger asChild>
-                                        <Button size={"icon"} variant={"ghost"}>
-                                            <ThumbsDown className="w-4 h-4 text-muted-foreground" />
+                                        <Button size={"icon"} variant={"ghost"} onClick={dislikeMessage} className={cn(isDisliked && "hover:bg-folder-red/20 dark:hover:bg-folder-red/20")}>
+                                            <ThumbsDown className={cn("w-4 h-4 text-muted-foreground", isDisliked ? "text-folder-red" : "")} />
                                         </Button>
                                     </TooltipTrigger>
                                     <TooltipContent>
