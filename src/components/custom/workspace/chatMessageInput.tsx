@@ -321,7 +321,7 @@ export default function ChatMessageInput({ attachments, setAttachments }: ChatMe
                 headers: { "Content-Type": "application/json" },
                 body: JSON.stringify({
                     history: [],
-                    userInput: `Summarize this message in MAX 3-5 words to make it a chat title, it has to be as descriptive as possible: "${firstUserContent}". Only return the title, nothing else. ${settings.language === "auto-detect" ? "Detect the language of the user and use it." : `Use the language ${settings.language} if you cannot detect the language of the query.`}`,
+                    userInput: `Summarize this message in MAX 3-5 words to make it a chat title, it has to be as descriptive as possible: "${firstUserContent}". Only return the title, nothing else. ${settings.language === "auto-detect" ? "Detect the language of the user and use it. Make it simple" : `Use the language ${settings.language} if you cannot detect the language of the query.`}`,
                     isThinking: false
                 })
             });

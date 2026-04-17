@@ -306,7 +306,7 @@ export default function SidebarArea() {
                 chat_id: newChat.id,
                 role: "assistant",
                 content: `# ${firstReview.title}\n\n${firstReview.query}. In ${firstReview.location}. \n\n---\n\nDo you want to proceed now?`,
-                credits_used: 150,
+                credits_used: 20,
             })
             .select()
             .single();
@@ -319,7 +319,7 @@ export default function SidebarArea() {
         // 7. Update the user's credits
         const { data: updatedUser, error: userError } = await supabase
             .from('profiles')
-            .update({ credits_left: user.credits_left - 150 })
+            .update({ credits_left: user.credits_left - 20 })
             .eq('id', user.id)
             .select()
             .single();
@@ -492,8 +492,8 @@ export default function SidebarArea() {
                                                 <p className="text-sm text-muted-foreground italic">No reviews yet.</p>
                                             </div>
                                         ) : (
-                                            [...reviews].sort((a, b) => a.importance - b.importance).map((review) => (
-                                                <ReviewItem key={review.id} review={review} />
+                                            [...reviews].sort((a, b) => a.importance - b.importance).map((review, index) => (
+                                                <ReviewItem key={review.id} review={review} index={index} />
                                             ))
                                         )}
                                     </div>
@@ -614,7 +614,7 @@ export default function SidebarArea() {
                             </DialogHeader>
 
                             {settingsTab === 0 && (
-                                <div className="flex flex-col py-6 min-h-[calc(100vh-500px)] ">
+                                <div className="flex flex-col py-6 h-[calc(100vh-250px)] sm:h-[calc(100vh-300px)] md:h-[calc(100vh-400px)] lg:h-[calc(100vh-500px)] overflow-y-auto scrollbar-hide">
                                     <div className="flex gap-2 border-t border-b border-border py-4 justify-between items-center">
                                         <p className="text-sm font-medium">Credits Left</p>
                                         <Tooltip>
@@ -665,7 +665,7 @@ export default function SidebarArea() {
                                 </div>
                             )}
                             {settingsTab === 1 && (
-                                <div className="flex flex-col py-6 min-h-[calc(100vh-500px)] ">
+                                <div className="flex flex-col py-6 h-[calc(100vh-250px)] sm:h-[calc(100vh-300px)] md:h-[calc(100vh-400px)] lg:h-[calc(100vh-500px)] overflow-y-auto scrollbar-hide">
                                     <div className="flex gap-2 justify-between items-center border-t border-b border-border py-4">
                                         <p className="text-sm font-medium">Appearance</p>
                                         <Select
@@ -723,7 +723,7 @@ export default function SidebarArea() {
                                 </div>
                             )}
                             {settingsTab === 2 && (
-                                <div className="flex flex-col py-6 min-h-[calc(100vh-500px)] ">
+                                <div className="flex flex-col py-6 h-[calc(100vh-250px)] sm:h-[calc(100vh-300px)] md:h-[calc(100vh-400px)] lg:h-[calc(100vh-500px)] overflow-y-auto scrollbar-hide pr-12 pb-12">
                                     <div className="flex flex-col gap-2 border-t border-b border-border py-4">
                                         <p className="text-sm font-medium">AI name</p>
                                         <Input
@@ -770,8 +770,7 @@ export default function SidebarArea() {
                                 </div>
                             )}
 
-                            {/* For spacing */}
-                            <div className="h-24"></div>
+
 
                             <DialogFooter className="flex items-center justify-end gap-2 p-2 absolute bottom-0 left-1/2 -translate-x-1/2 bg-card/50 backdrop-blur-sm w-fit rounded-full border">
                                 <DialogClose asChild>

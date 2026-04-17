@@ -1,26 +1,48 @@
 'use client'
 
+import { Button } from "@/components/ui/button";
 import { Tooltip, TooltipContent, TooltipTrigger } from "@/components/ui/tooltip";
 import { useTabs } from "@/context/tabsContext";
 import { cn } from "@/lib/utils";
 import { ReviewItemType } from "@/types/reviewItemType";
+import { Trash } from "lucide-react";
+import { supabase } from "@/lib/supabaseClient";
+import { useReviews } from "@/context/reviewContext";
 
-export default function ReviewItem({ review }: { review: ReviewItemType }) {
+export default function ReviewItem({ review, index }: { review: ReviewItemType, index: number }) {
     const { openTab } = useTabs();
+    const { reviews, setReviews } = useReviews();
+
+    const handleDelete = async (e: React.MouseEvent) => {
+        e.stopPropagation();
+        const { error } = await supabase
+            .from('review_items')
+            .delete()
+            .eq('id', review.id);
+
+        if (error) {
+            console.error(error);
+        }
+        setReviews(reviews.filter((r) => r.id !== review.id));
+    }
     return (
         <Tooltip>
             <TooltipTrigger asChild>
                 <div
-                    className="flex items-center w-full p-2 rounded-lg hover:bg-popover/70 cursor-pointer fade-up"
+                    className="flex items-center w-full p-2 rounded-lg hover:bg-popover/70 cursor-pointer fade-up relative hover:[&_button]:opacity-100"
                     onClick={() => {
                         openTab({ type: "chat", title: review.title, chatId: review.chatId });
                         console.log(review);
                     }}
+                    style={{ animationDelay: `${index * 0.05}s` }}
                 >
                     <div className="flex items-center gap-2">
                         <div className={cn("w-2 h-2 rounded-full", review.importance === 1 ? "bg-folder-red" : review.importance === 2 ? "bg-folder-yellow w-2 h-2" : "bg-folder-green")} />
-                        <p className="text-sm font-medium">{review.title.length > 20 ? review.title.slice(0, 20) + "..." : review.title}</p>
+                        <p className="text-sm    font-medium">{review.title.length > 20 ? review.title.slice(0, 20) + "..." : review.title}</p>
                     </div>
+                    <Button variant="ghost" className="w-7 h-7 absolute right-1 opacity-0 transition-opacity" onClick={handleDelete}>
+                        <Trash className="text-muted-foreground" size={16} />
+                    </Button>
                 </div>
             </TooltipTrigger>
             <TooltipContent side="right" className="relative">

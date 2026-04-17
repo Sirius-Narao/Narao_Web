@@ -631,7 +631,7 @@ export default function FoldersTab({ accessedNote, setAccessedNote, setIsNoteOpe
                         <Tooltip>
                             <TooltipTrigger asChild>
                                 <DropdownMenuTrigger asChild>
-                                    <Button variant="ghost" className="w-10 h-10 p-0 rounded-full">
+                                    <Button variant="ghost" className="w-10 h-10 p-0 rounded-full cursor-pointer">
                                         <Plus size={24} />
                                     </Button>
                                 </DropdownMenuTrigger>
@@ -641,13 +641,13 @@ export default function FoldersTab({ accessedNote, setAccessedNote, setIsNoteOpe
                             </TooltipContent>
                         </Tooltip>
                         <DropdownMenuContent align="end" className="p-1">
-                            <DropdownMenuItem className="gap-2 cursor-pointer" onClick={createFolder}>
-                                <FolderIcon size={16} /> New Folder
-                                <KbdGroup className="ml-auto"><Kbd>Ctrl+Shift+N</Kbd></KbdGroup>
+                            <DropdownMenuItem className="gap-2 cursor-pointer group" onClick={createFolder}>
+                                <FolderIcon size={16} className="group-hover:text-primary" /> New Folder
+                                <KbdGroup className="ml-auto"><Kbd className="bg-card text-foreground">Ctrl+Shift+N</Kbd></KbdGroup>
                             </DropdownMenuItem>
-                            <DropdownMenuItem className="gap-2 cursor-pointer" onClick={() => setCreateNoteDialogOpen(true)}>
-                                <FileText size={16} /> New Note
-                                <KbdGroup className="ml-auto"><Kbd>Ctrl+N</Kbd></KbdGroup>
+                            <DropdownMenuItem className="gap-2 cursor-pointer group" onClick={() => setCreateNoteDialogOpen(true)}>
+                                <FileText size={16} className="group-hover:text-primary" /> New Note
+                                <KbdGroup className="ml-auto"><Kbd className="bg-card text-foreground">Ctrl+N</Kbd></KbdGroup>
                             </DropdownMenuItem>
                         </DropdownMenuContent>
                     </DropdownMenu>
@@ -656,7 +656,7 @@ export default function FoldersTab({ accessedNote, setAccessedNote, setIsNoteOpe
                         <Tooltip>
                             <TooltipTrigger asChild>
                                 <DropdownMenuTrigger asChild>
-                                    <Button variant="ghost" className="w-10 h-10 p-0 rounded-full">
+                                    <Button variant="ghost" className="w-10 h-10 p-0 rounded-full cursor-pointer">
                                         <MoreVertical size={24} />
                                     </Button>
                                 </DropdownMenuTrigger>
@@ -667,10 +667,10 @@ export default function FoldersTab({ accessedNote, setAccessedNote, setIsNoteOpe
                         </Tooltip>
                         <DropdownMenuContent align="end" className="p-2">
                             <div className="flex flex-col gap-1">
-                                <Toggle aria-label="Ascending" size="sm" variant="outline" className="justify-start gap-2" onClick={() => setSortOrder("asc")} pressed={sortOrder === "asc"}>
+                                <Toggle aria-label="Ascending" size="sm" variant="default" className="justify-start gap-2 cursor-pointer hover:bg-accent/50 hover:text-accent-foreground" onClick={() => setSortOrder("asc")} pressed={sortOrder === "asc"}>
                                     <AArrowUp size={16} /> Ascending
                                 </Toggle>
-                                <Toggle aria-label="Descending" size="sm" variant="outline" className="justify-start gap-2" onClick={() => setSortOrder("desc")} pressed={sortOrder === "desc"}>
+                                <Toggle aria-label="Descending" size="sm" variant="default" className="justify-start gap-2 cursor-pointer hover:bg-accent/50 hover:text-accent-foreground" onClick={() => setSortOrder("desc")} pressed={sortOrder === "desc"}>
                                     <AArrowDown size={16} /> Descending
                                 </Toggle>
                             </div>

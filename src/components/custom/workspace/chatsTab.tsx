@@ -225,7 +225,7 @@ export default function ChatsTab({ tabId, initialChatId }: ChatsTabProps) {
                         className="text-center border-none shadow-none text-lg! font-medium focus-visible:ring-0 w-full bg-transparent! w-[364px]"
                     />
                 ) : currentChatId ? (
-                    <Button variant="ghost" className="text-lg p-2 rounded-3xl px-4" onClick={handleRenameChat}>{chatTitle}</Button>
+                    <Button variant="ghost" className="text-lg p-2 rounded-3xl px-4 cursor-pointer" onClick={handleRenameChat}>{chatTitle}</Button>
                 ) : (
                     <span className="text-lg font-medium p-2 rounded-3xl px-4">New Chat</span>
                 )}
@@ -233,7 +233,7 @@ export default function ChatsTab({ tabId, initialChatId }: ChatsTabProps) {
             <div className="absolute right-2 flex items-center gap-1 rounded-3xl p-1 mt-1 z-50 bg-popover/40 backdrop-blur-md shadow-lg">
                 <Tooltip>
                     <TooltipTrigger asChild>
-                        <Button variant="ghost" className="w-10 h-10 p-0 rounded-full" onClick={() => handleNewChat()}>
+                        <Button variant="ghost" className="w-10 h-10 p-0 rounded-full cursor-pointer" onClick={() => handleNewChat()}>
                             <PenSquare size={24} />
                         </Button>
                     </TooltipTrigger>
@@ -246,7 +246,7 @@ export default function ChatsTab({ tabId, initialChatId }: ChatsTabProps) {
                     <Tooltip>
                         <TooltipTrigger asChild>
                             <DropdownMenuTrigger asChild>
-                                <Button variant="ghost" className="w-10 h-10 p-0 rounded-full">
+                                <Button variant="ghost" className="w-10 h-10 p-0 rounded-full cursor-pointer">
                                     <MoreVertical size={24} />
                                 </Button>
                             </DropdownMenuTrigger>

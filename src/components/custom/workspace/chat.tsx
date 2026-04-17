@@ -86,7 +86,7 @@ export default function Chat() {
                         creditsUsed: msg.credits_used,
                         attachments: attachments?.filter(attachment => attachment.message_id === msg.id),
                         isLiked: msg.is_liked,
-                        isDisliked: !msg.is_liked,
+                        isDisliked: msg.is_liked === null ? null : !msg.is_liked,
                     };
                 });
 
