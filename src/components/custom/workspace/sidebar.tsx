@@ -38,6 +38,7 @@ import { useFetchedNotes } from "@/context/fetchedNotesContext";
 import { useFetchedFolders } from "@/context/fetchedFoldersContext";
 import { Folder, Note } from "@/types/folderStructureTypes";
 import { useReviews } from "@/context/reviewContext";
+import { LanguageMultiSelect } from "./languageMultiSelect";
 
 export default function SidebarArea() {
     const [userAuth, setUserAuth] = useState<any>(null);
@@ -410,7 +411,7 @@ export default function SidebarArea() {
     return (
         <Sidebar variant="inset" className="bg-transparent">
             {/* --------------------------- Header --------------------------- */}
-            <SidebarHeader className="bg-background px-0">
+            <SidebarHeader className=" px-0">
                 <header className="flex items-center p-0  group-data-[state=collapsed]:px-1">
                     {/* Logo and Narao text */}
                     <div className={cn(
@@ -438,7 +439,7 @@ export default function SidebarArea() {
 
 
             {/* --------------------------- Content --------------------------- */}
-            <SidebarContent className="bg-background overflow-hidden pt-[2.5px] relative justify-start">
+            <SidebarContent className=" overflow-hidden pt-[2.5px] relative justify-start">
                 {/* New feature: AI reviews */}
                 {state === "collapsed" ? (
                     <Tooltip>
@@ -506,7 +507,7 @@ export default function SidebarArea() {
 
 
             {/* --------------------------- Footer --------------------------- */}
-            <SidebarFooter className="bg-background p-0 group-data-[state=collapsed]:pl-1 transition-all duration-200">
+            <SidebarFooter className=" p-0 group-data-[state=collapsed]:pl-1 transition-all duration-200">
                 <AnimatePresence>
                     {announceFetched ? announce && showAnnounce && (
                         <motion.div
@@ -719,6 +720,18 @@ export default function SidebarArea() {
                                                 <SelectItem value="ko">한국어</SelectItem>
                                             </SelectContent>
                                         </Select>
+                                    </div>
+                                    <div className="flex gap-2 justify-between items-center py-4">
+                                        <div className="flex flex-col">
+                                            <p className="text-sm font-medium">Spellcheck Languages</p>
+                                            <p className="text-xs text-muted-foreground">Select multiple languages for checking editor text.</p>
+                                        </div>
+                                        <div className="w-48 text-right flex justify-end">
+                                            <LanguageMultiSelect 
+                                                selected={tempSettings.spellcheckLanguages || []} 
+                                                onChange={(val) => setTempSettings({...tempSettings, spellcheckLanguages: val})} 
+                                            />
+                                        </div>
                                     </div>
                                 </div>
                             )}

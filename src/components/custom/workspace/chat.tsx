@@ -177,8 +177,8 @@ export default function Chat() {
                             <ScrollArea className="h-full w-full px-[12%]">
                                 <div className="h-20 " key={"padding-top"}></div>
 
-                                {chatMessages.map((message) => (
-                                    <ChatMessageBlock key={message.id} message={message} />
+                                {chatMessages.map((message, index) => (
+                                    <ChatMessageBlock key={message.id} message={message} isFollowUp={index < chatMessages.length - 1 && chatMessages[index + 1].role === "user"} />
                                 ))}
                                 {chatMessages.length === 0 && (
                                     <div className="flex flex-col items-center justify-center h-[50vh]">

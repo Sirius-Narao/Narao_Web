@@ -28,7 +28,7 @@
   --chart-3: oklch(0.5500 0.2200 263);
   --chart-4: oklch(0.4900 0.2200 264);
   --chart-5: oklch(0.4200 0.1800 266);
-  --sidebar: oklch(0.9850 0 0);
+  --sidebar: oklch(0.97 0.005 48.687);
   --sidebar-foreground: oklch(0.1450 0 0);
   --sidebar-primary: oklch(0.2050 0 0);
   --sidebar-primary-foreground: oklch(0.9850 0 0);
@@ -658,4 +658,16 @@ body {
   height: 16px;
   color: var(--foreground);
   font-weight: 500;
+}
+
+/* ── Spellcheck Error Underlines ────────────────────────────────────────────────────── */
+
+.spellcheck-error {
+  text-decoration-line: underline;
+  text-decoration-style: wavy;
+  text-decoration-color: var(--folder-red);
+  text-decoration-thickness: 1.5px;
+  text-underline-offset: 3px;
+  background-color: transparent;
+  cursor: pointer;
 }

@@ -83,7 +83,7 @@ export default function FoldersTab({ accessedNote, setAccessedNote, setIsNoteOpe
     const [isDropdownCreateNewOpen, setIsDropdownCreateNewOpen] = useState(false);
 
     // create note state
-    const [noteFolder, setNoteFolder] = useState("/");
+    const [notePath, setNotePath] = useState("/");
     const [noteName, setNoteName] = useState("");
     const [noteDescription, setNoteDescription] = useState("");
 
@@ -100,6 +100,19 @@ export default function FoldersTab({ accessedNote, setAccessedNote, setIsNoteOpe
     // Drag and drop state
     const [dragItem, setDragItem] = useState<{ type: 'folder' | 'note'; id: string } | null>(null);
     const [dragOverFolderId, setDragOverFolderId] = useState<string | null>(null);
+
+    // Focus folder name input when renaming/creating
+    useEffect(() => {
+        if (renamingFolderId) {
+            const timer = setTimeout(() => {
+                folderNameInputRef.current?.focus();
+                if (isRenamingExistingFolder) {
+                    folderNameInputRef.current?.select();
+                }
+            }, 0);
+            return () => clearTimeout(timer);
+        }
+    }, [renamingFolderId, isRenamingExistingFolder]);
 
     // Path History useEffect
     useEffect(() => {
@@ -298,7 +311,6 @@ export default function FoldersTab({ accessedNote, setAccessedNote, setIsNoteOpe
         setIsRenamingExistingFolder(true);
         setRenamingFolderId(folderId);
         setTempFolderName(currentName);
-        setTimeout(() => folderNameInputRef.current?.focus(), 0);
     };
 
     const handleFolderRenameSubmit = async () => {
@@ -335,8 +347,8 @@ export default function FoldersTab({ accessedNote, setAccessedNote, setIsNoteOpe
         if (!user) return;
 
         let targetFolderId: string | undefined = undefined;
-        if (noteFolder !== "/") {
-            const targetPathObj = allFolderPaths.find(p => p.path === noteFolder);
+        if (notePath !== "/") {
+            const targetPathObj = allFolderPaths.find(p => p.path === notePath);
             if (targetPathObj) targetFolderId = targetPathObj.id;
         }
 
@@ -500,6 +512,13 @@ export default function FoldersTab({ accessedNote, setAccessedNote, setIsNoteOpe
         window.addEventListener("keydown", handleKeyDown);
         return () => window.removeEventListener("keydown", handleKeyDown);
     }, [activeTab, goBack, goForward, createFolder, setCreateNoteDialogOpen]);
+
+    // Dialog create note useEffect
+    useEffect(() => {
+        if (createNoteDialogOpen) {
+            setNotePath(path);
+        }
+    }, [createNoteDialogOpen, path]);
 
     if (!(foldersLoaded && notesLoaded)) {
         return (
@@ -712,14 +731,14 @@ export default function FoldersTab({ accessedNote, setAccessedNote, setIsNoteOpe
                                         <ContextMenuTrigger>
                                             <TooltipTrigger asChild>
                                                 {renamingFolderId === folder.id ? (
-                                                    <div className="group flex flex-col items-center gap-2 p-4 bg-muted/50 rounded-xl cursor-default w-32 h-28 justify-center border border-primary/50 fade-up">
+                                                    <div className="group flex flex-col items-center gap-2 p-4 bg-muted/50 rounded-xl cursor-default w-32 h-28 justify-center border border-primary/50">
                                                         <FolderIcon className={cn("w-12 h-12", folder.color && folderColorClasses[folder.color]?.text)} />
                                                         <Input
                                                             value={tempFolderName}
                                                             onChange={(e) => setTempFolderName(e.target.value)}
                                                             autoFocus
                                                             ref={folderNameInputRef}
-                                                            maxLength={24}
+                                                            maxLength={40}
                                                             className="h-6 w-full text-xs text-center px-1 bg-transparent border-none focus-visible:ring-0"
                                                             onBlur={() => isRenamingExistingFolder ? handleFolderRenameSubmit() : handleFolderSave()}
                                                             onKeyDown={(e) => {
@@ -870,8 +889,8 @@ export default function FoldersTab({ accessedNote, setAccessedNote, setIsNoteOpe
 
                     <Field className="gap-1">
                         <FieldLabel className="mb-1">Name</FieldLabel>
-                        <Input value={noteName} onChange={(e) => setNoteName(e.target.value)} placeholder="Note Name" maxLength={24} />
-                        <FieldDescription>*Max length is 24 characters</FieldDescription>
+                        <Input value={noteName} onChange={(e) => setNoteName(e.target.value)} placeholder="Note Name" maxLength={40} autoFocus />
+                        <FieldDescription>*Max length is 40 characters</FieldDescription>
                     </Field>
 
                     <Field className="gap-1 w-full">
@@ -882,7 +901,7 @@ export default function FoldersTab({ accessedNote, setAccessedNote, setIsNoteOpe
 
                     <Field className="flex flex-col gap-1">
                         <FieldLabel>Folder</FieldLabel>
-                        <Combobox value={noteFolder} onValueChange={(val) => setNoteFolder(val || "/")}>
+                        <Combobox value={notePath} onValueChange={(val) => setNotePath(val || "/")}>
                             <ComboboxInput placeholder="Select a folder..." />
                             <ComboboxContent>
                                 <ComboboxEmpty>No folder found.</ComboboxEmpty>

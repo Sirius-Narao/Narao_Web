@@ -36,7 +36,7 @@ const TOOL_NAMES = {
     "change_color_folder": { loading: "Changing Folder Color...", done: "Changed Folder Color", icon: <Palette className="w-3 h-3 shrink-0 text-primary/70" /> },
 }
 
-export default function ChatMessageBlock({ message }: { message: ChatMessage }) {
+export default function ChatMessageBlock({ message, isFollowUp }: { message: ChatMessage, isFollowUp: boolean }) {
     const [isThoughtExpanded, setIsThoughtExpanded] = useState(false);
     const { isLoading } = useIsLoading();
     const { requestEdit, requestRegenerate, requestQuickSend } = useEditMessage();
@@ -288,7 +288,7 @@ export default function ChatMessageBlock({ message }: { message: ChatMessage }) 
                                 <div className="flex w-full h-fit max-w-[90%] items-start">
                                     <MarkdownRenderer content={message.content} className="text-foreground w-full p-2" />
                                 </div>
-                                {!isLoading && message.content.endsWith("Do you want to proceed now?") && (
+                                {!isLoading && message.content.endsWith("Do you want to proceed now?") && !isFollowUp && (
                                     <div className="w-fit p-2 flex flex-row gap-2">
                                         <Button variant="ghost" className="hover:bg-folder-green/20 hover:text-foreground bg-folder-green/20 cursor-pointer hover:bg-folder-green/50 dark:hover:bg-folder-green/50" onClick={() => { proceed() }}>Okay, let's proceed!</Button>
                                         <Button variant="ghost" className="hover:bg-folder-red/20 hover:text-foreground bg-folder-red/20 cursor-pointer hover:bg-folder-red/50 dark:hover:bg-folder-red/50" onClick={() => { refuse() }}>Do not proceed</Button>

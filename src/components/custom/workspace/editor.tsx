@@ -2,6 +2,8 @@
 
 import { useContent } from "@/context/contentContext";
 import { useEditorInstance } from "@/context/editorContext";
+import { useSettings } from "@/context/settingsContext";
+import { SpellcheckExtension } from "@/lib/spellcheckExtension";
 import { useEffect, useState } from "react";
 import { useEditor, EditorContent } from '@tiptap/react';
 import StarterKit from '@tiptap/starter-kit';
@@ -9,6 +11,7 @@ import { Markdown } from 'tiptap-markdown';
 import "katex/dist/katex.min.css";
 import Placeholder from '@tiptap/extension-placeholder';
 
+import { SpellcheckHoverMenu } from './spellcheckHoverMenu';
 import { MathAwareCodeBlock } from './mathAwareCodeBlock';
 import { MathAwareInlineNode } from '../../../lib/mathAwareInlineNode';
 import { Table } from '@tiptap/extension-table';
@@ -91,6 +94,7 @@ const sanitiseMarkdown = (md: string): string => {
 export default function Editor() {
     const { content, setContent } = useContent();
     const { setEditor } = useEditorInstance();
+    const { settings } = useSettings();
     const [isMounted, setIsMounted] = useState(false);
 
     useEffect(() => {
@@ -117,6 +121,9 @@ export default function Editor() {
             }),
             Placeholder.configure({
                 placeholder: 'Start typing your note here...',
+            }),
+            SpellcheckExtension.configure({
+                getLanguages: () => settings.spellcheckLanguages || ['en-US'],
             })
         ],
         content: prepareContent(content),
@@ -166,6 +173,8 @@ export default function Editor() {
                     />
                 </div>
             </div>
+            
+            <SpellcheckHoverMenu editor={editor} />
         </div>
     );
 }

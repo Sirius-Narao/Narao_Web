@@ -235,7 +235,7 @@ export default function NotesTab({ accessedNote, setAccessedNote, initialNoteId 
                                     onChange={(e) => setTempNoteName(e.target.value)}
                                     onBlur={() => setIsRenamingNote(false)}
                                     autoFocus
-                                    maxLength={50}
+                                    maxLength={40}
                                     onKeyDown={(e) => {
                                         if (e.key === "Enter") { setIsRenamingNote(false); renameNote(); }
                                         if (e.key === "Escape") setIsRenamingNote(false);

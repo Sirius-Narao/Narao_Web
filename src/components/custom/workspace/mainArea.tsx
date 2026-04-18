@@ -117,6 +117,9 @@ export default function MainArea() {
     // ─── Open tab helpers ─────────────────────────────────────────────────────
     const handleOpenFolders = useCallback(() => {
         if (tabs.length < 24) {
+            if (activeTab.type === "home") {
+                closeTab(activeTabId);
+            }
             openTab({ type: "folder", title: "Folders", location: "/" });
         } else {
             toast.error("Too many tabs open", { position: 'bottom-right' });
@@ -125,6 +128,9 @@ export default function MainArea() {
 
     const handleNewNote = useCallback(() => {
         if (tabs.length < 24) {
+            if (activeTab.type === "home") {
+                closeTab(activeTabId);
+            }
             openTab({ type: "note", title: "Notes" });
         } else {
             toast.error("Too many tabs open", { position: 'bottom-right' });
@@ -135,6 +141,9 @@ export default function MainArea() {
 
     const handleNewChat = useCallback(() => {
         if (tabs.length < 24) {
+            if (activeTab.type === "home") {
+                closeTab(activeTabId);
+            }
             openTab({ type: "chat", title: "New Chat" });
         } else {
             toast.error("Too many tabs open", { position: 'bottom-right' });

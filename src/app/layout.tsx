@@ -4,6 +4,7 @@ import "./globals.css";
 import { ThemeProvider } from "@/components/theme-provider";
 import { Toaster } from "@/components/ui/sonner";
 import { SettingsProvider } from "@/context/settingsContext";
+import { Analytics } from "@vercel/analytics/next"
 
 const alanSans = Alan_Sans({
   variable: "--font-alan-sans",
@@ -54,6 +55,7 @@ export default function RootLayout({
       <body
         className={`${alanSans.variable} ${firaMono.variable} antialiased `}
       >
+        <Analytics />
         <SettingsProvider>
           <ThemeProvider>
             {children}

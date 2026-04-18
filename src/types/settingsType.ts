@@ -12,4 +12,5 @@ export interface Settings {
     customInstructions: CustomInstructions;
     plan: Plan;
     aiName: string;
+    spellcheckLanguages: string[];
 }
