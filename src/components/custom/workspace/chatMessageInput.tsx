@@ -49,7 +49,7 @@ export default function ChatMessageInput({ attachments, setAttachments }: ChatMe
     const editorRef = useRef<HTMLDivElement>(null)
     const fileInputRef = useRef<HTMLInputElement>(null)
     const abortControllerRef = useRef<AbortController | null>(null)
-    const { chatMessages, setChatMessages, currentChatId, setCurrentChatId, refreshChats, setChatTitle, setChatCache } = useChatMessages()
+    const { chatMessages, setChatMessages, currentChatId, setCurrentChatId, refreshChats, setChatTitle, setChatCache, chatInputHTML, setChatInputHTML } = useChatMessages()
 
     // Audio recording
     const { recordingState, audioURL, audioBlob, startRecording, stopRecording, uploadRecording, reset: resetRecording, analyserNode } = useAudioRecorder()
@@ -73,7 +73,7 @@ export default function ChatMessageInput({ attachments, setAttachments }: ChatMe
     const { fetchedFolders, setFetchedFolders } = useFetchedFolders();
 
     // Model Settings+
-    const [currentModel, setCurrentModel] = useState<keyof Models>("gemini-3-flash-preview")
+    const [currentModel, setCurrentModel] = useState<keyof Models>("gemini-2.5-flash")
 
     // Popover Settings
     // const [isSelectingModelPopoverOpen, setIsSelectingModelPopoverOpen] = useState(false)
@@ -212,12 +212,8 @@ export default function ChatMessageInput({ attachments, setAttachments }: ChatMe
         chip.textContent = `@${item.title}`
         chip.dataset.mentionId = item.id
         chip.dataset.mentionType = item.type
-        chip.onclick = () => {
-            if (item.type === "note") {
-                openTab({ type: "note", title: item.title, noteId: item.id })
-            } else if (item.type === "folder") {
-                openTab({ type: "folder", title: item.title, location: item.path || "/" })
-            }
+        if (item.type === "folder") {
+            chip.dataset.path = item.path || "/"
         }
 
         // Trailing non-breaking space so the caret can land after the chip
@@ -244,9 +240,15 @@ export default function ChatMessageInput({ attachments, setAttachments }: ChatMe
 
     useEffect(() => {
         if (activeTab?.type === "chat") {
-            editorRef.current?.focus()
+            // Only restore if the editor is currently empty or has a different content
+            // to avoid overwriting user input during active typing (though this is mostly for mount/tab-switch)
+            if (editorRef.current && editorRef.current.innerHTML !== chatInputHTML) {
+                editorRef.current.innerHTML = chatInputHTML;
+                setContent(getEditorText());
+            }
+            editorRef.current?.focus();
         }
-    }, [activeTab])
+    }, [activeTab, chatInputHTML, getEditorText]);
 
     // Recording duration timer
     useEffect(() => {
@@ -640,6 +642,7 @@ export default function ChatMessageInput({ attachments, setAttachments }: ChatMe
 
             const currentContent = effectiveContent;
             setContent("");
+            setChatInputHTML(""); // Clear persistent draft on send
             if (editorRef.current) editorRef.current.innerHTML = ""
             setAttachments([]);
 
@@ -1568,7 +1571,7 @@ export default function ChatMessageInput({ attachments, setAttachments }: ChatMe
                     </div>
                 </div>
             )}
-            <div className="absolute flex flex-col w-full sm:w-[90%] lg:w-[60%] bottom-0 left-0 sm:left-[5%] lg:left-[20%] right-0 sm:right-[5%] lg:right-[20%] gap-2 z-50 px-4 sm:px-0 pb-4" >
+            <div className="absolute flex flex-col w-full sm:w-[90%] lg:w-[60%] bottom-0 left-0 sm:left-[5%] lg:left-[20%] right-0 sm:right-[5%] lg:right-[20%] gap-2 z-50 px-4 sm:px-0" >
                 {/* Edit mode cancel pill */}
                 {pendingEdit && (
                     <div className="flex items-center justify-center animate-in fade-in">
@@ -1697,6 +1700,7 @@ export default function ChatMessageInput({ attachments, setAttachments }: ChatMe
                                         }
                                         const text = walk(el)
                                         setContent(text)
+                                        setChatInputHTML(el.innerHTML) // Sync HTML structure for persistence (chips)
 
                                         // Detect @mention trigger using caret offset
                                         const sel = window.getSelection()
@@ -1757,6 +1761,23 @@ export default function ChatMessageInput({ attachments, setAttachments }: ChatMe
                                         e.preventDefault()
                                         const text = e.clipboardData.getData("text/plain")
                                         document.execCommand("insertText", false, text)
+                                    }}
+                                    onClick={(e) => {
+                                        // Event delegation for mention-tokens (restored from innerHTML)
+                                        const target = e.target as HTMLElement
+                                        const chip = target.closest(".mention-token") as HTMLElement
+                                        if (chip) {
+                                            const id = chip.dataset.mentionId
+                                            const type = chip.dataset.mentionType
+                                            const title = chip.textContent?.slice(1) || "Item"
+                                            if (id && type) {
+                                                if (type === "note") {
+                                                    openTab({ type: "note", title, noteId: id })
+                                                } else if (type === "folder") {
+                                                    openTab({ type: "folder", title, location: chip.dataset.path || "/" })
+                                                }
+                                            }
+                                        }
                                     }}
                                 />
                                 {/* @mention suggestion dropdown */}

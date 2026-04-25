@@ -16,6 +16,8 @@ export interface Tab {
     noteId?: string;
     /** For chat tabs */
     chatId?: string;
+    /** For note tabs */
+    isSavedComplete?: boolean;
 }
 
 interface TabsContextType {
@@ -29,6 +31,7 @@ interface TabsContextType {
     updateTabLocation: (id: string, location: string) => void;
     updateTabNoteId: (id: string, noteId: string | undefined) => void;
     updateTabChatId: (id: string, chatId: string | undefined) => void;
+    updateTabIsSavedComplete: (id: string, isSavedComplete: boolean) => void;
     moveTab: (fromIndex: number, toIndex: number) => void;
 }
 
@@ -69,6 +72,7 @@ function TabsProvider({ children }: { children: React.ReactNode }) {
             ...tabData,
             id,
             title: tabData.title || DEFAULT_TITLE[tabData.type],
+            isSavedComplete: tabData.isSavedComplete ?? true,
         };
         setTabs((prev) => [...prev, newTab]);
         setActiveTabIdState(id);
@@ -121,6 +125,14 @@ function TabsProvider({ children }: { children: React.ReactNode }) {
         });
     }, []);
 
+    const updateTabIsSavedComplete = useCallback((id: string, isSavedComplete: boolean) => {
+        setTabs((prev) => {
+            const tab = prev.find(t => t.id === id);
+            if (tab && tab.isSavedComplete === isSavedComplete) return prev;
+            return prev.map((t) => (t.id === id ? { ...t, isSavedComplete } : t));
+        });
+    }, []);
+
     const moveTab = useCallback((fromIndex: number, toIndex: number) => {
         setTabs((prev) => {
             const next = [...prev];
@@ -143,6 +155,7 @@ function TabsProvider({ children }: { children: React.ReactNode }) {
                 updateTabLocation,
                 updateTabNoteId,
                 updateTabChatId,
+                updateTabIsSavedComplete,
                 moveTab,
             }}
         >

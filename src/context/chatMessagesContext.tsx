@@ -5,6 +5,7 @@ import { ChatMessage } from "@/types/chatType";
 interface ChatCacheEntry {
     messages: ChatMessage[];
     title: string;
+    inputHTML?: string;
 }
 
 // ── Per-tab state ─────────────────────────────────────────────────────────────
@@ -12,6 +13,7 @@ interface TabChatState {
     chatId: string | null;
     messages: ChatMessage[];
     title: string;
+    inputHTML: string;
 }
 
 interface ChatMessagesContextType {
@@ -22,6 +24,8 @@ interface ChatMessagesContextType {
     setCurrentChatId: Dispatch<SetStateAction<string | null>>;
     chatTitle: string;
     setChatTitle: Dispatch<SetStateAction<string>>;
+    chatInputHTML: string;
+    setChatInputHTML: (value: string | ((prev: string) => string)) => void;
 
     // ── Shared across tabs ────────────────────────────────────────────────────
     refreshTrigger: number;
@@ -62,7 +66,7 @@ function ChatMessagesProvider({ children }: { children: ReactNode }) {
     const initTabState = useCallback((tabId: string) => {
         setTabStates(prev => {
             if (prev[tabId]) return prev; // already exists
-            return { ...prev, [tabId]: { chatId: null, messages: [], title: "New Chat" } };
+            return { ...prev, [tabId]: { chatId: null, messages: [], title: "New Chat", inputHTML: "" } };
         });
     }, []);
 
@@ -80,24 +84,25 @@ function ChatMessagesProvider({ children }: { children: ReactNode }) {
 
     const setTabState = useCallback((tabId: string, patch: Partial<TabChatState>) => {
         setTabStates(prev => {
-            const existing = prev[tabId] ?? { chatId: null, messages: [], title: "New Chat" };
+            const existing = prev[tabId] ?? { chatId: null, messages: [], title: "New Chat", inputHTML: "" };
             return { ...prev, [tabId]: { ...existing, ...patch } };
         });
     }, []);
 
     // ── Active-tab derived state (backward-compat) ────────────────────────────
     const activeState: TabChatState = activeTabId
-        ? (tabStates[activeTabId] ?? { chatId: null, messages: [], title: "New Chat" })
-        : { chatId: null, messages: [], title: "New Chat" };
+        ? (tabStates[activeTabId] ?? { chatId: null, messages: [], title: "New Chat", inputHTML: "" })
+        : { chatId: null, messages: [], title: "New Chat", inputHTML: "" };
 
     const chatMessages = activeState.messages;
     const currentChatId = activeState.chatId;
     const chatTitle = activeState.title;
+    const chatInputHTML = activeState.inputHTML;
 
     const setChatMessages: Dispatch<SetStateAction<ChatMessage[]>> = useCallback((value) => {
         if (!activeTabId) return;
         setTabStates(prev => {
-            const existing = prev[activeTabId] ?? { chatId: null, messages: [], title: "New Chat" };
+            const existing = prev[activeTabId] ?? { chatId: null, messages: [], title: "New Chat", inputHTML: "" };
             const next = typeof value === "function" ? (value as (v: ChatMessage[]) => ChatMessage[])(existing.messages) : value;
             if (next === existing.messages) return prev;
             return { ...prev, [activeTabId]: { ...existing, messages: next } };
@@ -107,7 +112,7 @@ function ChatMessagesProvider({ children }: { children: ReactNode }) {
     const setCurrentChatId: Dispatch<SetStateAction<string | null>> = useCallback((value) => {
         if (!activeTabId) return;
         setTabStates(prev => {
-            const existing = prev[activeTabId] ?? { chatId: null, messages: [], title: "New Chat" };
+            const existing = prev[activeTabId] ?? { chatId: null, messages: [], title: "New Chat", inputHTML: "" };
             const next = typeof value === "function" ? (value as (v: string | null) => string | null)(existing.chatId) : value;
             if (next === existing.chatId) return prev;
             return { ...prev, [activeTabId]: { ...existing, chatId: next } };
@@ -117,10 +122,20 @@ function ChatMessagesProvider({ children }: { children: ReactNode }) {
     const setChatTitle: Dispatch<SetStateAction<string>> = useCallback((value) => {
         if (!activeTabId) return;
         setTabStates(prev => {
-            const existing = prev[activeTabId] ?? { chatId: null, messages: [], title: "New Chat" };
+            const existing = prev[activeTabId] ?? { chatId: null, messages: [], title: "New Chat", inputHTML: "" };
             const next = typeof value === "function" ? (value as (v: string) => string)(existing.title) : value;
             if (next === existing.title) return prev;
             return { ...prev, [activeTabId]: { ...existing, title: next } };
+        });
+    }, [activeTabId]);
+
+    const setChatInputHTML = useCallback((value: string | ((prev: string) => string)) => {
+        if (!activeTabId) return;
+        setTabStates(prev => {
+            const existing = prev[activeTabId] ?? { chatId: null, messages: [], title: "New Chat", inputHTML: "" };
+            const next = typeof value === "function" ? value(existing.inputHTML) : value;
+            if (next === existing.inputHTML) return prev;
+            return { ...prev, [activeTabId]: { ...existing, inputHTML: next } };
         });
     }, [activeTabId]);
 
@@ -129,16 +144,16 @@ function ChatMessagesProvider({ children }: { children: ReactNode }) {
         if (currentChatId) {
             setChatCache(prev => {
                 const existing = prev[currentChatId];
-                if (existing && existing.messages === chatMessages && existing.title === chatTitle) {
+                if (existing && existing.messages === chatMessages && existing.title === chatTitle && existing.inputHTML === chatInputHTML) {
                     return prev;
                 }
                 return {
                     ...prev,
-                    [currentChatId]: { messages: chatMessages, title: chatTitle }
+                    [currentChatId]: { messages: chatMessages, title: chatTitle, inputHTML: chatInputHTML }
                 };
             });
         }
-    }, [chatMessages, chatTitle, currentChatId]);
+    }, [chatMessages, chatTitle, currentChatId, chatInputHTML]);
 
     const refreshChats = useCallback(() => {
         setRefreshTrigger(prev => prev + 1);
@@ -153,6 +168,8 @@ function ChatMessagesProvider({ children }: { children: ReactNode }) {
         refreshChats,
         chatTitle,
         setChatTitle,
+        chatInputHTML,
+        setChatInputHTML,
         chatCache,
         setChatCache,
         activeTabId,
@@ -166,6 +183,7 @@ function ChatMessagesProvider({ children }: { children: ReactNode }) {
         currentChatId, setCurrentChatId,
         refreshTrigger, refreshChats,
         chatTitle, setChatTitle,
+        chatInputHTML, setChatInputHTML,
         chatCache,
         activeTabId, setActiveTabId,
         initTabState, removeTabState, getTabState, setTabState,

@@ -2,6 +2,11 @@ export type ContentType = string;
 export type FetchedFolders = Folder[];
 export type FetchedNotes = Note[];
 
+export type Tag = {
+    name: string;
+    color: string;
+}
+
 
 
 export type Note = {
@@ -12,7 +17,7 @@ export type Note = {
     description?: string;
     createdAt: Date;
     updatedAt: Date;
-    tags?: string[];
+    tags?: Tag[];
     folder_id?: string;
     is_reviewed?: boolean;
 }

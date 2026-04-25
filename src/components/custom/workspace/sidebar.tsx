@@ -133,6 +133,7 @@ export default function SidebarArea() {
     }, []);
     // Fetch reviews data
     useEffect(() => {
+        let ignore = false;
         const fetchReviews = async () => {
             if (!user?.id) return;
 
@@ -155,9 +156,14 @@ export default function SidebarArea() {
                 location: r.location,
                 chatId: r.chat_id || r.chatId,
             }));
-            setReviews(mapped);
+            if (!ignore) {
+                setReviews(mapped);
+            }
         };
         fetchReviews();
+        return () => {
+            ignore = true;
+        };
     }, [user]);
     // update settings
     const updateSettings = async () => {
@@ -283,56 +289,13 @@ export default function SidebarArea() {
             return;
         }
 
-        // 5. Create the chat first so we have a chat_id for the review
-        const firstReview = structuredData.reviews[0];
-        const { data: newChat, error: chatError } = await supabase
-            .from('chats')
-            .insert({
-                user_id: user.id,
-                title: "Review: " + (firstReview.title || "Untitled"),
-                description: `Review for ${reviewElement.note?.title || reviewElement.folder?.name}`,
-            })
-            .select()
-            .single();
+        // 5. We skip chat creation here. 
+        // It will be created when the user clicks on the review item in reviewItem.tsx
 
-        if (chatError) {
-            console.error("Error creating chat:", chatError);
-            return;
-        }
+        // 6. We also skip message creation and credit deduction here.
+        // These will also happen when the user clicks on the review item.
 
-        // 6. Create the chat message with the review content
-        const { data: newMessage, error: messageError } = await supabase
-            .from('chat_messages')
-            .insert({
-                chat_id: newChat.id,
-                role: "assistant",
-                content: `# ${firstReview.title}\n\n${firstReview.query}. In ${firstReview.location}. \n\n---\n\nDo you want to proceed now?`,
-                credits_used: 20,
-            })
-            .select()
-            .single();
-
-        if (messageError) {
-            console.error("Error creating message:", messageError);
-            return;
-        }
-
-        // 7. Update the user's credits
-        const { data: updatedUser, error: userError } = await supabase
-            .from('profiles')
-            .update({ credits_left: user.credits_left - 20 })
-            .eq('id', user.id)
-            .select()
-            .single();
-
-        if (userError) {
-            console.error("Error updating user credits:", userError);
-            return;
-        }
-        setUser(updatedUser);
-        setGlobalUser(updatedUser);
-
-        // 8. Save the reviews to the database WITH the chat_id
+        // 8. Save the reviews to the database WITHOUT the chat_id for now
         const payload = structuredData.reviews.map((review: ReviewItemType) => ({
             title: review.title,
             query: review.query,
@@ -340,7 +303,7 @@ export default function SidebarArea() {
             type: review.type,
             location: review.location,
             user_id: user.id,
-            chat_id: newChat.id,
+            // chat_id: newChat.id, // Removed
         }));
         const { data: insertedReviews, error } = await supabase
             .from('review_items')
@@ -388,9 +351,13 @@ export default function SidebarArea() {
                 importance: r.importance,
                 type: r.type,
                 location: r.location,
-                chatId: r.chat_id || newChat.id,
+                chatId: r.chat_id || r.chatId || null,
             }));
-            setReviews(prev => [...prev, ...mappedInserted]);
+            setReviews(prev => {
+                const existingIds = new Set(prev.map(r => r.id));
+                const newReviews = mappedInserted.filter(r => !existingIds.has(r.id));
+                return [...prev, ...newReviews];
+            });
         }
 
         return insertedReviews;
@@ -607,7 +574,7 @@ export default function SidebarArea() {
                             </div>
                         </div>
                         <div className="col-span-4 flex flex-col h-full relative px-4">
-                            <DialogHeader>
+                            <DialogHeader className="border-b border-border pb-4">
                                 <DialogTitle>{settingsTab === 0 ? "Preferences" : settingsTab === 1 ? "Account" : settingsTab === 2 ? "AI Settings" : "Categories"}</DialogTitle>
                                 <DialogDescription>
                                     {settingsTab === 0 ? "Manage your workspace preferences." : settingsTab === 1 ? "Manage your workspace account." : settingsTab === 2 ? "Manage your workspace AI settings." : "Manage your workspace categories."}
@@ -615,8 +582,8 @@ export default function SidebarArea() {
                             </DialogHeader>
 
                             {settingsTab === 0 && (
-                                <div className="flex flex-col py-6 h-[calc(100vh-250px)] sm:h-[calc(100vh-300px)] md:h-[calc(100vh-400px)] lg:h-[calc(100vh-500px)] overflow-y-auto scrollbar-hide">
-                                    <div className="flex gap-2 border-t border-b border-border py-4 justify-between items-center">
+                                <div className="flex flex-col pb-6 h-[calc(100vh-250px)] sm:h-[calc(100vh-300px)] md:h-[calc(100vh-400px)] lg:h-[calc(100vh-500px)] overflow-y-auto scrollbar-hide">
+                                    <div className="flex gap-2 border-b border-border py-4 justify-between items-center">
                                         <p className="text-sm font-medium">Credits Left</p>
                                         <Tooltip>
                                             <TooltipTrigger asChild>
@@ -631,7 +598,7 @@ export default function SidebarArea() {
                                             </TooltipContent>
                                         </Tooltip>
                                     </div>
-                                    <div className="flex flex-col gap-2 border-t border-b border-border py-4">
+                                    <div className="flex flex-col gap-2 border-b border-border py-4">
                                         <p className="text-sm font-medium">Username</p>
                                         <Input
                                             className="w-full focus-visible:border-primary focus-visible:ring-none focus-visible:ring-[0px]!"
@@ -666,8 +633,8 @@ export default function SidebarArea() {
                                 </div>
                             )}
                             {settingsTab === 1 && (
-                                <div className="flex flex-col py-6 h-[calc(100vh-250px)] sm:h-[calc(100vh-300px)] md:h-[calc(100vh-400px)] lg:h-[calc(100vh-500px)] overflow-y-auto scrollbar-hide">
-                                    <div className="flex gap-2 justify-between items-center border-t border-b border-border py-4">
+                                <div className="flex flex-col pb-6 h-[calc(100vh-250px)] sm:h-[calc(100vh-300px)] md:h-[calc(100vh-400px)] lg:h-[calc(100vh-500px)] overflow-y-auto scrollbar-hide">
+                                    <div className="flex gap-2 justify-between items-center border-b border-border py-4">
                                         <p className="text-sm font-medium">Appearance</p>
                                         <Select
                                             value={tempSettings.theme}
@@ -727,17 +694,17 @@ export default function SidebarArea() {
                                             <p className="text-xs text-muted-foreground">Select multiple languages for checking editor text.</p>
                                         </div>
                                         <div className="w-48 text-right flex justify-end">
-                                            <LanguageMultiSelect 
-                                                selected={tempSettings.spellcheckLanguages || []} 
-                                                onChange={(val) => setTempSettings({...tempSettings, spellcheckLanguages: val})} 
+                                            <LanguageMultiSelect
+                                                selected={tempSettings.spellcheckLanguages || []}
+                                                onChange={(val) => setTempSettings({ ...tempSettings, spellcheckLanguages: val })}
                                             />
                                         </div>
                                     </div>
                                 </div>
                             )}
                             {settingsTab === 2 && (
-                                <div className="flex flex-col py-6 h-[calc(100vh-250px)] sm:h-[calc(100vh-300px)] md:h-[calc(100vh-400px)] lg:h-[calc(100vh-500px)] overflow-y-auto scrollbar-hide pr-12 pb-12">
-                                    <div className="flex flex-col gap-2 border-t border-b border-border py-4">
+                                <div className="flex flex-col pb-6 h-[calc(100vh-250px)] sm:h-[calc(100vh-300px)] md:h-[calc(100vh-400px)] lg:h-[calc(100vh-500px)] overflow-y-auto scrollbar-hide pr-12 pb-12">
+                                    <div className="flex flex-col gap-2 border-b border-border py-4">
                                         <p className="text-sm font-medium">AI name</p>
                                         <Input
                                             className="w-full focus-visible:border-primary focus-visible:ring-none focus-visible:ring-[0px]! selection:bg-primary"
@@ -787,9 +754,11 @@ export default function SidebarArea() {
 
                             <DialogFooter className="flex items-center justify-end gap-2 p-2 absolute bottom-0 left-1/2 -translate-x-1/2 bg-card/50 backdrop-blur-sm w-fit rounded-full border">
                                 <DialogClose asChild>
-                                    <Button variant="ghost" onClick={() => setSettingsOpen(false)}>Close</Button>
+                                    <Button variant="ghost" onClick={() => setSettingsOpen(false)} className="cursor-pointer">Close</Button>
                                 </DialogClose>
-                                <Button variant="default" onClick={() => { updateSettings(); setSettingsOpen(false); }}>Save Changes</Button>
+                                <Button variant="default" onClick={() => { updateSettings(); setSettingsOpen(false); }} className="cursor-pointer hover:bg-primary/70" disabled={JSON.stringify(tempSettings) === JSON.stringify(settings)}>
+                                    Save Changes
+                                </Button>
                             </DialogFooter>
                         </div>
                     </DialogContent>

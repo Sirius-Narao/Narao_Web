@@ -131,7 +131,7 @@ export default function MainArea() {
             if (activeTab.type === "home") {
                 closeTab(activeTabId);
             }
-            openTab({ type: "note", title: "Notes" });
+            openTab({ type: "note", title: "Notes", isSavedComplete: true });
         } else {
             toast.error("Too many tabs open", { position: 'bottom-right' });
         }

@@ -31,7 +31,7 @@ export default function NotesTab({ accessedNote, setAccessedNote, initialNoteId 
     const { user } = useUser();
     const { content, setContent } = useContent();
     const [isSavedComplete, setIsSavedComplete] = useState(true);
-    const { activeTabId, updateTabTitle, closeTab } = useTabs();
+    const { activeTabId, updateTabTitle, closeTab, updateTabIsSavedComplete } = useTabs();
     const { setFetchedNotes, fetchedNotes } = useFetchedNotes();
     const { fetchedFolders } = useFetchedFolders();
 
@@ -45,18 +45,41 @@ export default function NotesTab({ accessedNote, setAccessedNote, initialNoteId 
 
     // rename note state
     const [isRenamingNote, setIsRenamingNote] = useState(false);
-    const [renamingNoteId, setRenamingNoteId] = useState<string | null>(null);
+    const [, setRenamingNoteId] = useState<string | null>(null);
     const [tempNoteName, setTempNoteName] = useState(accessedNote?.title || "");
 
     // Sync tab title with note title
     useEffect(() => {
         if (!activeTabId) return;
-        updateTabTitle(activeTabId, accessedNote?.title || "Notes");
 
-        if (!accessedNote) {
-            setCreateNoteDialogOpen(true);
+        const timer = setTimeout(() => {
+            updateTabTitle(activeTabId, accessedNote?.title || "Notes");
+
+            if (!accessedNote && !initialNoteId) {
+                setCreateNoteDialogOpen(true);
+            }
+        }, 0);
+
+        return () => clearTimeout(timer);
+    }, [accessedNote?.title, activeTabId, updateTabTitle, initialNoteId]);
+
+    // Sync saved status with tab context
+    useEffect(() => {
+        if (!activeTabId || !accessedNote) {
+            // If no note is accessed, consider it saved (or handle accordingly)
+            const timer = setTimeout(() => {
+                updateTabIsSavedComplete(activeTabId!, true);
+            }, 0);
+            return () => clearTimeout(timer);
         }
-    }, [accessedNote?.title, activeTabId]);
+
+        // If content matches accessedNote content, and we are not currently in the save process
+        const isActuallySaved = content === accessedNote.content && isSavedComplete;
+        const timer = setTimeout(() => {
+            updateTabIsSavedComplete(activeTabId, isActuallySaved);
+        }, 0);
+        return () => clearTimeout(timer);
+    }, [content, accessedNote?.content, activeTabId, isSavedComplete, updateTabIsSavedComplete]);
 
     // Restore note from initialNoteId on mount
     useEffect(() => {
@@ -165,7 +188,7 @@ export default function NotesTab({ accessedNote, setAccessedNote, initialNoteId 
                 createdAt: new Date(data.created_at),
                 updatedAt: new Date(data.updated_at)
             };
-            toast.info(`Saved ${updatedNote.title} successfully`, { position: 'bottom-right' });
+            toast.info(`Saved ${updatedNote.title} successfully`, { position: 'bottom-right', duration: 1000 });
             setAccessedNote(updatedNote);
         }
         setIsSavedComplete(true);
@@ -210,6 +233,17 @@ export default function NotesTab({ accessedNote, setAccessedNote, initialNoteId 
             }
         }
     }, [fetchedNotes]);
+
+    // useEffect to saveNote every 10 seconds if there are unsaved changes
+    useEffect(() => {
+        if (!accessedNote) return;
+        const interval = setInterval(() => {
+            if (content !== accessedNote.content) {
+                saveNote();
+            }
+        }, 10000);
+        return () => clearInterval(interval);
+    }, [saveNote, accessedNote, content]);
 
     useEffect(() => {
         const handleKeyDown = (e: KeyboardEvent) => {
@@ -282,7 +316,7 @@ export default function NotesTab({ accessedNote, setAccessedNote, initialNoteId 
                         closeTab(activeTabId);
                     }
                 }}>
-                    <DialogContent showCloseButton={false} className="w-[40%] pb-24">
+                    <DialogContent showCloseButton={false} className="w-[40%]">
                         <DialogHeader>
                             <DialogTitle>Create Note</DialogTitle>
                             <DialogDescription>Create a new note in your workspace</DialogDescription>
@@ -316,7 +350,7 @@ export default function NotesTab({ accessedNote, setAccessedNote, initialNoteId 
                         </Field>
 
                         <DialogFooter className="mt-4 gap-2">
-                            <Button variant="outline" onClick={() => { setCreateNoteDialogOpen(false), closeTab(activeTabId!) }}>Cancel</Button>
+                            <Button variant="ghost" onClick={() => { setCreateNoteDialogOpen(false), closeTab(activeTabId!) }}>Cancel</Button>
                             <Button onClick={createNote} disabled={!noteName.trim()}>Create Note</Button>
                         </DialogFooter>
                     </DialogContent>

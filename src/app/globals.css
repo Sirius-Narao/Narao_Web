@@ -467,12 +467,18 @@ body {
 }
 
 .tiptap table {
-  @apply w-full border-collapse border border-border my-6 overflow-hidden rounded-lg bg-secondary/50 text-sm;
+  @apply w-full table-fixed border-collapse border border-border my-6 overflow-hidden rounded-lg bg-secondary/50 text-sm;
 }
 
 .tiptap table th,
 .tiptap table td {
-  @apply border-b border-secondary/70 px-4 text-left align-top;
+  @apply border-b border-r border-secondary/70 px-4 text-left align-top;
+  min-width: 0;
+}
+
+.tiptap table th:last-child,
+.tiptap table td:last-child {
+  border-right: none;
 }
 
 .tiptap table th {
@@ -480,8 +486,44 @@ body {
 }
 
 .tiptap table td {
-  @apply bg-card py-2.5 text-foreground/70;
+  @apply bg-card/60 py-2.5 text-foreground/70;
 }
+
+/* ── Custom Table Handles ────────────────────────────────────────────────── */
+
+.custom-table-container {
+  @apply relative;
+}
+
+.custom-table-container table {
+  margin: 0;
+}
+
+.custom-table-handle-bottom {
+  @apply absolute -bottom-5 left-[20%] right-[20%] h-4 w-[60%] bg-secondary/30 hover:bg-primary/40 rounded-full transition-all cursor-pointer flex items-center justify-center opacity-0 group-hover/table:opacity-100;
+}
+
+.custom-table-handle-right {
+  @apply absolute -right-5 top-[20%] bottom-[20%] w-4 h-[60%] bg-secondary/30 hover:bg-primary/40 rounded-full transition-all cursor-pointer flex items-center justify-center opacity-0 group-hover/table:opacity-100;
+}
+
+.custom-table-container .plus-icon {
+  @apply text-foreground/50 scale-75;
+}
+
+.tiptap .column-resize-handle {
+  @apply absolute -right-1 top-0 bottom-0 w-1 bg-primary cursor-col-resize z-50;
+}
+
+.tiptap .selectedCell {
+  @apply relative;
+}
+
+.tiptap .selectedCell:after {
+  @apply absolute inset-0 bg-primary/10 pointer-events-none content-[''] z-10;
+}
+
+
 
 /* ── @Mention Input System ──────────────────────────────────────────────────── */
 

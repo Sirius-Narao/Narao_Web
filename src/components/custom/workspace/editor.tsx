@@ -14,7 +14,7 @@ import Placeholder from '@tiptap/extension-placeholder';
 import { SpellcheckHoverMenu } from './spellcheckHoverMenu';
 import { MathAwareCodeBlock } from './mathAwareCodeBlock';
 import { MathAwareInlineNode } from '../../../lib/mathAwareInlineNode';
-import { Table } from '@tiptap/extension-table';
+import { CustomTable } from './customTable';
 import { TableRow } from '@tiptap/extension-table-row';
 import { TableHeader } from '@tiptap/extension-table-header';
 import { TableCell } from '@tiptap/extension-table-cell';
@@ -61,7 +61,7 @@ const prepareContent = (raw: string): string => {
 
     // Step 1 – block math $$\n…\n$$ → ```math\n…\n```
     // Handle both LF and CRLF line endings
-    result = result.replace(/\$\$\r?\n([\s\S]*?)\r?\n\$\$/g, '```math\n$1\n```');
+    result = result.replace(/\$\$\s*\r?\n([\s\S]*?)\r?\n\s*\$\$/g, '```math\n$1\n```');
 
     // Step 2 – inline math $…$ → <span data-type="inlineMath" …>
     // Only transform text that is NOT inside an HTML tag (e.g. don't touch
@@ -110,7 +110,7 @@ export default function Editor() {
             Color,
             MathAwareCodeBlock,
             MathAwareInlineNode,
-            Table.configure({ resizable: false }),
+            CustomTable.configure({ resizable: false }),
             TableRow,
             TableHeader,
             TableCell,
@@ -141,8 +141,13 @@ export default function Editor() {
 
     // Register editor instance into shared context so toolbar can consume it
     useEffect(() => {
-        setEditor(editor ?? null);
-        return () => setEditor(null);
+        const timer = setTimeout(() => {
+            setEditor(editor ?? null);
+        }, 0);
+        return () => {
+            clearTimeout(timer);
+            setEditor(null);
+        };
         // eslint-disable-next-line react-hooks/exhaustive-deps
     }, [editor]);
 
@@ -151,7 +156,12 @@ export default function Editor() {
         if (editor && content && !editor.isFocused) {
             const currentMd = sanitiseMarkdown((editor.storage as any).markdown.getMarkdown());
             if (content !== currentMd) {
-                editor.commands.setContent(prepareContent(content));
+                const timer = setTimeout(() => {
+                    if (editor && !editor.isDestroyed) {
+                        editor.commands.setContent(prepareContent(content));
+                    }
+                }, 0);
+                return () => clearTimeout(timer);
             }
         }
     }, [content, editor]);
@@ -173,7 +183,7 @@ export default function Editor() {
                     />
                 </div>
             </div>
-            
+
             <SpellcheckHoverMenu editor={editor} />
         </div>
     );

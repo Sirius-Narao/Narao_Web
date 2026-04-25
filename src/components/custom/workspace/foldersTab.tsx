@@ -23,7 +23,7 @@ import {
     Trash,
 } from "lucide-react";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
-import { Folder, Note, FolderColor } from "@/types/folderStructureTypes";
+import { Folder, Note, FolderColor, Tag } from "@/types/folderStructureTypes";
 import { ScrollArea } from "@/components/ui/scroll-area";
 import { cn } from "@/lib/utils";
 import dateConvert from "@/lib/dateConvert";
@@ -520,6 +520,37 @@ export default function FoldersTab({ accessedNote, setAccessedNote, setIsNoteOpe
         }
     }, [createNoteDialogOpen, path]);
 
+    // handle function for displaying tags on a note card
+    const handleDisplayTags = (tags: Tag[]) => {
+        // create tags
+        if (tags.length === 0) {
+            return <></>
+        }
+
+        if (tags.length > 3) {
+            const tagToDisplay = tags.slice(0, 3);
+            return (
+                <div className="flex items-center">
+                    {tagToDisplay.map((tag, index) => (
+                        <div key={index} className="w-2 h-2 rounded-full -ml-1" style={{ backgroundColor: tag.color }}></div>
+                    ))}
+                    {tags.length > 3 && <p className="text-xs text-muted-foreground pl-0.5">+{tags.length - 3}</p>}
+                </div>
+            );
+        }
+
+        return (
+            <div className="flex items-center">
+                {tags.map((tag, index) => (
+                    <div key={index} className="flex items-center gap-2">
+                        <div className="h-2 w-2 rounded-full group-hover:scale-110 transition-all duration-200" style={{ backgroundColor: tag.color }}></div>
+                        <p className="text-xs font-medium text-center truncate w-full px-1 mt-1">{tag.name}</p>
+                    </div>
+                ))}
+            </div>
+        );
+    };
+
     if (!(foldersLoaded && notesLoaded)) {
         return (
             <div className="flex flex-col gap-2 h-full w-full">
@@ -795,7 +826,7 @@ export default function FoldersTab({ accessedNote, setAccessedNote, setIsNoteOpe
                                                     ))}
                                                 </ContextMenuSubContent>
                                             </ContextMenuSub>
-                                            <ContextMenuItem className="gap-2 text-destructive focus:text-destructive dark:hover:bg-destructive/10 hover:bg-destructive/10" onClick={() => deleteFolder(folder.id, folder.name)}>
+                                            <ContextMenuItem className="gap-2 text-destructive focus:text-destructive dark:hover:bg-destructive/10 hover:bg-destructive/10 dark:hover:bg-destructive/10 hover:bg-destructive/10!" onClick={() => deleteFolder(folder.id, folder.name)}>
                                                 <Trash size={14} className="text-destructive" /> Delete
                                             </ContextMenuItem>
                                         </ContextMenuContent>
@@ -836,8 +867,13 @@ export default function FoldersTab({ accessedNote, setAccessedNote, setIsNoteOpe
                                                     >
                                                         <FileText className="w-10 h-10 text-foreground/50 group-hover:text-foreground group-hover:scale-110 transition-all duration-200" />
                                                         <p className="text-xs font-medium text-center truncate w-full px-1 mt-1">{note.title}</p>
+                                                        {note.tags && note.tags.length > 0 && <div className="absolute top-2 right-2 border-border border rounded-full px-1 pl-2 bg-popover/60">
+                                                            {handleDisplayTags(note.tags)}
+                                                        </div>}
                                                     </div>
+
                                                 )}
+
                                             </TooltipTrigger>
                                             <TooltipContent side="bottom" className="flex flex-col gap-1 p-2 max-w-[200px]">
                                                 <p className="font-medium truncate">{note.title}</p>
@@ -849,7 +885,7 @@ export default function FoldersTab({ accessedNote, setAccessedNote, setIsNoteOpe
                                             <ContextMenuItem onClick={() => startNoteRename(note.id, note.title)} className="gap-2">
                                                 <FolderPen size={14} className="hover:text-primary" /> Rename
                                             </ContextMenuItem>
-                                            <ContextMenuItem className="gap-2 text-destructive focus:text-destructive dark:hover:bg-destructive/10 hover:bg-destructive/10" onClick={() => deleteNote(note.id)}>
+                                            <ContextMenuItem className="gap-2 text-destructive focus:text-destructive dark:hover:bg-destructive/10 hover:bg-destructive/10 dark:hover:bg-destructive/10 hover:bg-destructive/10!" onClick={() => deleteNote(note.id)}>
                                                 <Trash size={14} className="text-destructive" /> Delete
                                             </ContextMenuItem>
                                         </ContextMenuContent>

@@ -6,5 +6,5 @@ export type ReviewItemType = {
     importance: 1 | 2 | 3;
     type: "typo" | "suggestion" | "question";
     location: string;
-    chatId: string;
+    chatId?: string | null;
 }

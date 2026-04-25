@@ -11,6 +11,10 @@ import { useIsLoading } from "@/context/isLoadingContext";
 import { useEditMessage } from "@/context/editMessageContext";
 import { useChatMessages } from "@/context/chatMessagesContext";
 import { supabase } from "@/lib/supabaseClient";
+import { useFetchedNotes } from "@/context/fetchedNotesContext";
+import { useFetchedFolders } from "@/context/fetchedFoldersContext";
+import { resolveNotePath, resolveFolderPath } from "@/lib/workspaceTools";
+import { useTabs } from "@/context/tabsContext";
 
 const THINKING_PHRASES = [
     "Let me think about it... ",
@@ -23,17 +27,86 @@ const THINKING_PHRASES = [
 type ToolName = keyof typeof TOOL_NAMES
 const TOOL_NAMES = {
     "get_all_notes_and_folders": { loading: "Getting All Notes and Folders...", done: "Get All Notes and Folders", icon: <FolderSearch className="w-3 h-3 shrink-0 text-primary/70" /> },
-    "read_note": { loading: "Reading Note...", done: "Read Note", icon: <BookOpen className="w-3 h-3 shrink-0 text-primary/70" /> },
-    "create_note": { loading: "Creating Note...", done: "Created Note", icon: <FilePlus className="w-3 h-3 shrink-0 text-primary/70" /> },
-    "delete_note": { loading: "Deleting Note...", done: "Deleted Note", icon: <FileMinus className="w-3 h-3 shrink-0 text-primary/70" /> },
-    "rename_note": { loading: "Renaming Note...", done: "Renamed Note", icon: <PenTool className="w-3 h-3 shrink-0 text-primary/70" /> },
-    "move_note": { loading: "Moving Note...", done: "Moved Note", icon: <Move className="w-3 h-3 shrink-0 text-primary/70" /> },
-    "modify_note": { loading: "Modifying Note...", done: "Modified Note", icon: <FilePen className="w-3 h-3 shrink-0 text-primary/70" /> },
-    "create_folder": { loading: "Creating Folder...", done: "Created Folder", icon: <FolderPlus className="w-3 h-3 shrink-0 text-primary/70" /> },
-    "delete_folder": { loading: "Deleting Folder...", done: "Deleted Folder", icon: <FolderMinus className="w-3 h-3 shrink-0 text-primary/70" /> },
-    "rename_folder": { loading: "Renaming Folder...", done: "Renamed Folder", icon: <PenTool className="w-3 h-3 shrink-0 text-primary/70" /> },
-    "move_folder": { loading: "Moving Folder...", done: "Moved Folder", icon: <Move className="w-3 h-3 shrink-0 text-primary/70" /> },
-    "change_color_folder": { loading: "Changing Folder Color...", done: "Changed Folder Color", icon: <Palette className="w-3 h-3 shrink-0 text-primary/70" /> },
+    "read_note": { loading: "Reading Note(s)...", done: "Read Note(s)", icon: <BookOpen className="w-3 h-3 shrink-0 text-primary/70" /> },
+    "create_note": { loading: "Creating Note(s)...", done: "Created Note(s)", icon: <FilePlus className="w-3 h-3 shrink-0 text-primary/70" /> },
+    "delete_note": { loading: "Deleting Note(s)...", done: "Deleted Note(s)", icon: <FileMinus className="w-3 h-3 shrink-0 text-primary/70" /> },
+    "rename_note": { loading: "Renaming Note(s)...", done: "Renamed Note(s)", icon: <PenTool className="w-3 h-3 shrink-0 text-primary/70" /> },
+    "move_note": { loading: "Moving Note(s)...", done: "Moved Note(s)", icon: <Move className="w-3 h-3 shrink-0 text-primary/70" /> },
+    "modify_note": { loading: "Modifying Note(s)...", done: "Modified Note(s)", icon: <FilePen className="w-3 h-3 shrink-0 text-primary/70" /> },
+    "create_folder": { loading: "Creating Folder(s)...", done: "Created Folder(s)", icon: <FolderPlus className="w-3 h-3 shrink-0 text-primary/70" /> },
+    "delete_folder": { loading: "Deleting Folder(s)...", done: "Deleted Folder(s)", icon: <FolderMinus className="w-3 h-3 shrink-0 text-primary/70" /> },
+    "rename_folder": { loading: "Renaming Folder(s)...", done: "Renamed Folder(s)", icon: <PenTool className="w-3 h-3 shrink-0 text-primary/70" /> },
+    "move_folder": { loading: "Moving Folder(s)...", done: "Moved Folder(s)", icon: <Move className="w-3 h-3 shrink-0 text-primary/70" /> },
+    "change_color_folder": { loading: "Changing Folder Color(s)...", done: "Changed Folder Color(s)", icon: <Palette className="w-3 h-3 shrink-0 text-primary/70" /> },
+}
+
+function ToolCallCard({ part }: { part: any }) {
+    const [isExpanded, setIsExpanded] = useState(false);
+    const { fetchedNotes } = useFetchedNotes();
+    const { fetchedFolders } = useFetchedFolders();
+    const { openTab } = useTabs();
+
+    return (
+        <div
+            className="group/tool flex flex-col justify-start items-start p-4 py-3 my-1 rounded-xl text-xs text-muted-foreground max-w-[85%] animate-in fade-in slide-in-from-top-1 hover:bg-popover/40 cursor-pointer border border-border"
+            onClick={() => setIsExpanded(!isExpanded)}
+        >
+            <div className="flex gap-2 items-center w-full">
+                {TOOL_NAMES[part.toolCall.name as keyof typeof TOOL_NAMES]?.icon || <Wrench className="w-3 h-3 shrink-0 text-primary/70" />}
+                <span className="font-mono text-primary/80">{part.toolCall.status === "loading" ?
+                    (TOOL_NAMES[part.toolCall.name as keyof typeof TOOL_NAMES]?.loading || `Running ${part.toolCall.name.replace(/_/g, " ")}...`) : (TOOL_NAMES[part.toolCall.name as keyof typeof TOOL_NAMES]?.done || `Ran ${part.toolCall.name.replace(/_/g, " ")}`)}
+                </span>
+                <span className="ml-auto shrink-0 relative flex items-center justify-center w-5 h-5">
+                    <div className={cn(
+                        "absolute inset-0 flex items-center justify-center transition-all duration-300",
+                        "group-hover/tool:opacity-0 group-hover/tool:scale-75 opacity-100 scale-100"
+                    )}>
+                        {part.toolCall.status === 'loading' ? (
+                            <Spinner className="w-3 h-3" />
+                        ) : part.toolCall.status === 'done' ? (
+                            <Check className="w-3 h-3 text-green-500" />
+                        ) : (
+                            <TriangleAlert className="w-3 h-3 text-destructive" />
+                        )}
+                    </div>
+                    <div className={cn(
+                        "absolute inset-0 flex items-center justify-center transition-all duration-300",
+                        "group-hover/tool:opacity-100 group-hover/tool:scale-100 opacity-0 scale-75"
+                    )}>
+                        <ChevronDown className={cn("w-4 h-4 transition-transform duration-300", isExpanded ? "rotate-180" : "")} />
+                    </div>
+                </span>
+            </div>
+            <div className={cn("grid transition-all duration-300 ease-in-out w-full", isExpanded ? "grid-rows-[1fr] opacity-100 mt-2" : "grid-rows-[0fr] opacity-0 mt-0")}>
+                <div className={cn("overflow-hidden p-[1px] transition-all duration-300 ease-in-out", !isExpanded && "p-0")}>
+                    {part.toolCall.args?.items && (
+                        <span className="flex flex-wrap gap-1.5 mt-2">
+                            {part.toolCall.args.items.map((item: any, idx: number) => {
+                                const isFolderTool = part.toolCall.name.includes("folder");
+                                const targetPath = item.localisation || item.path || (isFolderTool ? item.name : item.title);
+                                const note = !isFolderTool ? resolveNotePath(targetPath, fetchedNotes, fetchedFolders) : null;
+                                const folder = isFolderTool ? resolveFolderPath(targetPath, fetchedFolders) : null;
+                                const displayName = (isFolderTool ? (folder?.name || item.name) : (note?.title || item.title)) || targetPath;
+
+                                return (
+                                    <span key={idx} className="mention-text-link bg-primary text-primary-foreground px-3 py-1 rounded-lg border border-primary/10 flex items-center gap-2 font-medium shadow-sm cursor-pointer mention-token py-1! px-2!" onClick={(e) => {
+                                        e.stopPropagation();
+                                        if (note) {
+                                            openTab({ noteId: note.id, title: note.title, type: 'note' });
+                                        }
+                                    }}>
+                                        {isFolderTool ? <FolderPlus className="w-4 h-4" /> : <BookOpen className="w-4 h-4" />}
+                                        {displayName}
+                                    </span>
+                                );
+                            })}
+                        </span>
+                    )
+                    }
+                </div>
+            </div>
+        </div >
+    );
 }
 
 export default function ChatMessageBlock({ message, isFollowUp }: { message: ChatMessage, isFollowUp: boolean }) {
@@ -44,9 +117,15 @@ export default function ChatMessageBlock({ message, isFollowUp }: { message: Cha
     const { chatMessages } = useChatMessages()
     const [displayText, setDisplayText] = useState("");
 
+    // notes
+    const { fetchedNotes } = useFetchedNotes();
+    const { fetchedFolders } = useFetchedFolders();
+
     // isLiked state
     const [isLiked, setIsLiked] = useState(message.isLiked);
     const [isDisliked, setIsDisliked] = useState(message.isDisliked);
+
+    const { openTab } = useTabs();
 
     useEffect(() => {
         if (!isLoading) {
@@ -108,6 +187,18 @@ export default function ChatMessageBlock({ message, isFollowUp }: { message: Cha
 
         setIsLiked(false);
         setIsDisliked(true);
+    }
+
+    // get note id by path (e.g. /maths/introduction)
+    const getNoteIdByPath = (path: string) => {
+        return resolveNotePath(path, fetchedNotes, fetchedFolders)?.id;
+    }
+
+    // get folder id by path (e.g. /maths/introduction)
+    const getFolderIdByPath = (path: string) => {
+        const folder = resolveFolderPath(path, fetchedFolders);
+        if (folder === null) return undefined; // root
+        return folder?.id;
     }
 
     return (
@@ -206,25 +297,7 @@ export default function ChatMessageBlock({ message, isFollowUp }: { message: Cha
                                 )}
                                 {message.messageParts.map((part, i) =>
                                     part.type === 'toolCall' ? (
-                                        <div
-                                            key={i}
-                                            className="flex items-center gap-2.5 px-3 py-2 my-1 rounded-xl border border-border bg-popover/40 backdrop-blur-sm text-xs text-muted-foreground max-w-[85%] animate-in fade-in slide-in-from-top-1 shadow-sm"
-                                        >
-                                            {TOOL_NAMES[part.toolCall.name as keyof typeof TOOL_NAMES].icon}
-                                            <span className="font-mono text-primary/80">{part.toolCall.status === "loading" ? TOOL_NAMES[part.toolCall.name as keyof typeof TOOL_NAMES].loading : TOOL_NAMES[part.toolCall.name as keyof typeof TOOL_NAMES].done}</span>
-                                            {/* <span className="truncate opacity-60 max-w-[264px]">
-                                                {JSON.stringify(part.toolCall.args?.localisation)}
-                                            </span> */}
-                                            <span className="ml-auto shrink-0">
-                                                {part.toolCall.status === 'loading' ? (
-                                                    <Spinner className="w-3 h-3" />
-                                                ) : part.toolCall.status === 'done' ? (
-                                                    <Check className="w-3 h-3 text-green-500" />
-                                                ) : (
-                                                    <TriangleAlert className="w-3 h-3 text-destructive" />
-                                                )}
-                                            </span>
-                                        </div>
+                                        <ToolCallCard key={i} part={part} />
                                     ) : part.content ? (
                                         <div key={i} className="w-full max-w-[90%] p-2">
                                             <MarkdownRenderer content={part.content} className="text-foreground" />
@@ -349,7 +422,7 @@ export default function ChatMessageBlock({ message, isFollowUp }: { message: Cha
                                     <TooltipTrigger asChild>
                                         <Button variant={"ghost"} className="gap-2 flex">
                                             <Coins className="w-4 h-4 text-muted-foreground" />
-                                            <p className="text-muted-foreground font-mono">{message.creditsUsed === null ? "0" : message.creditsUsed.toLocaleString()}</p>
+                                            <p className="text-muted-foreground font-mono">{message.creditsUsed === null ? "0" : message.creditsUsed?.toLocaleString()}</p>
                                         </Button>
                                     </TooltipTrigger>
                                     <TooltipContent>

@@ -28,13 +28,10 @@ interface ChatsTabProps {
 }
 
 export default function ChatsTab({ tabId, initialChatId }: ChatsTabProps) {
-    const { state, setOpen } = useSidebar();
     const { user } = useUser();
     const {
         chatTitle, setChatTitle, setChatMessages, currentChatId, setCurrentChatId,
-        refreshTrigger, refreshChats,
-        chatCache,
-        activeTabId, setActiveTabId,
+        refreshTrigger, refreshChats, chatCache, setActiveTabId,
         initTabState, getTabState, setTabState,
     } = useChatMessages();
     const { activeTabId: tabsActiveTabId, updateTabTitle, updateTabChatId, openTab, tabs } = useTabs();
@@ -57,7 +54,7 @@ export default function ChatsTab({ tabId, initialChatId }: ChatsTabProps) {
             // Restore from cache or DB
             if (chatCache[initialChatId]) {
                 const cached = chatCache[initialChatId];
-                setTabState(tabId, { chatId: initialChatId, messages: cached.messages, title: cached.title });
+                setTabState(tabId, { chatId: initialChatId, messages: cached.messages, title: cached.title, inputHTML: cached.inputHTML || "" });
             } else {
                 // Load chat metadata from DB
                 const loadChat = async () => {
@@ -383,9 +380,9 @@ export default function ChatsTab({ tabId, initialChatId }: ChatsTabProps) {
                                                 if (chat.id && chat.id !== currentChatId) {
                                                     const cached = chatCache[chat.id];
                                                     if (cached) {
-                                                        setTabState(tabId, { chatId: chat.id, messages: cached.messages, title: cached.title });
+                                                        setTabState(tabId, { chatId: chat.id, messages: cached.messages, title: cached.title, inputHTML: cached.inputHTML || "" });
                                                     } else {
-                                                        setTabState(tabId, { chatId: chat.id, messages: [], title: chat.title });
+                                                        setTabState(tabId, { chatId: chat.id, messages: [], title: chat.title, inputHTML: "" });
                                                     }
                                                 }
                                                 setIsSearchOpen(false);
@@ -397,6 +394,7 @@ export default function ChatsTab({ tabId, initialChatId }: ChatsTabProps) {
                                             <p>{chat.title}</p>
                                             <p className="text-xs text-muted-foreground">{chat.description}</p>
                                         </TooltipContent>
+                                        {chat.title.includes("Review: ") && <p className="text-xs text-primary px-2 py-1 rounded-lg bg-primary/10 dark:bg-primary/10 mr-1">Review</p>}
                                     </Tooltip>
                                     <DropdownMenu>
                                         <DropdownMenuTrigger>

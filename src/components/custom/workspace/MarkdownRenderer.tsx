@@ -42,33 +42,32 @@ export function MarkdownRenderer({ content, className = "" }: MarkdownRendererPr
      *  5. Promote same-line $$ ... $$ to block display math for remark-math
      */
     const processContent = (raw: string): string => {
-        // Helper: split on fenced code spans and only transform even-indexed (non-code) parts
-        const outsideCode = (str: string, fn: (s: string) => string): string => {
-            const parts = str.split(/(```[\s\S]*?```|`[^`]*`)/g);
+        // Helper: split on fenced code spans and HTML tags, only transform even-indexed (non-code/non-tag) parts
+        const outsideCodeAndTags = (str: string, fn: (s: string) => string): string => {
+            const parts = str.split(/(```[\s\S]*?```|`[^`]*`|<[^>]*>)/g);
             return parts.map((part, i) => (i % 2 === 0 ? fn(part) : part)).join('');
         };
 
         // Step 1 — Convert ```math ... ``` fences to $$ ... $$ BEFORE splitting
-        // (we do this globally because the fence IS the code span boundary)
-        let result = raw.replace(/```math\r?\n([\s\S]*?)\r?\n```/g, '\n$$\n$1\n$$\n');
+        let result = raw.replace(/```math\s*\r?\n([\s\S]*?)\r?\n\s*```/g, '\n$$\n$1\n$$\n');
 
-        // Step 2 — Unescape double backslashes outside code blocks
-        result = outsideCode(result, s => s.replace(/\\\\/g, '\\'));
+        // Step 2 — Unescape double backslashes outside code blocks/tags
+        result = outsideCodeAndTags(result, s => s.replace(/\\\\/g, '\\'));
 
         // Step 3 — \[ ... \] → $$ ... $$ (display math)
-        result = outsideCode(result, s =>
-            s.replace(/\\\[/g, '\n$$\n').replace(/\\\]/g, '\n$$\n')
+        result = outsideCodeAndTags(result, s =>
+            s.replace(/\\\[\s*([\s\S]*?)\s*\\\]/g, '\n$$\n$1\n$$\n')
         );
 
         // Step 4 — \( ... \) → $ ... $ (inline math)
-        result = outsideCode(result, s =>
-            s.replace(/\\\(/g, '$').replace(/\\\)/g, '$')
+        result = outsideCodeAndTags(result, s =>
+            s.replace(/\\\(\s*([\s\S]*?)\s*\\\)/g, '$$1$')
         );
 
-        // Step 5 — Same-line $$ ... $$ (both delimiters on one line, no newline inside)
-        // → promote to proper block display math that remark-math understands
-        result = outsideCode(result, s =>
-            s.replace(/\$\$([^$\n]+?)\$\$/g, '\n\n$$\n$1\n$$\n\n')
+        // Step 5 — Same-line $$ ... $$ or block math without strict newlines
+        // Convert any $$ ... $$ to a form remark-math reliably handles
+        result = outsideCodeAndTags(result, s =>
+            s.replace(/\$\$\s*([\s\S]*?)\s*\$\$/g, '\n\n$$\n$1\n$$\n\n')
         );
 
         return result;
@@ -226,17 +225,32 @@ export function MarkdownRenderer({ content, className = "" }: MarkdownRendererPr
                     hr() {
                         return <hr className="h-px bg-foreground/10 my-6" />
                     },
-                    span({ style, children, ...props }: ComponentPropsWithoutRef<'span'>) {
-                        // Pass through ALL props and styles so that:
-                        //   • KaTeX-generated spans (with class / aria- / data- attributes) render correctly
-                        //   • Colored <span style="color: …"> from the AI render correctly
-                        // We only restrict style to the `color` property for security on
-                        // user-visible coloured text spans; KaTeX spans that come from
-                        // rehype-katex don't carry a `style` prop at all (they use className).
-                        const safeStyle: CSSProperties | undefined = style
-                            ? { color: (style as CSSProperties).color }
-                            : undefined;
-                        return <span style={safeStyle} {...props}>{children}</span>;
+                    span({ style, children, ...props }: any) {
+                        // Handle Tiptap-specific inline math spans that might be in the content
+                        if (props['data-type'] === 'inlineMath') {
+                            const latex = props['data-latex'] || extractText(children);
+                            try {
+                                const html = katex.renderToString(latex, {
+                                    displayMode: false,
+                                    throwOnError: false,
+                                });
+                                return <span dangerouslySetInnerHTML={{ __html: html }} />;
+                            } catch {
+                                return <span className="text-destructive font-mono">${latex}$</span>;
+                            }
+                        }
+
+                        // If style is a string (e.g. from rehype-raw), convert it to a React-safe object.
+                        const styleObject = typeof style === 'string'
+                            ? Object.fromEntries(
+                                style.split(';').filter(Boolean).map(s => {
+                                    const [key, ...val] = s.split(':');
+                                    const camelKey = key.trim().replace(/-([a-z])/g, g => g[1].toUpperCase());
+                                    return [camelKey, val.join(':').trim()];
+                                })
+                            )
+                            : style;
+                        return <span style={styleObject} {...props}>{children}</span>;
                     }
                 }}
             >

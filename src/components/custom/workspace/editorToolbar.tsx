@@ -21,6 +21,14 @@ import {
     ListOrdered,
     Table,
     ChevronDown,
+    Sigma,
+    Variable,
+    Rows,
+    Columns,
+    Combine,
+    Split,
+    Trash2,
+    Plus,
 } from "lucide-react";
 import { Tooltip, TooltipContent, TooltipTrigger } from "@/components/ui/tooltip";
 import { Button } from "@/components/ui/button";
@@ -55,6 +63,8 @@ export function EditorToolbar() {
                 isH1: e.isActive("heading", { level: 1 }),
                 isH2: e.isActive("heading", { level: 2 }),
                 isH3: e.isActive("heading", { level: 3 }),
+                isInlineMath: e.isActive("inlineMath"),
+                isMathBlock: e.isActive("codeBlock", { language: "math" }),
                 activeColor: EDITOR_COLORS.find(c => e.isActive("textStyle", { color: c.value })) ?? null,
             };
         },
@@ -90,6 +100,21 @@ export function EditorToolbar() {
             action: () => editor?.chain().focus().toggleCode().run(),
             shortcut: "Ctrl+E",
         },
+        {
+            label: "Inline Math",
+            icon: <Variable size={14} />,
+            isActive: editorState?.isInlineMath,
+            action: () => {
+                if (!editor) return;
+                const { from, to } = editor.state.selection;
+                const latex = editor.state.doc.textBetween(from, to);
+                editor.chain().focus().insertContent({
+                    type: 'inlineMath',
+                    attrs: { latex }
+                }).run();
+            },
+            shortcut: "Alt+M",
+        },
     ];
 
     // ── Block format buttons ──────────────────────────────────────────────────
@@ -104,9 +129,16 @@ export function EditorToolbar() {
         {
             label: "Code Block",
             icon: <Code2 size={14} />,
-            isActive: editorState?.isCodeBlock,
+            isActive: editorState?.isCodeBlock && !editorState?.isMathBlock,
             action: () => editor?.chain().focus().toggleCodeBlock().run(),
             shortcut: "Ctrl+Alt+C",
+        },
+        {
+            label: "Math Block",
+            icon: <Sigma size={14} />,
+            isActive: editorState?.isMathBlock,
+            action: () => editor?.chain().focus().toggleCodeBlock({ language: 'math' }).run(),
+            shortcut: "Ctrl+Alt+M",
         },
         {
             label: "Bullet List",
@@ -234,27 +266,112 @@ export function EditorToolbar() {
                 </Tooltip>
             ))}
 
-            {/* ── Insert Table ── */}
-            <Tooltip>
-                <TooltipTrigger asChild>
-                    <Toggle
-                        pressed={editorState?.isTable}
-                        onPressedChange={() =>
-                            editorState?.isTable
-                                ? editor?.chain().focus().deleteTable().run()
-                                : editor?.chain().focus().insertTable({ rows: 3, cols: 3, withHeaderRow: true }).run()
-                        }
-                        aria-label="Insert Table"
-                        className={cn(toggleClass, editorState?.isTable && "bg-primary/20 text-primary")}
+            {/* ── Table Actions Dropdown ── */}
+            <DropdownMenu>
+                <Tooltip>
+                    <TooltipTrigger asChild>
+                        <DropdownMenuTrigger asChild>
+                            <Button
+                                variant="ghost"
+                                className={cn(
+                                    "rounded-full gap-1 cursor-pointer transition-all",
+                                    editorState?.isTable && "bg-primary/20 text-primary"
+                                )}
+                            >
+                                <Table size={14} />
+                                <ChevronDown size={14} className="opacity-50" />
+                            </Button>
+                        </DropdownMenuTrigger>
+                    </TooltipTrigger>
+                    <TooltipContent className="text-xs">Table Actions</TooltipContent>
+                </Tooltip>
+                <DropdownMenuContent align="start" className="min-w-[200px] rounded-lg p-1.5">
+                    {!editorState?.isTable ? (
+                        <DropdownMenuItem
+                            onClick={() => editor?.chain().focus().insertTable({ rows: 3, cols: 3, withHeaderRow: true }).run()}
+                            className="gap-2 text-xs cursor-pointer rounded-xl"
+                        >
+                            <Plus size={14} />
+                            <span>Insert Table (3×3)</span>
+                        </DropdownMenuItem>
+                    ) : (
+                        <>
+                            <div className="px-2 py-1.5 text-[10px] font-bold text-muted-foreground uppercase tracking-wider group/row-handles">Rows</div>
+                            <DropdownMenuItem
+                                onClick={() => editor?.chain().focus().addRowBefore().run()}
+                                className="gap-2 text-xs cursor-pointer rounded-xl"
+                            >
+                                <Rows size={14} className="rotate-180 hover:text-primary" />
+                                <span>Add Row Above</span>
+                            </DropdownMenuItem>
+                            <DropdownMenuItem
+                                onClick={() => editor?.chain().focus().addRowAfter().run()}
+                                className="gap-2 text-xs cursor-pointer rounded-xl"
+                            >
+                                <Rows size={14} className="hover:text-primary" />
+                                <span>Add Row Below</span>
+                            </DropdownMenuItem>
+                            <DropdownMenuItem
+                                onClick={() => editor?.chain().focus().deleteRow().run()}
+                                className="gap-2 text-xs cursor-pointer rounded-xl text-destructive focus:text-destructive dark:hover:bg-destructive/10 hover:bg-destructive/10!"
+                            >
+                                <Trash2 size={14} className="text-destructive" />
+                                <span>Delete Row</span>
+                            </DropdownMenuItem>
 
-                    >
-                        <Table size={14} />
-                    </Toggle>
-                </TooltipTrigger>
-                <TooltipContent className="text-xs">
-                    {editorState?.isTable ? "Delete Table" : "Insert Table (3×3)"}
-                </TooltipContent>
-            </Tooltip>
+                            <div className="h-px bg-border my-1" />
+                            <div className="px-2 py-1.5 text-[10px] font-bold text-muted-foreground uppercase tracking-wider">Columns</div>
+                            <DropdownMenuItem
+                                onClick={() => editor?.chain().focus().addColumnBefore().run()}
+                                className="gap-2 text-xs cursor-pointer rounded-xl"
+                            >
+                                <Columns size={14} className="rotate-180 hover:text-primary" />
+                                <span>Add Column Left</span>
+                            </DropdownMenuItem>
+                            <DropdownMenuItem
+                                onClick={() => editor?.chain().focus().addColumnAfter().run()}
+                                className="gap-2 text-xs cursor-pointer rounded-xl"
+                            >
+                                <Columns size={14} className="hover:text-primary" />
+                                <span>Add Column Right</span>
+                            </DropdownMenuItem>
+                            <DropdownMenuItem
+                                onClick={() => editor?.chain().focus().deleteColumn().run()}
+                                className="gap-2 text-xs cursor-pointer rounded-xl text-destructive focus:text-destructive dark:hover:bg-destructive/10 hover:bg-destructive/10!"
+                            >
+                                <Trash2 size={14} className="text-destructive" />
+                                <span>Delete Column</span>
+                            </DropdownMenuItem>
+
+                            <div className="h-px bg-border my-1" />
+                            <div className="px-2 py-1.5 text-[10px] font-bold text-muted-foreground uppercase tracking-wider">Cells</div>
+                            <DropdownMenuItem
+                                onClick={() => editor?.chain().focus().mergeCells().run()}
+                                className="gap-2 text-xs cursor-pointer rounded-xl"
+                            >
+                                <Combine size={14} className="hover:text-primary" />
+                                <span>Merge Cells</span>
+                            </DropdownMenuItem>
+                            <DropdownMenuItem
+                                onClick={() => editor?.chain().focus().splitCell().run()}
+                                className="gap-2 text-xs cursor-pointer rounded-xl"
+                            >
+                                <Split size={14} className="hover:text-primary" />
+                                <span>Split Cell</span>
+                            </DropdownMenuItem>
+
+                            <div className="h-px bg-border my-1" />
+                            <DropdownMenuItem
+                                onClick={() => editor?.chain().focus().deleteTable().run()}
+                                className="gap-2 text-xs cursor-pointer rounded-xl text-destructive focus:text-destructive dark:hover:bg-destructive/10 hover:bg-destructive/10!"
+                            >
+                                <Trash2 size={14} className="text-destructive" />
+                                <span>Delete Table</span>
+                            </DropdownMenuItem>
+                        </>
+                    )}
+                </DropdownMenuContent>
+            </DropdownMenu>
 
             <Divider />
 
