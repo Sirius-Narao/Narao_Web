@@ -154,8 +154,9 @@ export default function Editor() {
     // Sync external content changes (e.g. AI tool writes the note) into the editor
     useEffect(() => {
         if (editor && content && !editor.isFocused) {
+            const normalize = (s: string | null | undefined) => (s || "").trim();
             const currentMd = sanitiseMarkdown((editor.storage as any).markdown.getMarkdown());
-            if (content !== currentMd) {
+            if (normalize(content) !== normalize(currentMd)) {
                 const timer = setTimeout(() => {
                     if (editor && !editor.isDestroyed) {
                         editor.commands.setContent(prepareContent(content));

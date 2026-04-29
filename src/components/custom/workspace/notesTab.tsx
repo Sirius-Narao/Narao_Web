@@ -9,7 +9,7 @@ import { useTabs } from "@/context/tabsContext";
 import { toast } from "sonner";
 import { supabase } from "@/lib/supabaseClient";
 import { useCallback, useEffect, useMemo, useState } from "react";
-import { ArrowBigDown } from "lucide-react";
+import { ArrowBigDown, MoreVertical, Pen, Plus, Trash2 } from "lucide-react";
 import { Kbd, KbdGroup } from "@/components/ui/kbd";
 import { Spinner } from "@/components/ui/spinner";
 import { useFetchedNotes } from "@/context/fetchedNotesContext";
@@ -20,6 +20,9 @@ import { Textarea } from "@/components/ui/textarea";
 import { Combobox, ComboboxContent, ComboboxEmpty, ComboboxInput, ComboboxItem, ComboboxList } from "@/components/ui/combobox";
 import { useFetchedFolders } from "@/context/fetchedFoldersContext";
 import { EditorProvider } from "@/context/editorContext";
+import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from "@/components/ui/dropdown-menu";
+import { BackgroundColor } from "@tiptap/extension-text-style";
+import { cn } from "@/lib/utils";
 
 interface NotesTabProps {
     accessedNote: Note | null;
@@ -224,6 +227,36 @@ export default function NotesTab({ accessedNote, setAccessedNote, initialNoteId 
         if (error) console.error("Error renaming note:", error);
     };
 
+    const deleteNote = async () => {
+        if (!user || !accessedNote) return;
+        const { error } = await supabase
+            .from("notes")
+            .delete()
+            .eq("id", accessedNote.id);
+
+        if (error) {
+            toast.error(`Error deleting ${accessedNote.title}`, { position: 'bottom-right', duration: 1000 });
+            console.error("Error deleting note:", error);
+            return;
+        }
+
+        toast.info(`Deleted ${accessedNote.title} successfully`, { position: 'bottom-right', duration: 1000 });
+        setAccessedNote(null);
+        setContent("");
+        setFetchedNotes(prev => prev.filter(n => n.id !== accessedNote.id));
+        closeTab(activeTabId!);
+    };
+
+    const handleTextTagColor = (color: string) => {
+        const hex = color.replace("#", "");
+        const r = parseInt(hex.length === 3 ? hex[0] + hex[0] : hex.substring(0, 2), 16) || 0;
+        const g = parseInt(hex.length === 3 ? hex[1] + hex[1] : hex.substring(2, 4), 16) || 0;
+        const b = parseInt(hex.length === 3 ? hex[2] + hex[2] : hex.substring(4, 6), 16) || 0;
+
+        const brightness = (r * 299 + g * 587 + b * 114) / 1000;
+        return brightness < 128 ? "text-foreground" : "text-background";
+    }
+
     // useEffect to update accessedNote when fetchedNotes or fetchedFolders changes
     useEffect(() => {
         if (accessedNote) {
@@ -290,7 +323,7 @@ export default function NotesTab({ accessedNote, setAccessedNote, initialNoteId 
                     </div>
 
                     {/* Save button pill */}
-                    <div className="w-fit h-fit flex items-center justify-center bg-popover rounded-3xl border border-border p-1 shrink-0">
+                    <div className="w-fit h-fit flex items-center justify-center bg-popover rounded-3xl border border-border p-1 shrink-0 gap-1">
                         {isSavedComplete ? (
                             <Tooltip>
                                 <TooltipTrigger asChild>
@@ -306,6 +339,47 @@ export default function NotesTab({ accessedNote, setAccessedNote, initialNoteId 
                         ) : (
                             <div className="w-10 h-10 flex items-center justify-center"><Spinner /></div>
                         )}
+                        <DropdownMenu>
+                            <Tooltip>
+                                <TooltipTrigger asChild>
+                                    <DropdownMenuTrigger asChild>
+                                        <Button variant="ghost" className="w-10 h-10 p-0 rounded-full text-foreground">
+                                            <MoreVertical size={24} />
+                                        </Button>
+                                    </DropdownMenuTrigger>
+                                </TooltipTrigger>
+                                <TooltipContent>
+                                    <p>Note Settings</p>
+                                </TooltipContent>
+                            </Tooltip>
+                            <DropdownMenuContent align="end" className="w-fit h-fit rounded-lg max-w-40">
+                                <p className="px-2 py-1 text-muted-foreground text-sm">Tags:</p>
+                                <div className="flex flex-wrap gap-1 p-2 bg-card rounded-lg border border-border mb-1">
+                                    {fetchedNotes.find(f => f.id === accessedNote?.id)?.tags?.map((tag, i) => (
+                                        <Tooltip key={i + 'tag'} delayDuration={1000}>
+                                            <TooltipTrigger asChild>
+                                                <div className="rounded-lg flex items-center px-1 hover:opacity-80 cursor-pointer" style={{ backgroundColor: tag.color }}>
+                                                    <p className={cn(handleTextTagColor(tag.color), "text-xs")}>{tag.name}</p>
+                                                </div>
+                                            </TooltipTrigger>
+                                            <TooltipContent>
+                                                <p>{`Remove ${tag.name}`}</p>
+                                            </TooltipContent>
+                                        </Tooltip>
+                                    ))}
+                                    <div className="rounded-lg flex items-center px-1 hover:opacity-80 cursor-pointer text-xs bg-popover"> Add <Plus size={14} /></div>
+                                </div>
+                                <Button variant="ghost" className="rounded-lg w-full px-2 py-1 justify-start" onClick={() => { setRenamingNoteId(accessedNote?.id || null), setIsRenamingNote(true) }}>
+                                    <Pen size={16} />Rename
+                                </Button>
+                                <Button variant="ghost" className="rounded-lg w-full px-2 py-1 justify-start" onClick={() => { setRenamingNoteId(accessedNote?.id || null), setIsRenamingNote(true) }}>
+                                    <Pen size={16} />Rename
+                                </Button>
+                                <Button variant="ghost" className="rounded-lg text-destructive w-full hover:text-destructive hover:bg-destructive/10 dark:hover:bg-destructive/10 px-2 py-1 justify-start" onClick={deleteNote}>
+                                    <Trash2 size={16} />Delete
+                                </Button>
+                            </DropdownMenuContent>
+                        </DropdownMenu>
                     </div>
                 </div>
                 <Editor />
