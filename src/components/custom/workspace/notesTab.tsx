@@ -8,7 +8,7 @@ import { useContent } from "@/context/contentContext";
 import { useTabs } from "@/context/tabsContext";
 import { toast } from "sonner";
 import { supabase } from "@/lib/supabaseClient";
-import { useCallback, useEffect, useMemo, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { ArrowBigDown, MoreVertical, Pen, Plus, Trash2 } from "lucide-react";
 import { Kbd, KbdGroup } from "@/components/ui/kbd";
 import { Spinner } from "@/components/ui/spinner";
@@ -34,6 +34,10 @@ export default function NotesTab({ accessedNote, setAccessedNote, initialNoteId 
     const { user } = useUser();
     const { content, setContent } = useContent();
     const [isSavedComplete, setIsSavedComplete] = useState(true);
+    // Tracks the last content string that is confirmed saved (in tiptap-serialized form).
+    // Using a ref avoids re-renders and prevents the false-dirty state caused by tiptap
+    // normalizing the string (e.g. trailing newline) on first render.
+    const savedContentRef = useRef<string | null>(null);
     const { activeTabId, updateTabTitle, closeTab, updateTabIsSavedComplete } = useTabs();
     const { setFetchedNotes, fetchedNotes } = useFetchedNotes();
     const { fetchedFolders } = useFetchedFolders();
@@ -76,8 +80,15 @@ export default function NotesTab({ accessedNote, setAccessedNote, initialNoteId 
             return () => clearTimeout(timer);
         }
 
-        // If content matches accessedNote content, and we are not currently in the save process
-        const isActuallySaved = content === accessedNote.content && isSavedComplete;
+        // On the very first content update after a note is loaded, tiptap normalizes
+        // the string (e.g. adds a trailing newline). We capture that as the saved baseline
+        // so it isn't treated as a dirty change.
+        if (savedContentRef.current === null) {
+            savedContentRef.current = content ?? "";
+        }
+
+        // Compare against the savedContentRef baseline, not the raw DB string
+        const isActuallySaved = content === savedContentRef.current && isSavedComplete;
         const timer = setTimeout(() => {
             updateTabIsSavedComplete(activeTabId, isActuallySaved);
         }, 0);
@@ -100,6 +111,9 @@ export default function NotesTab({ accessedNote, setAccessedNote, initialNoteId 
                     createdAt: new Date(data.created_at),
                     updatedAt: new Date(data.updated_at)
                 };
+                // Reset savedContentRef so the first tiptap onUpdate after load
+                // is treated as the baseline (not a dirty change).
+                savedContentRef.current = null;
                 setAccessedNote(mappedNote);
                 setContent(mappedNote.content || "");
             }
@@ -170,7 +184,9 @@ export default function NotesTab({ accessedNote, setAccessedNote, initialNoteId 
 
     const saveNote = async () => {
         if (!user || !accessedNote) return;
-        if (content === accessedNote.content) return;
+        // Use savedContentRef as the baseline; if null fall back to accessedNote.content
+        const baseline = savedContentRef.current ?? accessedNote.content;
+        if (content === baseline) return;
 
         setIsSavedComplete(false);
         const { data, error } = await supabase
@@ -192,6 +208,8 @@ export default function NotesTab({ accessedNote, setAccessedNote, initialNoteId 
                 updatedAt: new Date(data.updated_at)
             };
             toast.info(`Saved ${updatedNote.title} successfully`, { position: 'bottom-right', duration: 1000 });
+            // Update the saved baseline to the content we just persisted
+            savedContentRef.current = content ?? "";
             setAccessedNote(updatedNote);
         }
         setIsSavedComplete(true);
@@ -271,7 +289,8 @@ export default function NotesTab({ accessedNote, setAccessedNote, initialNoteId 
     useEffect(() => {
         if (!accessedNote) return;
         const interval = setInterval(() => {
-            if (content !== accessedNote.content) {
+            const baseline = savedContentRef.current ?? accessedNote.content;
+            if (content !== baseline) {
                 saveNote();
             }
         }, 10000);
@@ -327,7 +346,7 @@ export default function NotesTab({ accessedNote, setAccessedNote, initialNoteId 
                         {isSavedComplete ? (
                             <Tooltip>
                                 <TooltipTrigger asChild>
-                                    <Button variant="ghost" className="w-10 h-10 p-0 rounded-full disabled:opacity-50 disabled:text-muted-foreground text-primary" onClick={saveNote} disabled={content === accessedNote?.content}>
+                                    <Button variant="ghost" className="w-10 h-10 p-0 rounded-full disabled:opacity-50 disabled:text-muted-foreground text-primary" onClick={saveNote} disabled={content === (savedContentRef.current ?? accessedNote?.content)}>
                                         <ArrowBigDown size={24} />
                                     </Button>
                                 </TooltipTrigger>

@@ -86,7 +86,7 @@ const prepareContent = (raw: string): string => {
  *    convert to $…$ (fallback, keeps DB clean)
  */
 const sanitiseMarkdown = (md: string): string => {
-    let result = md.replace(/```math\r?\n([\s\S]*?)\r?\n```/g, '$$\n$1\n$$');
+    let result = md.replace(/```math\r?\n([\s\S]*?)\r?\n```/g, (_, latex) => `$$\n${latex}\n$$`);
     result = healInlineMathSpans(result);
     return result;
 };

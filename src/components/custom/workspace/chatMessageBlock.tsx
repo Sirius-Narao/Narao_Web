@@ -83,7 +83,17 @@ function ToolCallCard({ part }: { part: any }) {
                         <span className="flex flex-wrap gap-1.5 mt-2">
                             {part.toolCall.args.items.map((item: any, idx: number) => {
                                 const isFolderTool = part.toolCall.name.includes("folder");
-                                const targetPath = item.localisation || item.path || (isFolderTool ? item.name : item.title);
+                                let targetPath = item.localisation || item.path || (isFolderTool ? item.name : item.title);
+
+                                // Special handling for creation tools to get the full path
+                                if (part.toolCall.name === "create_note") {
+                                    const folderPath = item.folder_path || item.folder || "/";
+                                    targetPath = (folderPath.endsWith("/") ? folderPath : folderPath + "/") + item.title;
+                                } else if (part.toolCall.name === "create_folder") {
+                                    const parentPath = item.parent_path || item.parent || "/";
+                                    targetPath = (parentPath.endsWith("/") ? parentPath : parentPath + "/") + item.name;
+                                }
+
                                 const note = !isFolderTool ? resolveNotePath(targetPath, fetchedNotes, fetchedFolders) : null;
                                 const folder = isFolderTool ? resolveFolderPath(targetPath, fetchedFolders) : null;
                                 const displayName = (isFolderTool ? (folder?.name || item.name) : (note?.title || item.title)) || targetPath;
@@ -93,6 +103,11 @@ function ToolCallCard({ part }: { part: any }) {
                                         e.stopPropagation();
                                         if (note) {
                                             openTab({ noteId: note.id, title: note.title, type: 'note' });
+                                        } else if (folder) {
+                                            openTab({ title: folder.name, type: 'folder', location: targetPath });
+                                        } else if (isFolderTool && folder === null) {
+                                            // Handle root folder
+                                            openTab({ title: "Root", type: 'folder', location: "/" });
                                         }
                                     }}>
                                         {isFolderTool ? <FolderPlus className="w-4 h-4" /> : <BookOpen className="w-4 h-4" />}

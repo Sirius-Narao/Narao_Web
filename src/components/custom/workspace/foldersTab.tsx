@@ -809,16 +809,16 @@ export default function FoldersTab({ accessedNote, setAccessedNote, setIsNoteOpe
                                             </TooltipContent>
                                         </ContextMenuTrigger>
                                         <ContextMenuContent className="w-48">
-                                            <ContextMenuItem onClick={() => startFolderRename(folder.id, folder.name)} className="gap-2">
+                                            <ContextMenuItem onClick={() => startFolderRename(folder.id, folder.name)} className="gap-2 cursor-pointer">
                                                 <FolderPen size={14} className="hover:text-primary" /> Rename
                                             </ContextMenuItem>
                                             <ContextMenuSub>
-                                                <ContextMenuSubTrigger className="gap-2"><Palette size={14} className="hover:text-primary" /> Color</ContextMenuSubTrigger>
+                                                <ContextMenuSubTrigger className="gap-2 cursor-pointer"><Palette size={14} className="hover:text-primary" /> Color</ContextMenuSubTrigger>
                                                 <ContextMenuSubContent className="grid grid-cols-5 gap-1 p-2 ">
                                                     {folderColors.map(color => (
                                                         <button
                                                             key={color.value}
-                                                            className={cn("w-6 h-6 rounded-full border border-border flex items-center justify-center hover:scale-110 transition-transform", color.bgClass)}
+                                                            className={cn("w-6 h-6 rounded-full border border-border flex items-center justify-center hover:scale-110 transition-transform cursor-pointer", color.bgClass)}
                                                             onClick={() => changeFolderColor(folder.id, color.value)}
                                                         >
                                                             {folder.color === color.value && <Check size={12} className="text-white" />}
@@ -826,7 +826,7 @@ export default function FoldersTab({ accessedNote, setAccessedNote, setIsNoteOpe
                                                     ))}
                                                 </ContextMenuSubContent>
                                             </ContextMenuSub>
-                                            <ContextMenuItem className="gap-2 text-destructive focus:text-destructive dark:hover:bg-destructive/10 hover:bg-destructive/10 dark:hover:bg-destructive/10 hover:bg-destructive/10!" onClick={() => deleteFolder(folder.id, folder.name)}>
+                                            <ContextMenuItem className="gap-2 text-destructive focus:text-destructive dark:hover:bg-destructive/10 hover:bg-destructive/10 dark:hover:bg-destructive/10 hover:bg-destructive/10! cursor-pointer" onClick={() => deleteFolder(folder.id, folder.name)}>
                                                 <Trash size={14} className="text-destructive" /> Delete
                                             </ContextMenuItem>
                                         </ContextMenuContent>
@@ -882,10 +882,10 @@ export default function FoldersTab({ accessedNote, setAccessedNote, setIsNoteOpe
                                             </TooltipContent>
                                         </ContextMenuTrigger>
                                         <ContextMenuContent className="w-48">
-                                            <ContextMenuItem onClick={() => startNoteRename(note.id, note.title)} className="gap-2">
+                                            <ContextMenuItem onClick={() => startNoteRename(note.id, note.title)} className="gap-2 cursor-pointer">
                                                 <FolderPen size={14} className="hover:text-primary" /> Rename
                                             </ContextMenuItem>
-                                            <ContextMenuItem className="gap-2 text-destructive focus:text-destructive dark:hover:bg-destructive/10 hover:bg-destructive/10 dark:hover:bg-destructive/10 hover:bg-destructive/10!" onClick={() => deleteNote(note.id)}>
+                                            <ContextMenuItem className="gap-2 text-destructive focus:text-destructive dark:hover:bg-destructive/10 hover:bg-destructive/10 dark:hover:bg-destructive/10 hover:bg-destructive/10! cursor-pointer" onClick={() => deleteNote(note.id)}>
                                                 <Trash size={14} className="text-destructive" /> Delete
                                             </ContextMenuItem>
                                         </ContextMenuContent>
@@ -904,11 +904,11 @@ export default function FoldersTab({ accessedNote, setAccessedNote, setIsNoteOpe
                 </ContextMenuTrigger>
 
                 <ContextMenuContent className="w-48">
-                    <ContextMenuItem onClick={createFolder} className="gap-2 ">
+                    <ContextMenuItem onClick={createFolder} className="gap-2 cursor-pointer">
                         <FolderPlus size={14} className="hover:text-primary" /> Folder
                         <KbdGroup className="ml-auto "><Kbd className="bg-card">Ctrl+Shift+N</Kbd></KbdGroup>
                     </ContextMenuItem>
-                    <ContextMenuItem onClick={() => setCreateNoteDialogOpen(true)} className="gap-2">
+                    <ContextMenuItem onClick={() => setCreateNoteDialogOpen(true)} className="gap-2 cursor-pointer">
                         <FilePlus size={14} className="hover:text-primary" /> Note
                         <KbdGroup className="ml-auto"><Kbd className="bg-card">Ctrl+N</Kbd></KbdGroup>
                     </ContextMenuItem>
