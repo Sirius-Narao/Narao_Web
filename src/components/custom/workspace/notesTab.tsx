@@ -9,7 +9,8 @@ import { useTabs } from "@/context/tabsContext";
 import { toast } from "sonner";
 import { supabase } from "@/lib/supabaseClient";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
-import { ArrowBigDown, MoreVertical, Pen, Plus, Trash2 } from "lucide-react";
+import { AnimatePresence, motion } from "framer-motion";
+import { ArrowBigDown, ChevronDown, MoreVertical, Pen, Plus, Trash2 } from "lucide-react";
 import { Kbd, KbdGroup } from "@/components/ui/kbd";
 import { Spinner } from "@/components/ui/spinner";
 import { useFetchedNotes } from "@/context/fetchedNotesContext";
@@ -54,6 +55,11 @@ export default function NotesTab({ accessedNote, setAccessedNote, initialNoteId 
     const [isRenamingNote, setIsRenamingNote] = useState(false);
     const [, setRenamingNoteId] = useState<string | null>(null);
     const [tempNoteName, setTempNoteName] = useState(accessedNote?.title || "");
+
+    const [isTagsExpanded, setIsTagsExpanded] = useState(false);
+    const [isTagsDialogOpen, setIsTagsDialogOpen] = useState(false);
+    const [newTagName, setNewTagName] = useState("");
+    const [newTagColor, setNewTagColor] = useState("#3b82f6"); // Default blue
 
     // Sync tab title with note title
     useEffect(() => {
@@ -265,6 +271,63 @@ export default function NotesTab({ accessedNote, setAccessedNote, initialNoteId 
         closeTab(activeTabId!);
     };
 
+    const handleAddTag = async () => {
+        if (!user || !accessedNote || !newTagName.trim()) return;
+
+        const currentTags = accessedNote.tags || [];
+        if (currentTags.some(t => t.name.toLowerCase() === newTagName.trim().toLowerCase())) {
+            toast.error("Tag already exists", { position: 'bottom-right' });
+            return;
+        }
+
+        const updatedTags = [...currentTags, { name: newTagName.trim(), color: newTagColor }];
+
+        const { data, error } = await supabase
+            .from("notes")
+            .update({ tags: updatedTags })
+            .eq("id", accessedNote.id)
+            .select()
+            .single();
+
+        if (data) {
+            const updatedNote: Note = {
+                ...accessedNote,
+                tags: data.tags,
+                updatedAt: new Date(data.updated_at)
+            };
+            setAccessedNote(updatedNote);
+            setFetchedNotes(prev => prev.map(n => n.id === updatedNote.id ? updatedNote : n));
+            setNewTagName("");
+            toast.info(`Added tag ${newTagName}`, { position: 'bottom-right' });
+        }
+        if (error) console.error("Error adding tag:", error);
+    };
+
+    const handleRemoveTag = async (tagName: string) => {
+        if (!user || !accessedNote) return;
+
+        const updatedTags = (accessedNote.tags || []).filter(t => t.name !== tagName);
+
+        const { data, error } = await supabase
+            .from("notes")
+            .update({ tags: updatedTags })
+            .eq("id", accessedNote.id)
+            .select()
+            .single();
+
+        if (data) {
+            const updatedNote: Note = {
+                ...accessedNote,
+                tags: data.tags,
+                updatedAt: new Date(data.updated_at)
+            };
+            setAccessedNote(updatedNote);
+            setFetchedNotes(prev => prev.map(n => n.id === updatedNote.id ? updatedNote : n));
+            toast.info(`Removed tag ${tagName}`, { position: 'bottom-right' });
+        }
+        if (error) console.error("Error removing tag:", error);
+    };
+
     const handleTextTagColor = (color: string) => {
         const hex = color.replace("#", "");
         const r = parseInt(hex.length === 3 ? hex[0] + hex[0] : hex.substring(0, 2), 16) || 0;
@@ -372,25 +435,56 @@ export default function NotesTab({ accessedNote, setAccessedNote, initialNoteId 
                                 </TooltipContent>
                             </Tooltip>
                             <DropdownMenuContent align="end" className="w-fit h-fit rounded-lg max-w-40">
-                                <p className="px-2 py-1 text-muted-foreground text-sm">Tags:</p>
-                                <div className="flex flex-wrap gap-1 p-2 bg-card rounded-lg border border-border mb-1">
-                                    {fetchedNotes.find(f => f.id === accessedNote?.id)?.tags?.map((tag, i) => (
-                                        <Tooltip key={i + 'tag'} delayDuration={1000}>
-                                            <TooltipTrigger asChild>
-                                                <div className="rounded-lg flex items-center px-1 hover:opacity-80 cursor-pointer" style={{ backgroundColor: tag.color }}>
-                                                    <p className={cn(handleTextTagColor(tag.color), "text-xs")}>{tag.name}</p>
+                                <div className="flex flex-col p-2 bg-card rounded-lg border border-border hover:bg-card/70 cursor-pointer transition-all duration-100 relative" onClick={() => setIsTagsExpanded(!isTagsExpanded)}>
+                                    <p className="px-1 text-muted-foreground text-sm">Tags:</p>
+                                    <ChevronDown className={cn("absolute right-2.5 top-2.5 h-4 w-4 text-muted-foreground transition-transform duration-200", isTagsExpanded && "rotate-180")} />
+                                    <AnimatePresence>
+                                        {isTagsExpanded && (
+                                            <motion.div
+                                                initial={{ height: 0, opacity: 0 }}
+                                                animate={{ height: "auto", opacity: 1 }}
+                                                exit={{ height: 0, opacity: 0 }}
+                                                transition={{ duration: 0.2, ease: "easeInOut" }}
+                                                className="overflow-hidden mt-1"
+                                            >
+                                                <div className="flex flex-wrap gap-1" onClick={(e) => e.stopPropagation()}>
+                                                    {fetchedNotes.find(f => f.id === accessedNote?.id)?.tags?.map((tag, i) => (
+                                                        <Tooltip key={i + 'tag'} delayDuration={200}>
+                                                            <TooltipTrigger asChild>
+                                                                <motion.div
+                                                                    initial="initial"
+                                                                    whileHover="hover"
+                                                                    className="rounded-lg flex items-center px-1.5 py-0.5 hover:opacity-80 cursor-pointer transition-all duration-100 overflow-hidden"
+                                                                    style={{ backgroundColor: tag.color }}
+                                                                    onClick={() => handleRemoveTag(tag.name)}
+                                                                >
+                                                                    <p className={cn(handleTextTagColor(tag.color), "text-xs whitespace-nowrap")}>{tag.name}</p>
+                                                                    <motion.div
+                                                                        variants={{
+                                                                            initial: { width: 0, opacity: 0, marginLeft: 0 },
+                                                                            hover: { width: "auto", opacity: 1, marginLeft: 4 }
+                                                                        }}
+                                                                        transition={{ duration: 0.2 }}
+                                                                        className="flex items-center"
+                                                                    >
+                                                                        <Trash2 size={10} className={handleTextTagColor(tag.color)} />
+                                                                    </motion.div>
+                                                                </motion.div>
+                                                            </TooltipTrigger>
+                                                            <TooltipContent>
+                                                                <p>{`Remove ${tag.name}`}</p>
+                                                            </TooltipContent>
+                                                        </Tooltip>
+                                                    ))}
+                                                    <div className="rounded-lg flex items-center px-1 hover:opacity-80 cursor-pointer text-xs bg-popover transition-all duration-100" onClick={() => setIsTagsDialogOpen(true)}> Add <Plus size={14} /></div>
                                                 </div>
-                                            </TooltipTrigger>
-                                            <TooltipContent>
-                                                <p>{`Remove ${tag.name}`}</p>
-                                            </TooltipContent>
-                                        </Tooltip>
-                                    ))}
-                                    <div className="rounded-lg flex items-center px-1 hover:opacity-80 cursor-pointer text-xs bg-popover"> Add <Plus size={14} /></div>
+                                            </motion.div>
+                                        )}
+                                    </AnimatePresence>
                                 </div>
-                                <Button variant="ghost" className="rounded-lg w-full px-2 py-1 justify-start" onClick={() => { setRenamingNoteId(accessedNote?.id || null), setIsRenamingNote(true) }}>
+                                {/* <Button variant="ghost" className="rounded-lg w-full px-2 py-1 justify-start" onClick={() => { setRenamingNoteId(accessedNote?.id || null), setIsRenamingNote(true) }}>
                                     <Pen size={16} />Rename
-                                </Button>
+                                </Button> */}
                                 <Button variant="ghost" className="rounded-lg w-full px-2 py-1 justify-start" onClick={() => { setRenamingNoteId(accessedNote?.id || null), setIsRenamingNote(true) }}>
                                     <Pen size={16} />Rename
                                 </Button>
@@ -445,6 +539,100 @@ export default function NotesTab({ accessedNote, setAccessedNote, initialNoteId 
                         <DialogFooter className="mt-4 gap-2">
                             <Button variant="ghost" onClick={() => { setCreateNoteDialogOpen(false), closeTab(activeTabId!) }}>Cancel</Button>
                             <Button onClick={createNote} disabled={!noteName.trim()}>Create Note</Button>
+                        </DialogFooter>
+                    </DialogContent>
+                </Dialog>
+
+                {/* Dialog for adding tags */}
+                <Dialog open={isTagsDialogOpen} onOpenChange={setIsTagsDialogOpen}>
+                    <DialogContent showCloseButton={false} className="min-w-[400px] w-[40%]">
+                        <DialogHeader>
+                            <DialogTitle>Manage Tags</DialogTitle>
+                            <DialogDescription>Add or delete tags for this note.</DialogDescription>
+                        </DialogHeader>
+
+                        <div className="flex flex-col gap-4 py-4">
+                            <div className="flex flex-wrap gap-2 min-h-[40px] p-2 rounded-lg border border-border bg-muted/30">
+                                {accessedNote?.tags?.length === 0 && <p className="text-sm text-muted-foreground italic text-center w-full">No tags added yet.</p>}
+                                {accessedNote?.tags?.map((tag, i) => (
+                                    <motion.div
+                                        key={i}
+                                        initial="initial"
+                                        whileHover="hover"
+                                        className="rounded-full flex items-center px-3 py-1 hover:opacity-90 transition-all group cursor-pointer overflow-hidden h-6"
+                                        style={{ backgroundColor: tag.color }}
+                                        onClick={() => handleRemoveTag(tag.name)}
+                                    >
+                                        <span className={cn("text-xs font-medium whitespace-nowrap", handleTextTagColor(tag.color))}>
+                                            {tag.name}
+                                        </span>
+                                        <motion.div
+                                            variants={{
+                                                initial: { width: 0, opacity: 0, marginLeft: 0 },
+                                                hover: { width: "auto", opacity: 1, marginLeft: 6 }
+                                            }}
+                                            transition={{ duration: 0.2 }}
+                                            className="flex items-center"
+                                        >
+                                            <Trash2 size={12} className={handleTextTagColor(tag.color)} />
+                                        </motion.div>
+                                    </motion.div>
+                                ))}
+                            </div>
+
+                            <div className="flex flex-col gap-3">
+                                <Field className="gap-1.5">
+                                    <FieldLabel>Tag Name</FieldLabel>
+                                    <Input
+                                        placeholder="Enter tag name..."
+                                        value={newTagName}
+                                        onChange={(e) => setNewTagName(e.target.value)}
+                                        onKeyDown={(e) => e.key === "Enter" && handleAddTag()}
+                                        maxLength={20}
+                                    />
+                                </Field>
+
+                                <Field className="gap-1.5">
+                                    <FieldLabel>Color</FieldLabel>
+                                    <div className="flex items-center gap-2">
+                                        <div className="flex flex-wrap gap-1.5 flex-1">
+                                            {["#ef4444", "#f97316", "#f59e0b", "#10b981", "#3b82f6", "#6366f1", "#8b5cf6", "#ec4899", "#71717a"].map((color) => (
+                                                <button
+                                                    key={color}
+                                                    className={cn(
+                                                        "w-6 h-6 rounded-full border-2 transition-all cursor-pointer",
+                                                        newTagColor === color ? "border-foreground scale-110" : "border-transparent hover:scale-105"
+                                                    )}
+                                                    style={{ backgroundColor: color }}
+                                                    onClick={() => setNewTagColor(color)}
+                                                />
+                                            ))}
+                                        </div>
+                                        <Tooltip>
+                                            <TooltipTrigger asChild>
+                                                <div className="relative w-10 h-10 rounded-full border border-border overflow-hidden shrink-0 cursor-pointer">
+                                                    <input
+                                                        type="color"
+                                                        value={newTagColor}
+                                                        onChange={(e) => setNewTagColor(e.target.value)}
+                                                        className="absolute -inset-2 w-[200%] h-[200%] cursor-pointer"
+                                                    />
+                                                </div>
+                                            </TooltipTrigger>
+                                            <TooltipContent>
+                                                Select custom color
+                                            </TooltipContent>
+                                        </Tooltip>
+                                    </div>
+                                </Field>
+                            </div>
+                        </div>
+
+                        <DialogFooter className="gap-2">
+                            <Button variant="ghost" onClick={() => setIsTagsDialogOpen(false)}>Close</Button>
+                            <Button onClick={handleAddTag} disabled={!newTagName.trim()} style={{ backgroundColor: newTagColor }} className={handleTextTagColor(newTagColor)}>
+                                <Plus size={16} className="mr-1" /> Add Tag
+                            </Button>
                         </DialogFooter>
                     </DialogContent>
                 </Dialog>
