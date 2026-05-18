@@ -1,14 +1,16 @@
 "use client";
 import { createContext, useContext, useState, ReactNode } from "react";
+import { ChatAttachment } from "@/types/chatType";
 
 interface PendingEdit {
     messageId: string;
     content: string;
+    attachments?: ChatAttachment[];
 }
 
 interface EditMessageContextType {
     pendingEdit: PendingEdit | null;
-    requestEdit: (messageId: string, content: string) => void;
+    requestEdit: (messageId: string, content: string, attachments?: ChatAttachment[]) => void;
     clearEdit: () => void;
     pendingRegenerate: string | null; // assistantMessageId to regenerate
     requestRegenerate: (assistantMessageId: string) => void;
@@ -25,8 +27,8 @@ function EditMessageProvider({ children }: { children: ReactNode }) {
     const [pendingRegenerate, setPendingRegenerate] = useState<string | null>(null);
     const [pendingQuickSend, setPendingQuickSend] = useState<string | null>(null);
 
-    const requestEdit = (messageId: string, content: string) => {
-        setPendingEdit({ messageId, content });
+    const requestEdit = (messageId: string, content: string, attachments?: ChatAttachment[]) => {
+        setPendingEdit({ messageId, content, attachments });
     };
 
     const clearEdit = () => {

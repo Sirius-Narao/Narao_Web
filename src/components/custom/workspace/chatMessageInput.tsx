@@ -312,8 +312,31 @@ export default function ChatMessageInput({ attachments, setAttachments }: ChatMe
             editorRef.current.innerText = pendingEdit.content
         }
         setContent(pendingEdit.content);
+
+        // Fetch and load the attachments into the local attachments state
+        if (pendingEdit.attachments && pendingEdit.attachments.length > 0) {
+            const loadAttachments = async () => {
+                try {
+                    const loadedFiles = await Promise.all(
+                        pendingEdit.attachments!.map(async (att) => {
+                            const res = await fetch(att.file_url);
+                            if (!res.ok) throw new Error(`Failed to fetch ${att.file_name}`);
+                            const blob = await res.blob();
+                            return new File([blob], att.file_name, { type: att.mime_type });
+                        })
+                    );
+                    setAttachments(loadedFiles);
+                } catch (e) {
+                    console.error("Error loading attachments for edit:", e);
+                }
+            };
+            loadAttachments();
+        } else {
+            setAttachments([]);
+        }
+
         setTimeout(() => editorRef.current?.focus(), 50);
-    }, [pendingEdit]); // intentionally narrow dep — only fires when a new edit is requested
+    }, [pendingEdit, setAttachments]); // intentionally narrow dep — only fires when a new edit is requested
 
     // update chat name
     const updateChatName = async (chatId: string, firstUserContent: string) => {
@@ -412,7 +435,7 @@ export default function ChatMessageInput({ attachments, setAttachments }: ChatMe
      *  - Images / PDFs    → { kind: "inline",  name, type, data }  (base64)
      */
     const fileToApiPart = (file: File): Promise<
-        | { kind: "text";   name: string; text: string }
+        | { kind: "text"; name: string; text: string }
         | { kind: "inline"; name: string; type: string; data: string }
     > => {
         const isText = TEXT_MIME_TYPES.has(file.type) ||
@@ -1231,13 +1254,48 @@ export default function ChatMessageInput({ attachments, setAttachments }: ChatMe
         setChatMessages(prev => [...prev, assistantPlaceholder]);
 
         try {
+            // Re-prepare attachments if there are any
+            const apiAttachments = await Promise.all(
+                (userMessage.attachments || []).map(async (att) => {
+                    try {
+                        const fileRes = await fetch(att.file_url);
+                        if (!fileRes.ok) {
+                            throw new Error(`Failed to fetch attachment ${att.file_name}: ${fileRes.statusText}`);
+                        }
+                        const isText = att.file_type === "text" ||
+                            TEXT_MIME_TYPES.has(att.mime_type) ||
+                            /\.(txt|md|csv|json|xml|yaml|yml|toml|ini|log|ts|tsx|js|jsx|css|html|htm|sh|py|rb|java|c|cpp|h|rs|go|php)$/i.test(att.file_name);
+
+                        if (isText) {
+                            const text = await fileRes.text();
+                            return { kind: "text" as const, name: att.file_name, text };
+                        } else {
+                            const blob = await fileRes.blob();
+                            const base64 = await new Promise<string>((resolve, reject) => {
+                                const reader = new FileReader();
+                                reader.onloadend = () => {
+                                    const base64String = (reader.result as string).split(',')[1];
+                                    resolve(base64String);
+                                };
+                                reader.onerror = reject;
+                                reader.readAsDataURL(blob);
+                            });
+                            return { kind: "inline" as const, name: att.file_name, type: att.mime_type, data: base64 };
+                        }
+                    } catch (e) {
+                        console.error("Error fetching attachment for regeneration:", e);
+                        return null;
+                    }
+                })
+            ).then(results => results.filter((item): item is NonNullable<typeof item> => item !== null));
+
             const response = await fetch(`/api/chat/${currentModel}`, {
                 method: "POST",
                 headers: { "Content-Type": "application/json" },
                 body: JSON.stringify({
                     history: baseMessages,
                     userInput: userMessage.content,
-                    attachments: [],
+                    attachments: apiAttachments,
                     isThinking: isThinking,
                     systemPrompt: systemPromptString,
                     tools: WORKSPACE_TOOL_DECLARATIONS
@@ -1619,7 +1677,7 @@ export default function ChatMessageInput({ attachments, setAttachments }: ChatMe
                             <Edit size={12} className="text-primary" />
                             <span>Editing message</span>
                             <button
-                                onClick={() => { clearEdit(); setContent(""); if (editorRef.current) editorRef.current.innerHTML = ""; }}
+                                onClick={() => { clearEdit(); setContent(""); if (editorRef.current) editorRef.current.innerHTML = ""; setAttachments([]); }}
                                 className="ml-1 flex items-center justify-center rounded-full hover:text-foreground transition-colors"
                                 aria-label="Cancel edit"
                             >
@@ -1669,7 +1727,7 @@ export default function ChatMessageInput({ attachments, setAttachments }: ChatMe
                                     <Plus />
                                 </Button>
                             </TooltipTrigger>
-                            <TooltipContent><p>Attach Image or PDF</p><p className="text-xs text-muted-foreground">Maximum 3 attachments allowed</p></TooltipContent>
+                            <TooltipContent><p>Attach Image, PDF, or Text/Code file</p><p className="text-xs text-muted-foreground text-center">Increase credits' usage</p></TooltipContent>
                         </Tooltip>
                     </div>
                     <div className={cn("flex w-full rounded-[30px] border-1 border-border bg-popover/60 backdrop-blur-md shadow-lg px-2 py-1 items-end justify-center gap-2 transition-all duration-200", pendingEdit && "bg-primary/10 border-primary/20")}>
@@ -1678,7 +1736,7 @@ export default function ChatMessageInput({ attachments, setAttachments }: ChatMe
                             ref={fileInputRef}
                             className="hidden"
                             multiple
-                            accept="image/*,.pdf"
+                            accept="image/*,.pdf,.txt,.md,.csv,.json,.xml,.yaml,.yml,.toml,.ini,.log,.ts,.tsx,.js,.jsx,.css,.html,.htm,.sh,.py,.rb,.java,.c,.cpp,.h,.rs,.go,.php"
                             onChange={(e) => {
                                 setAttachments(prev => [...prev, ...Array.from(e.target.files || [])]);
                                 e.target.value = "";

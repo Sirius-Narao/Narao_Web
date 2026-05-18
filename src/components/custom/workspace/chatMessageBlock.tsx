@@ -254,7 +254,7 @@ export default function ChatMessageBlock({ message, isFollowUp }: { message: Cha
                                 </Tooltip>
                                 <Tooltip>
                                     <TooltipTrigger asChild>
-                                        <Button size={"icon"} variant={"ghost"} onClick={() => requestEdit(message.id, message.content)}>
+                                        <Button size={"icon"} variant={"ghost"} onClick={() => requestEdit(message.id, message.content, message.attachments)}>
                                             <Edit className="w-4 h-4 text-muted-foreground" />
                                         </Button>
                                     </TooltipTrigger>
