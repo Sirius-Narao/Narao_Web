@@ -37,20 +37,21 @@ const CustomTableComponent = (props: any) => {
 
   const tableStyle = fixedWidth
     ? { width: `${totalWidth}px` }
-    : { width: '100%', minWidth: `${totalWidth}px` }
+    : { width: 'max-content', minWidth: `${Math.max(totalWidth, 120)}px` }
 
   return (
     <NodeViewWrapper
-      style={{ display: 'block', width: '100%' }}
-      className="custom-table-container group/table my-8"
+      style={{ display: 'block', width: 'fit-content', maxWidth: '100%' }}
+      className="custom-table-container group/table my-6"
     >
-      <div style={{ width: '100%' }} className="overflow-x-auto">
-        <table style={tableStyle} className="w-full table-fixed border-collapse">
+      <div style={{ maxWidth: '100%' }} className="overflow-x-auto scrollbar-no-bg rounded-lg">
+        <table style={tableStyle} className="table-auto border-collapse">
           <colgroup>
             {colWidths.map((w, i) => (
-              <col key={i} style={{ width: w ? `${w}px` : '', minWidth: '25px' }} />
+              <col key={i} style={{ width: w ? `${w}px` : '', minWidth: '80px' }} />
             ))}
           </colgroup>
+          {/* @ts-ignore */}
           <NodeViewContent as="tbody" />
         </table>
       </div>

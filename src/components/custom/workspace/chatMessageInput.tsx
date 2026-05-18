@@ -73,7 +73,7 @@ export default function ChatMessageInput({ attachments, setAttachments }: ChatMe
     const { fetchedFolders, setFetchedFolders } = useFetchedFolders();
 
     // Model Settings+
-    const [currentModel, setCurrentModel] = useState<keyof Models>("gemini-3-flash-preview")
+    const [currentModel, setCurrentModel] = useState<keyof Models>("gemini-2.5-flash")
 
     // Popover Settings
     // const [isSelectingModelPopoverOpen, setIsSelectingModelPopoverOpen] = useState(false)
@@ -377,6 +377,22 @@ export default function ChatMessageInput({ attachments, setAttachments }: ChatMe
         }
     };
 
+    // MIME types we treat as plain text (sent as { kind: "text" } to the API)
+    const TEXT_MIME_TYPES = new Set([
+        "text/plain",
+        "text/markdown",
+        "text/csv",
+        "text/html",
+        "text/css",
+        "text/javascript",
+        "text/typescript",
+        "application/json",
+        "application/xml",
+        "text/xml",
+        "application/javascript",
+        "application/typescript",
+    ]);
+
     // convert file to base64 for the AI API call
     const fileToBase64 = (file: File): Promise<string> => {
         return new Promise((resolve, reject) => {
@@ -388,6 +404,29 @@ export default function ChatMessageInput({ attachments, setAttachments }: ChatMe
             };
             reader.onerror = error => reject(error);
         });
+    };
+
+    /**
+     * Converts a File into the correct API part shape:
+     *  - Text-like files  → { kind: "text",   name, text }
+     *  - Images / PDFs    → { kind: "inline",  name, type, data }  (base64)
+     */
+    const fileToApiPart = (file: File): Promise<
+        | { kind: "text";   name: string; text: string }
+        | { kind: "inline"; name: string; type: string; data: string }
+    > => {
+        const isText = TEXT_MIME_TYPES.has(file.type) ||
+            /\.(txt|md|csv|json|xml|yaml|yml|toml|ini|log|ts|tsx|js|jsx|css|html|htm|sh|py|rb|java|c|cpp|h|rs|go|php)$/i.test(file.name);
+
+        if (isText) {
+            return new Promise((resolve, reject) => {
+                const reader = new FileReader();
+                reader.readAsText(file);
+                reader.onload = () => resolve({ kind: "text", name: file.name, text: reader.result as string });
+                reader.onerror = err => reject(err);
+            });
+        }
+        return fileToBase64(file).then(data => ({ kind: "inline", name: file.name, type: file.type, data }));
     };
 
     // Upload a file to Supabase Storage and return its persistent public URL
@@ -608,22 +647,23 @@ export default function ChatMessageInput({ attachments, setAttachments }: ChatMe
                 clearEdit();
             }
             // 1. Prepare attachments — upload to Supabase Storage for persistence,
-            //    and convert to base64 separately for the AI API call
+            //    and convert to the correct API part separately for the AI API call.
+            //    Text-like files are read as plain text; images/PDFs are base64-encoded.
             const [uiAttachments, apiAttachments] = await Promise.all([
                 Promise.all(attachments.map(async file => ({
                     id: uuidv4(),
                     file_name: file.name,
-                    file_type: file.type.includes("pdf") ? "pdf" : "image",
-                    mime_type: file.type, // real MIME type, e.g. "image/png", "application/pdf"
-                    file_url: await uploadAttachment(file, user!.id), // persistent URL
+                    file_type: file.type.includes("pdf")
+                        ? "pdf"
+                        : TEXT_MIME_TYPES.has(file.type) || /\.(txt|md|csv|json|xml|yaml|yml|toml|ini|log|ts|tsx|js|jsx|css|html|htm|sh|py|rb|java|c|cpp|h|rs|go|php)$/i.test(file.name)
+                            ? "text"
+                            : "image",
+                    mime_type: file.type,
+                    file_url: await uploadAttachment(file, user!.id),
                     file_size: file.size,
                     created_at: new Date()
                 } as ChatAttachment))),
-                Promise.all(attachments.map(async file => ({
-                    name: file.name,
-                    type: file.type,
-                    data: await fileToBase64(file)
-                })))
+                Promise.all(attachments.map(file => fileToApiPart(file)))
             ]);
 
             // 2. Create and add user message

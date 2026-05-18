@@ -64,8 +64,15 @@ export async function POST(req: NextRequest) {
                 if (msg.attachments?.length > 0) {
                     await Promise.all(msg.attachments.map(async (att: any) => {
                         try {
-                            const data = await urlToBase64(att.file_url);
-                            parts.push({ inlineData: { data, mimeType: att.mime_type } });
+                            if (att.file_type === "text") {
+                                // Fetch and embed as plain text so the model can read it
+                                const res = await fetch(att.file_url);
+                                const text = await res.text();
+                                parts.push({ text: `[File: ${att.file_name}]\n\`\`\`\n${text}\n\`\`\`` });
+                            } else {
+                                const data = await urlToBase64(att.file_url);
+                                parts.push({ inlineData: { data, mimeType: att.mime_type } });
+                            }
                         } catch (e) {
                             console.warn(`Could not re-fetch attachment ${att.file_name}:`, e);
                         }
@@ -96,7 +103,12 @@ export async function POST(req: NextRequest) {
         const currentParts: any[] = [{ text: userInput }];
         if (attachments && attachments.length > 0) {
             attachments.forEach((att: any) => {
-                currentParts.push({ inlineData: { data: att.data, mimeType: att.type } });
+                if (att.kind === "text") {
+                    // Plain-text file: embed the content directly so the model can read it
+                    currentParts.push({ text: `[File: ${att.name}]\n\`\`\`\n${att.text}\n\`\`\`` });
+                } else {
+                    currentParts.push({ inlineData: { data: att.data, mimeType: att.type } });
+                }
             });
         }
 

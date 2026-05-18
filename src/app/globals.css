@@ -466,14 +466,20 @@ body {
   overflow-y: hidden;
 }
 
+/* ── Tiptap Table — base: let the custom NodeView wrapper drive sizing ─── */
+/* Width & overflow are handled on the .custom-table-container scroll wrapper */
 .tiptap table {
-  @apply w-full table-fixed border-collapse border border-border my-6 overflow-hidden rounded-lg bg-secondary/50 text-sm;
+  border-collapse: collapse;
+  font-size: 0.875rem;  /* text-sm */
+  width: max-content;   /* shrink to content — overridden by inline style when cols have explicit widths */
+  min-width: 0;
 }
 
 .tiptap table th,
 .tiptap table td {
-  @apply border-b border-r border-secondary/70 px-4 text-left align-top;
-  min-width: 0;
+  @apply border-b border-r px-4 text-left align-top;
+  border-color: var(--border);
+  min-width: 80px;
 }
 
 .tiptap table th:last-child,
@@ -481,28 +487,63 @@ body {
   border-right: none;
 }
 
+/* Last row — remove bottom border so it doesn't double up with wrapper ring */
+.tiptap table tr:last-child th,
+.tiptap table tr:last-child td {
+  border-bottom: none;
+}
+
 .tiptap table th {
-  @apply bg-secondary/70 py-3 font-bold text-foreground/80;
+  @apply py-2.5 font-semibold text-foreground/90 bg-secondary/60;
+  font-size: 0.8rem;
+  letter-spacing: 0.02em;
 }
 
 .tiptap table td {
-  @apply bg-card/60 py-2.5 text-foreground/70;
+  @apply py-2.5 text-foreground/85;
+  background: transparent;
 }
 
-/* ── Custom Table Handles ────────────────────────────────────────────────── */
+/* Row hover for body rows (not header) */
+.tiptap table tbody tr:hover td {
+  background: color-mix(in oklch, var(--primary) 4%, transparent);
+}
+
+/* Selected cell highlight */
+.tiptap .selectedCell {
+  @apply relative;
+}
+
+.tiptap .selectedCell:after {
+  @apply absolute inset-0 bg-primary/10 pointer-events-none content-[''] z-10;
+}
+
+/* ── Custom Table Container (NodeViewWrapper scroll shell) ─────────────── */
 
 .custom-table-container {
   @apply relative;
 }
 
+/* The scroll wrapper — this is where the visual table chrome lives */
+.custom-table-container > div:first-child {
+  border: 1px solid var(--border);
+  border-radius: 0.75rem;    /* rounded-xl */
+  overflow: hidden;          /* clips table corners cleanly */
+  overflow-x: auto;          /* scrolls when content wider than editor */
+  box-shadow: 0 1px 4px 0 oklch(0 0 0 / 0.06);
+}
+
+/* Override the margin tiptap would add — handled by NodeViewWrapper my-6 */
 .custom-table-container table {
   margin: 0;
 }
 
+/* Add/Remove row handle (bottom) */
 .custom-table-handle-bottom {
   @apply absolute -bottom-5 left-[20%] right-[20%] h-4 w-[60%] bg-secondary/30 hover:bg-primary/40 rounded-full transition-all cursor-pointer flex items-center justify-center opacity-0 group-hover/table:opacity-100;
 }
 
+/* Add/Remove column handle (right) */
 .custom-table-handle-right {
   @apply absolute -right-5 top-[20%] bottom-[20%] w-4 h-[60%] bg-secondary/30 hover:bg-primary/40 rounded-full transition-all cursor-pointer flex items-center justify-center opacity-0 group-hover/table:opacity-100;
 }
@@ -511,16 +552,9 @@ body {
   @apply text-foreground/50 scale-75;
 }
 
+/* Column resize handle */
 .tiptap .column-resize-handle {
   @apply absolute -right-1 top-0 bottom-0 w-1 bg-primary cursor-col-resize z-50;
-}
-
-.tiptap .selectedCell {
-  @apply relative;
-}
-
-.tiptap .selectedCell:after {
-  @apply absolute inset-0 bg-primary/10 pointer-events-none content-[''] z-10;
 }
 
 
