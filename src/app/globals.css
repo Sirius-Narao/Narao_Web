@@ -470,8 +470,10 @@ body {
 /* Width & overflow are handled on the .custom-table-container scroll wrapper */
 .tiptap table {
   border-collapse: collapse;
-  font-size: 0.875rem;  /* text-sm */
-  width: max-content;   /* shrink to content — overridden by inline style when cols have explicit widths */
+  font-size: 0.875rem;
+  /* text-sm */
+  width: max-content;
+  /* shrink to content — overridden by inline style when cols have explicit widths */
   min-width: 0;
 }
 
@@ -525,11 +527,14 @@ body {
 }
 
 /* The scroll wrapper — this is where the visual table chrome lives */
-.custom-table-container > div:first-child {
+.custom-table-container>div:first-child {
   border: 1px solid var(--border);
-  border-radius: 0.75rem;    /* rounded-xl */
-  overflow: hidden;          /* clips table corners cleanly */
-  overflow-x: auto;          /* scrolls when content wider than editor */
+  border-radius: 0.75rem;
+  /* rounded-xl */
+  overflow: hidden;
+  /* clips table corners cleanly */
+  overflow-x: auto;
+  /* scrolls when content wider than editor */
   box-shadow: 0 1px 4px 0 oklch(0 0 0 / 0.06);
 }
 
@@ -576,7 +581,7 @@ body {
   overflow-wrap: break-word;
   min-height: calc(1.5rem + 1.5rem);
   /* 1 line + vertical padding */
-  max-height: 156px;
+  max-height: 256px;
   overflow-y: auto;
   caret-color: var(--foreground);
   color: var(--foreground);

@@ -1,5 +1,6 @@
 import { ChatMessage } from "@/types/chatType";
 import { MarkdownRenderer } from "./MarkdownRenderer";
+import { SelectionQuote, parseMessageQuote } from "./selectionQuote";
 import { BookOpen, Check, ChevronDown, Coins, Copy, Edit, FileImage, FileMinus, FilePen, FilePlus, FileTypeCorner, FolderMinus, FolderPlus, FolderSearch, Lightbulb, Move, Palette, PenTool, RefreshCcw, ThumbsDown, ThumbsUp, TriangleAlert, Wrench } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { useState, useEffect } from "react";
@@ -129,8 +130,11 @@ export default function ChatMessageBlock({ message, isFollowUp }: { message: Cha
     const { isLoading } = useIsLoading();
     const { requestEdit, requestRegenerate, requestQuickSend } = useEditMessage();
     const [phraseIndex, setPhraseIndex] = useState(0);
-    const { chatMessages } = useChatMessages()
+    const { chatMessages, chatTitle, setChatQuote } = useChatMessages()
     const [displayText, setDisplayText] = useState("");
+
+    const parsedQuote = parseMessageQuote(message.content);
+    const displayContent = parsedQuote ? parsedQuote.remainingContent : message.content;
 
     // notes
     const { fetchedNotes } = useFetchedNotes();
@@ -221,8 +225,17 @@ export default function ChatMessageBlock({ message, isFollowUp }: { message: Cha
             {
                 message.role === "user" ? (
                     <div className="flex flex-col relative w-fit h-fit max-w-[80%] items-end">
-                        {message.content && <div className="relative w-fit max-w-[100%] h-fit rounded-2xl bg-secondary/80 p-4 px-6 shadow-sm border border-border/10 overflow-hidden text-left">
-                            <MarkdownRenderer content={message.content} className="text-foreground break-words" />
+                        {parsedQuote && (
+                            <div className="w-full max-w-[100%] mb-1 animate-in fade-in slide-in-from-bottom-1">
+                                <SelectionQuote text={parsedQuote.quoteText} sourceName={parsedQuote.sourceName} pendingEdit={false} />
+                            </div>
+                        )}
+                        {displayContent && <div 
+                            className="relative w-fit max-w-[100%] h-fit rounded-2xl bg-secondary/80 p-4 px-6 shadow-sm border border-border/10 overflow-hidden text-left"
+                            data-quote-source={`Chat: ${chatTitle}`}
+                            data-quote-type="chat"
+                        >
+                            <MarkdownRenderer content={displayContent} className="text-foreground break-words" />
                         </div>}
                         {/* Content such as images, pdfs, etc */}
                         {message.attachments && message.attachments.length > 0 && (
@@ -254,7 +267,15 @@ export default function ChatMessageBlock({ message, isFollowUp }: { message: Cha
                                 </Tooltip>
                                 <Tooltip>
                                     <TooltipTrigger asChild>
-                                        <Button size={"icon"} variant={"ghost"} onClick={() => requestEdit(message.id, message.content, message.attachments)}>
+                                        <Button size={"icon"} variant={"ghost"} onClick={() => {
+                                            const parsed = parseMessageQuote(message.content);
+                                            if (parsed) {
+                                                setChatQuote({ text: parsed.quoteText, sourceName: parsed.sourceName });
+                                                requestEdit(message.id, parsed.remainingContent, message.attachments);
+                                            } else {
+                                                requestEdit(message.id, message.content, message.attachments);
+                                            }
+                                        }}>
                                             <Edit className="w-4 h-4 text-muted-foreground" />
                                         </Button>
                                     </TooltipTrigger>
@@ -314,7 +335,12 @@ export default function ChatMessageBlock({ message, isFollowUp }: { message: Cha
                                     part.type === 'toolCall' ? (
                                         <ToolCallCard key={i} part={part} />
                                     ) : part.content ? (
-                                        <div key={i} className="w-full max-w-[90%] p-2">
+                                        <div 
+                                            key={i} 
+                                            className="w-full max-w-[90%] p-2"
+                                            data-quote-source={`Chat: ${chatTitle}`}
+                                            data-quote-type="chat"
+                                        >
                                             <MarkdownRenderer content={part.content} className="text-foreground" />
                                         </div>
                                     ) : null
@@ -373,7 +399,11 @@ export default function ChatMessageBlock({ message, isFollowUp }: { message: Cha
                                         </div>
                                     </div>
                                 )}
-                                <div className="flex w-full h-fit max-w-[90%] items-start">
+                                <div 
+                                    className="flex w-full h-fit max-w-[90%] items-start"
+                                    data-quote-source={`Chat: ${chatTitle}`}
+                                    data-quote-type="chat"
+                                >
                                     <MarkdownRenderer content={message.content} className="text-foreground w-full p-2" />
                                 </div>
                                 {!isLoading && message.content.endsWith("Do you want to proceed now?") && !isFollowUp && (

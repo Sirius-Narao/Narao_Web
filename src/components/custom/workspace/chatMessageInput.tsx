@@ -22,6 +22,7 @@ import { EDITOR_COLORS } from "@/constants/editorColors"
 import { useSettings } from "@/context/settingsContext"
 import getSystemPromptString from "@/constants/systemPromptString"
 import { useReviews } from "@/context/reviewContext"
+import { SelectionQuote, getSelectionQuoteMarkdown } from "./selectionQuote"
 
 // ── @mention types ──────────────────────────────────────────────────────────
 type MentionItem = { id: string; title: string; type: "note" | "folder"; path?: string; color?: string };
@@ -49,7 +50,7 @@ export default function ChatMessageInput({ attachments, setAttachments }: ChatMe
     const editorRef = useRef<HTMLDivElement>(null)
     const fileInputRef = useRef<HTMLInputElement>(null)
     const abortControllerRef = useRef<AbortController | null>(null)
-    const { chatMessages, setChatMessages, currentChatId, setCurrentChatId, refreshChats, setChatTitle, setChatCache, chatInputHTML, setChatInputHTML } = useChatMessages()
+    const { chatMessages, setChatMessages, currentChatId, setCurrentChatId, refreshChats, setChatTitle, setChatCache, chatInputHTML, setChatInputHTML, chatQuote, setChatQuote } = useChatMessages()
 
     // Audio recording
     const { recordingState, audioURL, audioBlob, startRecording, stopRecording, uploadRecording, reset: resetRecording, analyserNode } = useAudioRecorder()
@@ -73,7 +74,7 @@ export default function ChatMessageInput({ attachments, setAttachments }: ChatMe
     const { fetchedFolders, setFetchedFolders } = useFetchedFolders();
 
     // Model Settings+
-    const [currentModel, setCurrentModel] = useState<keyof Models>("gemini-2.5-flash")
+    const [currentModel, setCurrentModel] = useState<keyof Models>("gemini-3-flash-preview")
 
     // Popover Settings
     // const [isSelectingModelPopoverOpen, setIsSelectingModelPopoverOpen] = useState(false)
@@ -616,7 +617,13 @@ export default function ChatMessageInput({ attachments, setAttachments }: ChatMe
 
     // handle send function of the input
     const handleSend = async (contentOverride?: string) => {
-        const effectiveContent = contentOverride ?? content;
+        let effectiveContent = contentOverride ?? content;
+
+        if (chatQuote) {
+            const quoteMarkdown = getSelectionQuoteMarkdown(chatQuote.text, chatQuote.sourceName);
+            effectiveContent = `${quoteMarkdown}${effectiveContent}`;
+        }
+
         if ((effectiveContent.trim() === "" && attachments.length === 0) || isLoading) return;
 
         // ── Zero-credit guard ────────────────────────────────────────────────
@@ -706,6 +713,7 @@ export default function ChatMessageInput({ attachments, setAttachments }: ChatMe
             const currentContent = effectiveContent;
             setContent("");
             setChatInputHTML(""); // Clear persistent draft on send
+            setChatQuote(null); // Clear quote
             if (editorRef.current) editorRef.current.innerHTML = ""
             setAttachments([]);
 
@@ -1670,51 +1678,119 @@ export default function ChatMessageInput({ attachments, setAttachments }: ChatMe
                 </div>
             )}
             <div className="absolute flex flex-col w-full sm:w-[90%] lg:w-[60%] bottom-0 left-0 sm:left-[5%] lg:left-[20%] right-0 sm:right-[5%] lg:right-[20%] gap-2 z-50 px-4 sm:px-0" >
-                {/* Edit mode cancel pill */}
-                {pendingEdit && (
-                    <div className="flex items-center justify-center animate-in fade-in">
-                        <div className={cn("flex items-center gap-2 bg-popover/60 backdrop-blur-md border border-border px-3 py-1.5 rounded-xl text-xs group relative animate-in fade-in shadow-lg", pendingEdit && "bg-primary/10 border-primary/20")}>
-                            <Edit size={12} className="text-primary" />
-                            <span>Editing message</span>
-                            <button
-                                onClick={() => { clearEdit(); setContent(""); if (editorRef.current) editorRef.current.innerHTML = ""; setAttachments([]); }}
-                                className="ml-1 flex items-center justify-center rounded-full hover:text-foreground transition-colors"
-                                aria-label="Cancel edit"
-                            >
-                                <X size={12} />
-                            </button>
+
+
+                {/* Quote Preview */}
+                {chatQuote ? (
+                    <div className="hover:translate-y-[0px] translate-y-[60px] transition-all duration-300s">
+
+                        {/* Edit mode cancel pill */}
+                        {pendingEdit && (
+                            <div className="flex items-center justify-center animate-in fade-in">
+                                <div className={cn("flex items-center gap-2 border border-border px-3 py-1.5 rounded-xl text-xs group relative animate-in fade-in shadow-lg", pendingEdit ? "bg-primary/10 border-primary/20 backdrop-blur-md" : "bg-popover")}>
+                                    <Edit size={14} className="text-primary" />
+                                    <span>Editing message</span>
+                                    <button
+                                        onClick={() => { clearEdit(); setContent(""); if (editorRef.current) editorRef.current.innerHTML = ""; setAttachments([]); setChatQuote(null); }}
+                                        className="text-muted-foreground hover:text-foreground transition-colors cursor-pointer"
+                                        aria-label="Cancel edit"
+                                    >
+                                        <X size={14} />
+                                    </button>
+                                </div>
+                            </div>
+                        )}
+
+                        {/* Attachment Previews */}
+                        {attachments.length > 0 && (
+                            <div className="flex flex-row items-center gap-2 px-4 flex-wrap justify-center pt-2">
+                                {attachments.map((file, index) => (
+                                    <div key={index} className={cn("flex items-center gap-2 border border-border px-3 py-1.5 rounded-xl text-xs group relative animate-in fade-in fade-up shadow-lg", pendingEdit ? "bg-primary/10 border-primary/20 backdrop-blur-sm" : "bg-popover")}>
+                                        {(file.type.includes("jpeg") || file.type.includes("png") || file.type.includes("webp")) && (
+                                            <FileImage className="w-4 h-4 text-primary" />
+                                        )}
+                                        {file.type.includes("pdf") && (
+                                            <FileTypeCorner className="w-4 h-4 text-destructive" />
+                                        )}
+                                        {(file.type.includes("webm") || file.type.includes("mp4") || file.type.includes("ogg") || file.name.startsWith("voice-")) && (
+                                            <Mic2 className="w-4 h-4 text-primary" />
+                                        )}
+                                        <span className="max-w-[100px] truncate">{file.name}</span>
+                                        <button
+                                            onClick={() => removeAttachment(index)}
+                                            className="text-muted-foreground hover:text-foreground transition-colors cursor-pointer"
+                                        >
+                                            <X size={14} />
+                                        </button>
+                                    </div>
+                                ))}
+                            </div>
+                        )
+                        }
+                        <div className={cn("flex px-4 relative w-full sm:w-[90%] lg:w-[80%] mx-auto group animate-in fade-in fade-up")}>
+                            <div className="w-full relative">
+                                <SelectionQuote text={chatQuote.text} sourceName={chatQuote.sourceName} pendingEdit={pendingEdit ? true : false} />
+                                <Button
+                                    onClick={() => setChatQuote(null)}
+                                    size="icon"
+                                    className="absolute top-5 right-2 rounded-full bg-background/80 hover:bg-destructive/10 hover:text-destructive text-muted-foreground transition-all shadow-sm border border-border/50 opacity-0 group-hover:opacity-100 z-10 cursor-pointer"
+                                    aria-label="Remove quote"
+                                >
+                                    <X />
+                                </Button>
+                            </div>
                         </div>
                     </div>
-                )}
-                {/* Attachment Previews */}
-                {attachments.length > 0 && (
-                    <div className="flex flex-row items-center gap-2 px-4 flex-wrap justify-center">
-                        {attachments.map((file, index) => (
-                            <div key={index} className={cn("flex items-center gap-2 bg-popover/60 backdrop-blur-md border border-border px-3 py-1.5 rounded-xl text-xs group relative animate-in fade-in slide-in-from-bottom-2 shadow-lg", pendingEdit && "bg-primary/10 border-primary/20")}>
-                                {(file.type.includes("jpeg") || file.type.includes("png") || file.type.includes("webp")) && (
-                                    <FileImage className="w-4 h-4 text-primary" />
-                                )}
-                                {file.type.includes("pdf") && (
-                                    <FileTypeCorner className="w-4 h-4 text-destructive" />
-                                )}
-                                {(file.type.includes("webm") || file.type.includes("mp4") || file.type.includes("ogg") || file.name.startsWith("voice-")) && (
-                                    <Mic2 className="w-4 h-4 text-primary" />
-                                )}
-                                <span className="max-w-[100px] truncate">{file.name}</span>
+                ) : <>
+                    {/* Edit mode cancel pill */}
+                    {pendingEdit && (
+                        <div className="flex items-center justify-center animate-in fade-in">
+                            <div className={cn("flex items-center gap-2 border border-border px-3 py-1.5 rounded-xl text-xs group relative animate-in fade-in shadow-lg", pendingEdit ? "bg-primary/10 border-primary/20 backdrop-blur-md" : "bg-popover")}>
+                                <Edit size={14} className="text-primary" />
+                                <span>Editing message</span>
                                 <button
-                                    onClick={() => removeAttachment(index)}
-                                    className="text-muted-foreground hover:text-foreground transition-colors"
+                                    onClick={() => { clearEdit(); setContent(""); if (editorRef.current) editorRef.current.innerHTML = ""; setAttachments([]); setChatQuote(null); }}
+                                    className="text-muted-foreground hover:text-foreground transition-colors cursor-pointer"
+                                    aria-label="Cancel edit"
                                 >
                                     <X size={14} />
                                 </button>
                             </div>
-                        ))}
-                    </div>
-                )
+                        </div>
+                    )}
+
+                    {/* Attachment Previews */}
+                    {attachments.length > 0 && (
+                        <div className="flex flex-row items-center gap-2 px-4 flex-wrap justify-center">
+                            {attachments.map((file, index) => (
+                                <div key={index} className={cn("flex items-center gap-2 border border-border px-3 py-1.5 rounded-xl text-xs group relative animate-in fade-in fade-up shadow-lg", pendingEdit ? "bg-primary/10 border-primary/20 backdrop-blur-sm" : "bg-popover")}>
+                                    {(file.type.includes("jpeg") || file.type.includes("png") || file.type.includes("webp")) && (
+                                        <FileImage className="w-4 h-4 text-primary" />
+                                    )}
+                                    {file.type.includes("pdf") && (
+                                        <FileTypeCorner className="w-4 h-4 text-destructive" />
+                                    )}
+                                    {(file.type.includes("webm") || file.type.includes("mp4") || file.type.includes("ogg") || file.name.startsWith("voice-")) && (
+                                        <Mic2 className="w-4 h-4 text-primary" />
+                                    )}
+                                    <span className="max-w-[100px] truncate">{file.name}</span>
+                                    <button
+                                        onClick={() => removeAttachment(index)}
+                                        className="text-muted-foreground hover:text-foreground transition-colors cursor-pointer"
+                                    >
+                                        <X size={14} />
+                                    </button>
+                                </div>
+                            ))}
+                        </div>
+                    )
+                    }
+
+                </>
                 }
 
                 < div className="flex gap-2 items-center items-end pb-1" >
-                    <div className={cn("rounded-[30px] p-2 border-1 border-border transition-all duration-200 bg-popover/40 backdrop-blur-md shadow-lg", pendingEdit && "bg-primary/10 border-primary/20")}>
+                    <div className={cn("rounded-[30px] p-2 border-1 border-border transition-all duration-200 shadow-lg", pendingEdit ? "bg-primary/10 border-primary/20 backdrop-blur-sm" : "bg-popover")}>
                         <Tooltip>
                             <TooltipTrigger asChild>
                                 <Button
@@ -1730,7 +1806,7 @@ export default function ChatMessageInput({ attachments, setAttachments }: ChatMe
                             <TooltipContent><p>Attach Image, PDF, or Text/Code file</p><p className="text-xs text-muted-foreground text-center">Increase credits' usage</p></TooltipContent>
                         </Tooltip>
                     </div>
-                    <div className={cn("flex w-full rounded-[30px] border-1 border-border bg-popover/60 backdrop-blur-md shadow-lg px-2 py-1 items-end justify-center gap-2 transition-all duration-200", pendingEdit && "bg-primary/10 border-primary/20")}>
+                    <div className={cn("flex w-full rounded-[30px] border-1 border-border shadow-lg px-2 py-1 items-end justify-center gap-2 transition-all duration-200 z-100", pendingEdit ? "bg-primary/10 border-primary/20 backdrop-blur-md" : "bg-popover")}>
                         <input
                             type="file"
                             ref={fileInputRef}
@@ -1772,7 +1848,7 @@ export default function ChatMessageInput({ attachments, setAttachments }: ChatMe
                             <div className="flex flex-col items-center justify-center w-full py-1 gap-1.5">
                                 <WaveformAnimation analyserNode={null} isRecording={false} barCount={32} />
                                 {audioURL && (
-                                    <audio controls src={audioURL} className="h-7 w-full max-w-[240px] opacity-80" />
+                                    <audio controls src={audioURL} className="h-7 w-full max-w-[240px]" />
                                 )}
                             </div>
                         ) : (

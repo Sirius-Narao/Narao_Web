@@ -34,6 +34,7 @@ export default function HomeTab({ setIsNoteOpened, setAccessedNote }: { setIsNot
             };
             setAccessedNote(mappedNote);
             setContent(mappedNote.content || "");
+            closeTab(activeTabId!)
             openTab({ type: "note", title: mappedNote.title, noteId: mappedNote.id });
         } else if (error) {
             console.error("Error opening note:", error);

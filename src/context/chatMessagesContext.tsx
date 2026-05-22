@@ -8,12 +8,18 @@ interface ChatCacheEntry {
     inputHTML?: string;
 }
 
+export interface ChatQuote {
+    text: string;
+    sourceName: string;
+}
+
 // ── Per-tab state ─────────────────────────────────────────────────────────────
 interface TabChatState {
     chatId: string | null;
     messages: ChatMessage[];
     title: string;
     inputHTML: string;
+    quote?: ChatQuote | null;
 }
 
 interface ChatMessagesContextType {
@@ -26,6 +32,8 @@ interface ChatMessagesContextType {
     setChatTitle: Dispatch<SetStateAction<string>>;
     chatInputHTML: string;
     setChatInputHTML: (value: string | ((prev: string) => string)) => void;
+    chatQuote: ChatQuote | null;
+    setChatQuote: Dispatch<SetStateAction<ChatQuote | null>>;
 
     // ── Shared across tabs ────────────────────────────────────────────────────
     refreshTrigger: number;
@@ -90,14 +98,13 @@ function ChatMessagesProvider({ children }: { children: ReactNode }) {
     }, []);
 
     // ── Active-tab derived state (backward-compat) ────────────────────────────
-    const activeState: TabChatState = activeTabId
-        ? (tabStates[activeTabId] ?? { chatId: null, messages: [], title: "New Chat", inputHTML: "" })
-        : { chatId: null, messages: [], title: "New Chat", inputHTML: "" };
+    const activeState = activeTabId ? tabStates[activeTabId] : null;
 
-    const chatMessages = activeState.messages;
-    const currentChatId = activeState.chatId;
-    const chatTitle = activeState.title;
-    const chatInputHTML = activeState.inputHTML;
+    const chatMessages = activeState?.messages ?? [];
+    const currentChatId = activeState?.chatId ?? null;
+    const chatTitle = activeState?.title ?? "New Chat";
+    const chatInputHTML = activeState?.inputHTML ?? "";
+    const chatQuote = activeState?.quote ?? null;
 
     const setChatMessages: Dispatch<SetStateAction<ChatMessage[]>> = useCallback((value) => {
         if (!activeTabId) return;
@@ -132,10 +139,20 @@ function ChatMessagesProvider({ children }: { children: ReactNode }) {
     const setChatInputHTML = useCallback((value: string | ((prev: string) => string)) => {
         if (!activeTabId) return;
         setTabStates(prev => {
-            const existing = prev[activeTabId] ?? { chatId: null, messages: [], title: "New Chat", inputHTML: "" };
-            const next = typeof value === "function" ? value(existing.inputHTML) : value;
-            if (next === existing.inputHTML) return prev;
-            return { ...prev, [activeTabId]: { ...existing, inputHTML: next } };
+            const current = prev[activeTabId];
+            if (!current) return prev;
+            const nextValue = typeof value === "function" ? value(current.inputHTML) : value;
+            return { ...prev, [activeTabId]: { ...current, inputHTML: nextValue } };
+        });
+    }, [activeTabId]);
+
+    const setChatQuote = useCallback((value: SetStateAction<ChatQuote | null>) => {
+        if (!activeTabId) return;
+        setTabStates(prev => {
+            const current = prev[activeTabId];
+            if (!current) return prev;
+            const nextValue = typeof value === "function" ? value(current.quote || null) : value;
+            return { ...prev, [activeTabId]: { ...current, quote: nextValue } };
         });
     }, [activeTabId]);
 
@@ -170,6 +187,8 @@ function ChatMessagesProvider({ children }: { children: ReactNode }) {
         setChatTitle,
         chatInputHTML,
         setChatInputHTML,
+        chatQuote,
+        setChatQuote,
         chatCache,
         setChatCache,
         activeTabId,
@@ -184,6 +203,7 @@ function ChatMessagesProvider({ children }: { children: ReactNode }) {
         refreshTrigger, refreshChats,
         chatTitle, setChatTitle,
         chatInputHTML, setChatInputHTML,
+        chatQuote, setChatQuote,
         chatCache,
         activeTabId, setActiveTabId,
         initTabState, removeTabState, getTabState, setTabState,

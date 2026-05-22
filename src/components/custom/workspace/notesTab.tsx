@@ -495,7 +495,13 @@ export default function NotesTab({ accessedNote, setAccessedNote, initialNoteId 
                         </DropdownMenu>
                     </div>
                 </div>
-                <Editor />
+                <div 
+                    className="flex-1 overflow-hidden" 
+                    data-quote-source={accessedNote?.title || "New Note"}
+                    data-quote-type="note"
+                >
+                    <Editor />
+                </div>
                 {/* Create Note Dialog */}
                 <Dialog open={createNoteDialogOpen} onOpenChange={(open) => {
                     setCreateNoteDialogOpen(open);

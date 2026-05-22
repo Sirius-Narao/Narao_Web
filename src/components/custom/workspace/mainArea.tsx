@@ -22,6 +22,7 @@ import NotesTab from "./notesTab";
 import ChatsTab from "./chatsTab";
 import TabCard from "./tabCard";
 import HomeTab from "./homeTab";
+import { SelectionQuoteMenu } from "./selectionQuoteMenu";
 import { Kbd, KbdGroup } from "@/components/ui/kbd";
 
 export default function MainArea() {
@@ -249,6 +250,7 @@ export default function MainArea() {
 
     return (
         <SidebarInset className="bg-background">
+            <SelectionQuoteMenu />
             {/* ─── Top Toolbar / Tab Bar ─────────────────────────────────────── */}
             <div className="bg-background text-foreground h-12 w-[calc(100%-0.5rem)] rounded-lg absolute top-3 pr-1 flex items-center justify-between z-10 transition-all duration-300">
                 <div className="w-full flex justify-left gap-1 items-center">
