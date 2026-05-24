@@ -1,3 +1,5 @@
+import { Tag } from "./folderStructureTypes";
+
 export type Plan = "free" | "pro";
 export type Theme = "light" | "dark" | "system";
 export type Language = "en" | "fr" | "es" | "de" | "it" | "pt" | "zh" | "ja" | "ko" | "auto-detect";
@@ -14,4 +16,5 @@ export interface Settings {
     aiName: string;
     spellcheckLanguages: string[];
     enableTools: boolean;
+    tags: Tag[];
 }

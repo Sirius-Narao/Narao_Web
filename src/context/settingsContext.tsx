@@ -22,6 +22,8 @@ const defaultSettings: SettingsType = {
     plan: "free",
     aiName: "Narao AI",
     spellcheckLanguages: ["en-US"],
+    enableTools: true,
+    tags: [],
 };
 
 function loadSettings(): SettingsType {

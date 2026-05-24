@@ -1,5 +1,5 @@
 import type { Metadata } from "next";
-import { Alan_Sans, Fira_Mono, Old_Standard_TT } from "next/font/google";
+import { Alan_Sans, Fira_Mono, Lora } from "next/font/google";
 import "./globals.css";
 import { ThemeProvider } from "@/components/theme-provider";
 import { Toaster } from "@/components/ui/sonner";
@@ -8,6 +8,12 @@ import { Analytics } from "@vercel/analytics/next"
 
 const alanSans = Alan_Sans({
   variable: "--font-alan-sans",
+  subsets: ["latin"],
+  weight: ["400", "500", "700"],
+});
+
+const lora = Lora({
+  variable: "--font-lora",
   subsets: ["latin"],
   weight: ["400", "500", "700"],
 });
@@ -53,7 +59,7 @@ export default function RootLayout({
   return (
     <html lang="en" suppressHydrationWarning>
       <body
-        className={`${alanSans.variable} ${firaMono.variable} antialiased `}
+        className={`${alanSans.variable} ${firaMono.variable} ${lora.variable} antialiased `}
       >
         <Analytics />
         <SettingsProvider>

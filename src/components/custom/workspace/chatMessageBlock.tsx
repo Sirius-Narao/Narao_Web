@@ -1,7 +1,7 @@
 import { ChatMessage } from "@/types/chatType";
 import { MarkdownRenderer } from "./MarkdownRenderer";
 import { SelectionQuote, parseMessageQuote } from "./selectionQuote";
-import { BookOpen, Check, ChevronDown, Coins, Copy, Edit, FileImage, FileMinus, FilePen, FilePlus, FileTypeCorner, FolderMinus, FolderPlus, FolderSearch, Lightbulb, Move, Palette, PenTool, RefreshCcw, ThumbsDown, ThumbsUp, TriangleAlert, Wrench } from "lucide-react";
+import { BookOpen, Check, ChevronDown, Coins, Copy, Edit, FileImage, FileMinus, FilePen, FilePlus, FileTypeCorner, FolderMinus, FolderPlus, FolderSearch, Lightbulb, Loader2, Move, Palette, PenTool, RefreshCcw, ThumbsDown, ThumbsUp, TriangleAlert, Wrench } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { useState, useEffect } from "react";
 import { cn } from "@/lib/utils";
@@ -335,13 +335,13 @@ export default function ChatMessageBlock({ message, isFollowUp }: { message: Cha
                                     part.type === 'toolCall' ? (
                                         <ToolCallCard key={i} part={part} />
                                     ) : part.content ? (
-                                        <div 
-                                            key={i} 
+                                        <div
+                                            key={i}
                                             className="w-full max-w-[90%] p-2"
                                             data-quote-source={`Chat: ${chatTitle}`}
                                             data-quote-type="chat"
                                         >
-                                            <MarkdownRenderer content={part.content} className="text-foreground" />
+                                            <MarkdownRenderer content={part.content} className="text-foreground font-serif" />
                                         </div>
                                     ) : null
                                 )}
@@ -399,12 +399,12 @@ export default function ChatMessageBlock({ message, isFollowUp }: { message: Cha
                                         </div>
                                     </div>
                                 )}
-                                <div 
+                                <div
                                     className="flex w-full h-fit max-w-[90%] items-start"
                                     data-quote-source={`Chat: ${chatTitle}`}
                                     data-quote-type="chat"
                                 >
-                                    <MarkdownRenderer content={message.content} className="text-foreground w-full p-2" />
+                                    <MarkdownRenderer content={message.content} className="text-foreground w-full p-2 font-serif" />
                                 </div>
                                 {!isLoading && message.content.endsWith("Do you want to proceed now?") && !isFollowUp && (
                                     <div className="w-fit p-2 flex flex-row gap-2">
@@ -475,6 +475,13 @@ export default function ChatMessageBlock({ message, isFollowUp }: { message: Cha
                                     </TooltipContent>
                                 </Tooltip>
 
+                            </div>
+                        )}
+                        {chatMessages[chatMessages.length - 1]?.id === message.id && isLoading && !(chatMessages[chatMessages.length - 1]?.id === message.id && !message.content && !message.toolCalls?.length && !message.thought) && !message.isDone && (
+                            <div className="flex gap-1 items-center ml-4 mt-4">
+                                <span className="w-2 h-2 rounded-full bg-popover animate-bounce" style={{ animationDelay: '0ms' }}></span>
+                                <span className="w-2 h-2 rounded-full bg-popover animate-bounce" style={{ animationDelay: '150ms' }}></span>
+                                <span className="w-2 h-2 rounded-full bg-popover animate-bounce" style={{ animationDelay: '300ms' }}></span>
                             </div>
                         )}
                     </div>

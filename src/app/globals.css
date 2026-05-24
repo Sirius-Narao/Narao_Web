@@ -37,7 +37,7 @@
   --sidebar-border: oklch(0.9220 0 0);
   --sidebar-ring: oklch(0.7080 0 0);
   --font-sans: Alan Sans, ui-sans-serif, sans-serif, system-ui;
-  --font-serif: Alan Sans, ui-sans-serif, sans-serif, system-ui;
+  --font-serif: Lora, ui-serif, serif;
   --font-mono: Fira Mono, ui-monospace, monospace;
   --radius: 1.3rem;
   --shadow-x: 0;
@@ -113,7 +113,7 @@
   --sidebar-border: oklch(0.2750 0 0);
   --sidebar-ring: oklch(0.4390 0 0);
   --font-sans: Alan Sans, ui-sans-serif, sans-serif, system-ui;
-  --font-serif: Alan Sans, ui-sans-serif, sans-serif, system-ui;
+  --font-serif: Lora, ui-serif, serif;
   --font-mono: Fira Mono, ui-monospace, monospace;
   --radius: 1.3rem;
   --shadow-x: 0;
@@ -208,7 +208,7 @@
 
   --font-sans: Alan Sans, ui-sans-serif, sans-serif, system-ui;
   --font-mono: Fira Mono, ui-monospace, monospace;
-  --font-serif: Alan Sans, ui-sans-serif, sans-serif, system-ui;
+  --font-serif: Lora, ui-serif, serif;
 
   --radius-sm: calc(var(--radius) - 4px);
   --radius-md: calc(var(--radius) - 2px);

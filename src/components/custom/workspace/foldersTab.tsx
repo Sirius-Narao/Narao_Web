@@ -573,7 +573,7 @@ export default function FoldersTab({ accessedNote, setAccessedNote, setIsNoteOpe
                 <div className="flex items-center gap-2 absolute left-2 rounded-3xl bg-popover border border-border p-1">
                     <Tooltip>
                         <TooltipTrigger asChild>
-                            <Button variant="ghost" className={cn("w-10 h-10 p-0 rounded-full cursor-pointer", path === "/" && "opacity-50")} onClick={goBack} disabled={path === "/"}>
+                            <Button variant="ghost" className={cn("w-9 h-9 p-0 rounded-full cursor-pointer", path === "/" && "opacity-50")} onClick={goBack} disabled={path === "/"}>
                                 <MoveLeft size={24} />
                             </Button>
                         </TooltipTrigger>
@@ -586,7 +586,7 @@ export default function FoldersTab({ accessedNote, setAccessedNote, setIsNoteOpe
                     </Tooltip>
                     <Tooltip>
                         <TooltipTrigger asChild>
-                            <Button variant="ghost" className={cn("w-10 h-10 p-0 rounded-full cursor-pointer", pathHistory.length <= 2 && "opacity-50")} onClick={goForward} disabled={pathHistory.length <= 2}>
+                            <Button variant="ghost" className={cn("w-9 h-9 p-0 rounded-full cursor-pointer", pathHistory.length <= 2 && "opacity-50")} onClick={goForward} disabled={pathHistory.length <= 2}>
                                 <MoveRight size={24} />
                             </Button>
                         </TooltipTrigger>
@@ -681,7 +681,7 @@ export default function FoldersTab({ accessedNote, setAccessedNote, setIsNoteOpe
                         <Tooltip>
                             <TooltipTrigger asChild>
                                 <DropdownMenuTrigger asChild>
-                                    <Button variant="ghost" className="w-10 h-10 p-0 rounded-full cursor-pointer">
+                                    <Button variant="ghost" className="w-9 h-9 p-0 rounded-full cursor-pointer">
                                         <Plus size={24} />
                                     </Button>
                                 </DropdownMenuTrigger>
@@ -706,7 +706,7 @@ export default function FoldersTab({ accessedNote, setAccessedNote, setIsNoteOpe
                         <Tooltip>
                             <TooltipTrigger asChild>
                                 <DropdownMenuTrigger asChild>
-                                    <Button variant="ghost" className="w-10 h-10 p-0 rounded-full cursor-pointer">
+                                    <Button variant="ghost" className="w-9 h-9 p-0 rounded-full cursor-pointer">
                                         <MoreVertical size={24} />
                                     </Button>
                                 </DropdownMenuTrigger>
@@ -716,7 +716,7 @@ export default function FoldersTab({ accessedNote, setAccessedNote, setIsNoteOpe
                             </TooltipContent>
                         </Tooltip>
                         <DropdownMenuContent align="end" className="p-2">
-                            <div className="flex flex-col gap-1">
+                            <div className="flex flex-col">
                                 <Toggle aria-label="Ascending" size="sm" variant="default" className="justify-start gap-2 cursor-pointer hover:bg-accent/50 hover:text-accent-foreground" onClick={() => setSortOrder("asc")} pressed={sortOrder === "asc"}>
                                     <AArrowUp size={16} /> Ascending
                                 </Toggle>

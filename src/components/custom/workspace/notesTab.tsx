@@ -6,6 +6,7 @@ import { Note } from "@/types/folderStructureTypes";
 import { useUser } from "@/context/userContext";
 import { useContent } from "@/context/contentContext";
 import { useTabs } from "@/context/tabsContext";
+import { useSettings } from "@/context/settingsContext";
 import { toast } from "sonner";
 import { supabase } from "@/lib/supabaseClient";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
@@ -18,12 +19,13 @@ import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, D
 import { Field, FieldDescription, FieldLabel } from "@/components/ui/field";
 import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
-import { Combobox, ComboboxContent, ComboboxEmpty, ComboboxInput, ComboboxItem, ComboboxList } from "@/components/ui/combobox";
+
 import { useFetchedFolders } from "@/context/fetchedFoldersContext";
 import { EditorProvider } from "@/context/editorContext";
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from "@/components/ui/dropdown-menu";
 import { BackgroundColor } from "@tiptap/extension-text-style";
 import { cn } from "@/lib/utils";
+import { Combobox, ComboboxContent, ComboboxEmpty, ComboboxInput, ComboboxItem, ComboboxList } from "@/components/ui/combobox";
 
 interface NotesTabProps {
     accessedNote: Note | null;
@@ -42,6 +44,7 @@ export default function NotesTab({ accessedNote, setAccessedNote, initialNoteId 
     const { activeTabId, updateTabTitle, closeTab, updateTabIsSavedComplete } = useTabs();
     const { setFetchedNotes, fetchedNotes } = useFetchedNotes();
     const { fetchedFolders } = useFetchedFolders();
+    const { settings, setSettings } = useSettings();
 
     // dialog state
     const [createNoteDialogOpen, setCreateNoteDialogOpen] = useState(false);
@@ -271,16 +274,52 @@ export default function NotesTab({ accessedNote, setAccessedNote, initialNoteId 
         closeTab(activeTabId!);
     };
 
-    const handleAddTag = async () => {
-        if (!user || !accessedNote || !newTagName.trim()) return;
 
+    // Get all existing tags from settings
+    const getAllExistingTags = useCallback(() => {
+        // Return tags from settings, or empty array if none
+        return (settings.tags || []).sort((a, b) => a.name.localeCompare(b.name));
+    }, [settings.tags]);
+
+    // Get available tags (excluding ones already added to current note)
+    const getAvailableTags = useCallback(() => {
+        const currentTagNames = (accessedNote?.tags || []).map(t => t.name.toLowerCase());
+        return getAllExistingTags().filter(tag => 
+            !currentTagNames.includes(tag.name.toLowerCase())
+        );
+    }, [getAllExistingTags, accessedNote?.tags]);
+
+
+    const handleAddTag = async () => {
+        if (!user || !accessedNote || !newTagName || !newTagName.trim()) return;
+
+        const tagName = newTagName.trim();
         const currentTags = accessedNote.tags || [];
-        if (currentTags.some(t => t.name.toLowerCase() === newTagName.trim().toLowerCase())) {
-            toast.error("Tag already exists", { position: 'bottom-right' });
+        
+        if (currentTags.some(t => t.name.toLowerCase() === tagName.toLowerCase())) {
+            toast.error("Tag already added", { position: 'bottom-right' });
             return;
         }
 
-        const updatedTags = [...currentTags, { name: newTagName.trim(), color: newTagColor }];
+        // Check if tag exists in settings
+        const existingTagInSettings = (settings.tags || []).find(t => t.name.toLowerCase() === tagName.toLowerCase());
+        
+        // If tag doesn't exist in settings, add it
+        if (!existingTagInSettings) {
+            const updatedSettings = {
+                ...settings,
+                tags: [...(settings.tags || []), { name: tagName, color: newTagColor }]
+            };
+            setSettings(updatedSettings);
+            
+            // Save to Supabase
+            await supabase
+                .from('profiles')
+                .update({ settings: updatedSettings })
+                .eq('id', user.id);
+        }
+
+        const updatedTags = [...currentTags, { name: tagName, color: existingTagInSettings ? existingTagInSettings.color : newTagColor }];
 
         const { data, error } = await supabase
             .from("notes")
@@ -298,7 +337,8 @@ export default function NotesTab({ accessedNote, setAccessedNote, initialNoteId 
             setAccessedNote(updatedNote);
             setFetchedNotes(prev => prev.map(n => n.id === updatedNote.id ? updatedNote : n));
             setNewTagName("");
-            toast.info(`Added tag ${newTagName}`, { position: 'bottom-right' });
+            setNewTagColor("#3b82f6");
+            toast.info(`Added tag ${tagName}`, { position: 'bottom-right' });
         }
         if (error) console.error("Error adding tag:", error);
     };
@@ -409,8 +449,8 @@ export default function NotesTab({ accessedNote, setAccessedNote, initialNoteId 
                         {isSavedComplete ? (
                             <Tooltip>
                                 <TooltipTrigger asChild>
-                                    <Button variant="ghost" className="w-10 h-10 p-0 rounded-full disabled:opacity-50 disabled:text-muted-foreground text-primary" onClick={saveNote} disabled={content === (savedContentRef.current ?? accessedNote?.content)}>
-                                        <ArrowBigDown size={24} />
+                                    <Button variant="ghost" className="w-9 h-9 p-0 rounded-full disabled:opacity-50 disabled:text-muted-foreground text-primary" onClick={saveNote} disabled={content === (savedContentRef.current ?? accessedNote?.content)}>
+                                        <ArrowBigDown size={14} />
                                     </Button>
                                 </TooltipTrigger>
                                 <TooltipContent className="flex items-center gap-2">
@@ -425,8 +465,8 @@ export default function NotesTab({ accessedNote, setAccessedNote, initialNoteId 
                             <Tooltip>
                                 <TooltipTrigger asChild>
                                     <DropdownMenuTrigger asChild>
-                                        <Button variant="ghost" className="w-10 h-10 p-0 rounded-full text-foreground">
-                                            <MoreVertical size={24} />
+                                        <Button variant="ghost" className="w-9 h-9 p-0 rounded-full text-foreground">
+                                            <MoreVertical size={14} />
                                         </Button>
                                     </DropdownMenuTrigger>
                                 </TooltipTrigger>
@@ -435,7 +475,7 @@ export default function NotesTab({ accessedNote, setAccessedNote, initialNoteId 
                                 </TooltipContent>
                             </Tooltip>
                             <DropdownMenuContent align="end" className="w-fit h-fit rounded-lg max-w-40">
-                                <div className="flex flex-col p-2 bg-card rounded-lg border border-border hover:bg-card/70 cursor-pointer transition-all duration-100 relative" onClick={() => setIsTagsExpanded(!isTagsExpanded)}>
+                                <div className="flex flex-col p-2 bg-card rounded-lg border border-border group-dropdown hover:bg-card/70 cursor-pointer transition-all duration-100 relative" onClick={() => setIsTagsExpanded(!isTagsExpanded)}>
                                     <p className="px-1 text-muted-foreground text-sm">Tags:</p>
                                     <ChevronDown className={cn("absolute right-2.5 top-2.5 h-4 w-4 text-muted-foreground transition-transform duration-200", isTagsExpanded && "rotate-180")} />
                                     <AnimatePresence>
@@ -447,37 +487,38 @@ export default function NotesTab({ accessedNote, setAccessedNote, initialNoteId 
                                                 transition={{ duration: 0.2, ease: "easeInOut" }}
                                                 className="overflow-hidden mt-1"
                                             >
-                                                <div className="flex flex-wrap gap-1" onClick={(e) => e.stopPropagation()}>
+                                                <div className="flex flex-wrap gap-1 max-h-64 overflow-hidden relative " onClick={(e) => e.stopPropagation()}>
                                                     {fetchedNotes.find(f => f.id === accessedNote?.id)?.tags?.map((tag, i) => (
                                                         <Tooltip key={i + 'tag'} delayDuration={200}>
-                                                            <TooltipTrigger asChild>
+                                                            
                                                                 <motion.div
+                                                                    key={i}
                                                                     initial="initial"
                                                                     whileHover="hover"
-                                                                    className="rounded-lg flex items-center px-1.5 py-0.5 hover:opacity-80 cursor-pointer transition-all duration-100 overflow-hidden"
+                                                                    className="rounded-full flex items-center px-3 py-1 hover:opacity-90 transition-all group overflow-hidden h-6 relative hover:pr-7 cursor-default"
                                                                     style={{ backgroundColor: tag.color }}
-                                                                    onClick={() => handleRemoveTag(tag.name)}
                                                                 >
-                                                                    <p className={cn(handleTextTagColor(tag.color), "text-xs whitespace-nowrap")}>{tag.name}</p>
-                                                                    <motion.div
-                                                                        variants={{
-                                                                            initial: { width: 0, opacity: 0, marginLeft: 0 },
-                                                                            hover: { width: "auto", opacity: 1, marginLeft: 4 }
-                                                                        }}
-                                                                        transition={{ duration: 0.2 }}
-                                                                        className="flex items-center"
-                                                                    >
-                                                                        <Trash2 size={10} className={handleTextTagColor(tag.color)} />
-                                                                    </motion.div>
+                                                                    <span className={cn("text-xs font-medium whitespace-nowrap", handleTextTagColor(tag.color))}>
+                                                                        {tag.name}
+                                                                    </span>
+                                                                    <TooltipTrigger asChild>
+                                                                        <Button
+                                                                            variant="ghost"
+                                                                            onClick={() => handleRemoveTag(tag.name)}
+                                                                            className="absolute right-0 w-6 h-6 p-0 rounded-full opacity-0 group-hover:opacity-100 dark:hover:bg-card/60 hover:bg-secondary transition-all duration-100 scale-90 cursor-pointer"
+                                                                        >
+                                                                            <Trash2 />
+                                                                        </Button>
+                                                                    </TooltipTrigger>
+                                                                    <TooltipContent>
+                                                                        <p>{`Remove ${tag.name}`}</p>
+                                                                    </TooltipContent>
                                                                 </motion.div>
-                                                            </TooltipTrigger>
-                                                            <TooltipContent>
-                                                                <p>{`Remove ${tag.name}`}</p>
-                                                            </TooltipContent>
+                                                            
                                                         </Tooltip>
                                                     ))}
-                                                    <div className="rounded-lg flex items-center px-1 hover:opacity-80 cursor-pointer text-xs bg-popover transition-all duration-100" onClick={() => setIsTagsDialogOpen(true)}> Add <Plus size={14} /></div>
                                                 </div>
+                                                <div className="rounded-lg flex items-center px-3 py-1 hover:bg-muted cursor-pointer text-xs bg-popover transition-all duration-100 w-full items-center justify-center gap-1 mt-4" onClick={() => setIsTagsDialogOpen(true)}> Add <Plus size={14} /></div>
                                             </motion.div>
                                         )}
                                     </AnimatePresence>
@@ -565,23 +606,20 @@ export default function NotesTab({ accessedNote, setAccessedNote, initialNoteId 
                                         key={i}
                                         initial="initial"
                                         whileHover="hover"
-                                        className="rounded-full flex items-center px-3 py-1 hover:opacity-90 transition-all group cursor-pointer overflow-hidden h-6"
+                                        className="rounded-full flex items-center px-3 py-1 hover:opacity-90 transition-all group cursor-pointer overflow-hidden h-6 relative hover:pr-7"
                                         style={{ backgroundColor: tag.color }}
                                         onClick={() => handleRemoveTag(tag.name)}
                                     >
                                         <span className={cn("text-xs font-medium whitespace-nowrap", handleTextTagColor(tag.color))}>
                                             {tag.name}
                                         </span>
-                                        <motion.div
-                                            variants={{
-                                                initial: { width: 0, opacity: 0, marginLeft: 0 },
-                                                hover: { width: "auto", opacity: 1, marginLeft: 6 }
-                                            }}
-                                            transition={{ duration: 0.2 }}
-                                            className="flex items-center"
+                                        <Button
+                                            variant="ghost"
+                                            onClick={() => handleRemoveTag(tag.name)}
+                                            className="absolute right-0 w-6 h-6 p-0 rounded-full opacity-0 group-hover:opacity-100 dark:hover:bg-card/60 hover:bg-secondary transition-all duration-100 scale-90 cursor-pointer"
                                         >
-                                            <Trash2 size={12} className={handleTextTagColor(tag.color)} />
-                                        </motion.div>
+                                            <Trash2 />
+                                        </Button>
                                     </motion.div>
                                 ))}
                             </div>
@@ -589,13 +627,48 @@ export default function NotesTab({ accessedNote, setAccessedNote, initialNoteId 
                             <div className="flex flex-col gap-3">
                                 <Field className="gap-1.5">
                                     <FieldLabel>Tag Name</FieldLabel>
-                                    <Input
-                                        placeholder="Enter tag name..."
-                                        value={newTagName}
-                                        onChange={(e) => setNewTagName(e.target.value)}
-                                        onKeyDown={(e) => e.key === "Enter" && handleAddTag()}
-                                        maxLength={20}
-                                    />
+                                    <Combobox
+                                        value={newTagName || ""}
+                                        onValueChange={(value) => {
+                                            if (value === null || value === undefined) return;
+                                            setNewTagName(value);
+                                            // If selecting an existing tag, also set its color
+                                            const existingTag = getAllExistingTags().find(t => t.name === value);
+                                            if (existingTag) {
+                                                setNewTagColor(existingTag.color);
+                                            }
+                                        }}
+                                    >
+                                        <ComboboxInput
+                                            placeholder="Enter or select tag name..."
+                                            onKeyDown={(e) => {
+                                                if (e.key === "Enter") {
+                                                    e.preventDefault();
+                                                    handleAddTag();
+                                                }
+                                            }}
+                                            maxLength={20}
+                                        />
+                                        <ComboboxContent>
+                                            {getAvailableTags().length === 0 ? (
+                                                <ComboboxEmpty>No available tags</ComboboxEmpty>
+                                            ) : (
+                                                <ComboboxList>
+                                                    {getAvailableTags().map((tag) => (
+                                                        <ComboboxItem key={tag.name} value={tag.name}>
+                                                            <div className="flex items-center gap-2">
+                                                                <div 
+                                                                    className="w-3 h-3 rounded-full"
+                                                                    style={{ backgroundColor: tag.color }}
+                                                                />
+                                                                {tag.name}
+                                                            </div>
+                                                        </ComboboxItem>
+                                                    ))}
+                                                </ComboboxList>
+                                            )}
+                                        </ComboboxContent>
+                                    </Combobox>
                                 </Field>
 
                                 <Field className="gap-1.5">
@@ -636,7 +709,7 @@ export default function NotesTab({ accessedNote, setAccessedNote, initialNoteId 
 
                         <DialogFooter className="gap-2">
                             <Button variant="ghost" onClick={() => setIsTagsDialogOpen(false)}>Close</Button>
-                            <Button onClick={handleAddTag} disabled={!newTagName.trim()} style={{ backgroundColor: newTagColor }} className={handleTextTagColor(newTagColor)}>
+                            <Button onClick={handleAddTag} disabled={!newTagName.trim()} style={{ backgroundColor: newTagColor }} className={cn("hover:opacity-80", handleTextTagColor(newTagColor))}>
                                 <Plus size={16} className="mr-1" /> Add Tag
                             </Button>
                         </DialogFooter>

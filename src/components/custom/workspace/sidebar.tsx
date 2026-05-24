@@ -2,7 +2,7 @@
 
 import { Sidebar, SidebarContent, SidebarHeader, SidebarTrigger, SidebarFooter, useSidebar } from "@/components/ui/sidebar";
 import Image from "next/image";
-import { User, Settings as SettingsIcon, X, Sun, Bot, Tags, ArrowUpLeft, Coins, InboxIcon, ChevronDown, CircleOff } from "lucide-react";
+import { User, Settings as SettingsIcon, X, Sun, Bot, Tags, ArrowUpLeft, Coins, InboxIcon, ChevronDown, CircleOff, Plus, Trash2 } from "lucide-react";
 import { AnimatePresence, motion } from "framer-motion";
 import { Button } from "@/components/ui/button";
 import { cn } from "@/lib/utils";
@@ -40,6 +40,7 @@ import { Folder, Note } from "@/types/folderStructureTypes";
 import { useReviews } from "@/context/reviewContext";
 import { LanguageMultiSelect } from "./languageMultiSelect";
 import { Switch } from "@/components/ui/switch";
+import { toast } from "sonner";
 
 export default function SidebarArea() {
     const [userAuth, setUserAuth] = useState<any>(null);
@@ -70,6 +71,12 @@ export default function SidebarArea() {
     // fetched notes and folders state
     const { fetchedNotes, setFetchedNotes } = useFetchedNotes();
     const { fetchedFolders, setFetchedFolders } = useFetchedFolders();
+
+    // tags management state
+    const [newTagName, setNewTagName] = useState("");
+    const [newTagColor, setNewTagColor] = useState("#3b82f6");
+    const [isDeleteConfirmOpen, setIsDeleteConfirmOpen] = useState(false);
+    const [tagToDelete, setTagToDelete] = useState<{ name: string; color: string } | null>(null);
 
     // auth fetch
     useEffect(() => {
@@ -104,6 +111,7 @@ export default function SidebarArea() {
                 enableTools: true,
                 plan: "free",
                 aiName: "Narao AI",
+                tags: [],
             };
             setSettings(loadedSettings);
             setTempSettings(loadedSettings);
@@ -197,6 +205,129 @@ export default function SidebarArea() {
         }
         return credits;
     };
+
+    // ----------------- Helper functions for tag management ----------------- 
+    // Get all unique tags from settings with their counts from notes
+    const getAllTagsWithCounts = useCallback(() => {
+        const tagMap = new Map<string, { name: string; color: string; count: number }>();
+        
+        // First, add all tags from settings
+        if (settings.tags) {
+            settings.tags.forEach(tag => {
+                const key = tag.name.toLowerCase();
+                if (!tagMap.has(key)) {
+                    tagMap.set(key, { name: tag.name, color: tag.color, count: 0 });
+                }
+            });
+        }
+        
+        // Then, count how many notes use each tag
+        fetchedNotes.forEach(note => {
+            if (note.tags) {
+                note.tags.forEach(tag => {
+                    const key = tag.name.toLowerCase();
+                    if (tagMap.has(key)) {
+                        tagMap.get(key)!.count += 1;
+                    } else {
+                        // If a tag exists in notes but not in settings, add it
+                        tagMap.set(key, { name: tag.name, color: tag.color, count: 1 });
+                    }
+                });
+            }
+        });
+        
+        return Array.from(tagMap.values()).sort((a, b) => b.count - a.count);
+    }, [fetchedNotes, settings.tags]);
+
+    // Handle text color based on tag background color
+    const handleTextTagColor = (color: string) => {
+        const hex = color.replace("#", "");
+        const r = parseInt(hex.length === 3 ? hex[0] + hex[0] : hex.substring(0, 2), 16) || 0;
+        const g = parseInt(hex.length === 3 ? hex[1] + hex[1] : hex.substring(2, 4), 16) || 0;
+        const b = parseInt(hex.length === 3 ? hex[2] + hex[2] : hex.substring(4, 6), 16) || 0;
+        const luminance = (0.299 * r + 0.587 * g + 0.114 * b) / 255;
+        return luminance > 0.5 ? "text-black" : "text-white";
+    };
+
+    // Create a new tag and save to settings
+    const handleCreateTag = async () => {
+        if (!user || !newTagName || !newTagName.trim()) return;
+
+        // Check if tag already exists
+        const existingTags = getAllTagsWithCounts();
+        if (existingTags.some(t => t.name.toLowerCase() === newTagName.trim().toLowerCase())) {
+            toast.error("Tag already exists", { position: 'bottom-right' });
+            return;
+        }
+
+        const newTag = { name: newTagName.trim(), color: newTagColor };
+        
+        // Add the new tag to settings
+        const updatedSettings = {
+            ...settings,
+            tags: [...(settings.tags || []), newTag]
+        };
+        setSettings(updatedSettings);
+        setTempSettings(updatedSettings);
+        
+        // Save to Supabase
+        await supabase
+            .from('profiles')
+            .update({ settings: updatedSettings })
+            .eq('id', user.id);
+        
+        setNewTagName("");
+        setNewTagColor("#3b82f6");
+        toast.info(`Tag ${newTag.name} created. You can now add it to notes.`, { position: 'bottom-right' });
+    };
+
+    // Delete a tag from all notes and settings
+    const handleDeleteTag = async (tagName: string) => {
+        if (!user) return;
+
+        // Find all notes with this tag and remove it
+        const notesToUpdate = fetchedNotes.filter(note => 
+            note.tags?.some(t => t.name.toLowerCase() === tagName.toLowerCase())
+        );
+
+        for (const note of notesToUpdate) {
+            const updatedTags = note.tags!.filter(t => t.name.toLowerCase() !== tagName.toLowerCase());
+            await supabase
+                .from("notes")
+                .update({ tags: updatedTags })
+                .eq("id", note.id);
+        }
+
+        // Update local notes state
+        setFetchedNotes(prev => prev.map(note => {
+            if (note.tags?.some(t => t.name.toLowerCase() === tagName.toLowerCase())) {
+                return {
+                    ...note,
+                    tags: note.tags.filter(t => t.name.toLowerCase() !== tagName.toLowerCase())
+                };
+            }
+            return note;
+        }));
+
+        // Remove from settings
+        const updatedSettings = {
+            ...settings,
+            tags: (settings.tags || []).filter(t => t.name.toLowerCase() !== tagName.toLowerCase())
+        };
+        setSettings(updatedSettings);
+        setTempSettings(updatedSettings);
+        
+        // Save to Supabase
+        await supabase
+            .from('profiles')
+            .update({ settings: updatedSettings })
+            .eq('id', user.id);
+
+        setIsDeleteConfirmOpen(false);
+        setTagToDelete(null);
+        toast.info(`Tag ${tagName} deleted from all notes`, { position: 'bottom-right' });
+    };
+
 
     // ----------------- Helper functions for folder and note paths ----------------- 
     const getFolderPath = useCallback((folderId: string): string => {
@@ -563,11 +694,11 @@ export default function SidebarArea() {
                                 <Bot size={16} />
                                 <p className="text-sm font-medium">AI Settings</p>
                             </div>
-                            {/* <div className={cn("flex items-center justify-center w-full gap-2 p-4 py-2 rounded-lg border border-sidebar-border hover:bg-card/50 cursor-pointer transition-all duration-200 text-left justify-start ", settingsTab === 3 && "bg-card hover:bg-card")}
+                            <div className={cn("flex items-center justify-center w-full gap-2 p-4 py-2 rounded-lg border border-sidebar-border hover:bg-card/50 cursor-pointer transition-all duration-200 text-left justify-start ", settingsTab === 3 && "bg-card hover:bg-card")}
                                 onClick={() => { setSettingsTab(3) }}>
                                 <Tags size={16} />
-                                <p className="text-sm font-medium">Categories</p>
-                            </div> */}
+                                <p className="text-sm font-medium">Tags</p>
+                            </div>
                             <div className={cn("flex items-center justify-center w-full gap-2 p-4 py-2 rounded-lg border bg-card border-sidebar-border hover:bg-card/50 cursor-pointer transition-all duration-200 text-left justify-start absolute bottom-0 left-0 right-0 ")}
                                 // We want it to link to the about page
                                 onClick={() => { }}>
@@ -577,9 +708,9 @@ export default function SidebarArea() {
                         </div>
                         <div className="col-span-4 flex flex-col h-full relative px-4">
                             <DialogHeader className="border-b border-border pb-4">
-                                <DialogTitle>{settingsTab === 0 ? "Preferences" : settingsTab === 1 ? "Account" : settingsTab === 2 ? "AI Settings" : "Categories"}</DialogTitle>
+                                <DialogTitle>{settingsTab === 0 ? "Account" : settingsTab === 1 ? "Preferences" : settingsTab === 2 ? "AI Settings" : "Tags"}</DialogTitle>
                                 <DialogDescription>
-                                    {settingsTab === 0 ? "Manage your workspace preferences." : settingsTab === 1 ? "Manage your workspace account." : settingsTab === 2 ? "Manage your workspace AI settings." : "Manage your workspace categories."}
+                                    {settingsTab === 0 ? "Manage your workspace account." : settingsTab === 1 ? "Manage your workspace preferences." : settingsTab === 2 ? "Manage your workspace AI settings." : "Manage your workspace tags."}
                                 </DialogDescription>
                             </DialogHeader>
 
@@ -709,7 +840,7 @@ export default function SidebarArea() {
                                     <div className="flex flex-col gap-2 border-b border-border py-4">
                                         <p className="text-sm font-medium">AI name</p>
                                         <Input
-                                            className="w-full focus-visible:border-primary focus-visible:ring-none focus-visible:ring-[0px]! selection:bg-primary"
+                                            className="w-full"
                                             value={tempSettings.aiName}
                                             onChange={(e) => {
                                                 setTempSettings({ ...tempSettings, aiName: e.target.value });
@@ -766,7 +897,83 @@ export default function SidebarArea() {
 
                                 </div>
                             )}
+                            {settingsTab === 3 && (
+                                <div className="flex flex-col pb-6 h-[calc(100vh-250px)] sm:h-[calc(100vh-300px)] md:h-[calc(100vh-400px)] lg:h-[calc(100vh-500px)] overflow-y-auto scrollbar-hide">
+                                    <div className="flex flex-col gap-4">
+                                        {/* Create new tag section */}
+                                        <div className="flex flex-col gap-3 border-b border-border py-4">
+                                            <p className="text-sm font-medium">Create New Tag</p>
+                                            <div className="flex gap-2 items-center">
+                                                <Input
+                                                    placeholder="Tag name..."
+                                                    value={newTagName}
+                                                    onChange={(e) => setNewTagName(e.target.value)}
+                                                    onKeyDown={(e) => e.key === "Enter" && handleCreateTag()}
+                                                    maxLength={20}
+                                                    className="flex-1"
+                                                />
+                                                <Tooltip>
+                                                    <TooltipTrigger asChild>
+                                                    <div className="relative w-9 h-9 rounded-full border border-border overflow-hidden shrink-0 cursor-pointer">
+                                                        
+                                                                <input
+                                                                    type="color"
+                                                                    value={newTagColor}
+                                                                    onChange={(e) => setNewTagColor(e.target.value)}
+                                                                    className="absolute -inset-2 w-[200%] h-[200%] cursor-pointer"
+                                                                />
+                                                            
+                                                    </div>
+                                                </TooltipTrigger>
+                                                <TooltipContent>
+                                                    <p>Choose color</p>
+                                                </TooltipContent>
+                                                </Tooltip>
+                                                <Button onClick={handleCreateTag} disabled={!newTagName.trim()} style={{ backgroundColor: newTagColor }} className={cn(handleTextTagColor(newTagColor), "flex items-center gap-2 hover:opacity-80 transition-opacity")}>
+                                                    <p>Add</p>
+                                                    <Plus size={16} />
+                                                </Button>
+                                            </div>
+                                        </div>
 
+                                        {/* Tags list section */}
+                                        <div className="flex flex-col gap-3">
+                                            <p className="text-sm font-medium">Your Tags</p>
+                                            {getAllTagsWithCounts().length === 0 ? (
+                                                <p className="text-sm text-muted-foreground italic">No tags created yet.</p>
+                                            ) : (
+                                                <div className="grid grid-cols-1 gap-2">
+                                                    {getAllTagsWithCounts().map((tag) => (
+                                                        <div key={tag.name} className="flex items-center justify-between p-2 pl-4 rounded-3xl border border-border hover:bg-muted/50 transition-all">
+                                                            <div className="flex items-center gap-3">
+                                                                <div 
+                                                                    className="w-4 h-4 rounded-full"
+                                                                    style={{ backgroundColor: tag.color }}
+                                                                />
+                                                                <div className="flex flex-col">
+                                                                    <span className="text-sm font-medium">{tag.name}</span>
+                                                                    <span className="text-xs text-muted-foreground">{tag.count} note{tag.count !== 1 ? 's' : ''}</span>
+                                                                </div>
+                                                            </div>
+                                                            <Button
+                                                                variant="ghost"
+                                                                size="icon"
+                                                                onClick={() => {
+                                                                    setTagToDelete({ name: tag.name, color: tag.color });
+                                                                    setIsDeleteConfirmOpen(true);
+                                                                }}
+                                                                className="text-muted-foreground hover:text-destructive"
+                                                            >
+                                                                <Trash2 size={16} />
+                                                            </Button>
+                                                        </div>
+                                                    ))}
+                                                </div>
+                                            )}
+                                        </div>
+                                    </div>
+                                </div>
+                            )}
 
 
                             <DialogFooter className="flex items-center justify-end gap-2 p-2 absolute bottom-0 left-1/2 -translate-x-1/2 bg-card/50 backdrop-blur-sm w-fit rounded-full border">
@@ -779,7 +986,28 @@ export default function SidebarArea() {
                             </DialogFooter>
                         </div>
                     </DialogContent>
+                
+                {/* Delete tag confirmation dialog */}
+                <Dialog open={isDeleteConfirmOpen} onOpenChange={setIsDeleteConfirmOpen}>
+                    <DialogContent className="w-xl" showCloseButton={false}>
+                        <DialogHeader>
+                            <DialogTitle>Delete Tag</DialogTitle>
+                            <DialogDescription>
+                                Are you sure you want to delete the tag "{tagToDelete?.name}"? This will remove it from all notes.
+                            </DialogDescription>
+                        </DialogHeader>
+                        <DialogFooter>
+                            <Button variant="ghost" onClick={() => setIsDeleteConfirmOpen(false)}>
+                                Cancel
+                            </Button>
+                            <Button variant="destructive" onClick={() => tagToDelete && handleDeleteTag(tagToDelete.name)}>
+                                Delete
+                            </Button>
+                        </DialogFooter>
+                    </DialogContent>
                 </Dialog>
+
+</Dialog>
             </SidebarFooter>
         </Sidebar>
     );

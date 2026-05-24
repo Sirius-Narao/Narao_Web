@@ -74,7 +74,7 @@ export default function ChatMessageInput({ attachments, setAttachments }: ChatMe
     const { fetchedFolders, setFetchedFolders } = useFetchedFolders();
 
     // Model Settings+
-    const [currentModel, setCurrentModel] = useState<keyof Models>("gemini-3-flash-preview")
+    const [currentModel, setCurrentModel] = useState<keyof Models>("gemini-2.5-flash")
 
     // Popover Settings
     // const [isSelectingModelPopoverOpen, setIsSelectingModelPopoverOpen] = useState(false)
