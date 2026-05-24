@@ -39,6 +39,7 @@ import { useFetchedFolders } from "@/context/fetchedFoldersContext";
 import { Folder, Note } from "@/types/folderStructureTypes";
 import { useReviews } from "@/context/reviewContext";
 import { LanguageMultiSelect } from "./languageMultiSelect";
+import { Switch } from "@/components/ui/switch";
 
 export default function SidebarArea() {
     const [userAuth, setUserAuth] = useState<any>(null);
@@ -100,6 +101,7 @@ export default function SidebarArea() {
                     aboutUser: "",
                     customPrompt: "",
                 },
+                enableTools: true,
                 plan: "free",
                 aiName: "Narao AI",
             };
@@ -656,7 +658,7 @@ export default function SidebarArea() {
                                             </SelectContent>
                                         </Select>
                                     </div>
-                                    <div className="flex gap-2 justify-between items-center py-4">
+                                    <div className="flex gap-2 justify-between items-center py-4 border-b border-border">
                                         <div className="flex flex-col">
                                             <p className="text-sm font-medium">Default Language</p>
                                             <p className="text-xs text-muted-foreground">Check this setting for more relevant responses from the AI.</p>
@@ -716,6 +718,18 @@ export default function SidebarArea() {
                                         />
                                     </div>
 
+                                    <div className="flex flex-row items-start gap-2 py-4 justify-between border-b border-border">
+                                        <div className="flex flex-col">
+                                            <p className="text-sm font-medium">Enable tools</p>
+                                            <p className="text-xs text-muted-foreground">Give AI access to your workspace in future chat sessions. If disabled, it will reduce the amount of credits used significantly.</p>
+                                        </div>
+                                        <Switch
+                                            checked={tempSettings.enableTools}
+                                            onCheckedChange={(checked) => setTempSettings({ ...tempSettings, enableTools: checked })}
+                                        />
+
+                                    </div>
+
                                     <div className="flex flex-col gap-2 border-b border-border py-4">
                                         <div className="flex flex-col">
                                             <p className="text-sm font-medium">Custom Instructions</p>
@@ -730,6 +744,8 @@ export default function SidebarArea() {
                                             }}
                                             onBlur={() => { if (!tempSettings.customInstructions.customPrompt) setTempSettings({ ...tempSettings, customInstructions: { ...tempSettings.customInstructions, customPrompt: "" } }) }}
                                         />
+                                        <p className="text-xs text-muted-foreground">*Max 500 characters.</p>
+
                                     </div>
                                     <div className="flex flex-col gap-2 py-4">
                                         <div className="flex flex-col">
@@ -747,6 +763,7 @@ export default function SidebarArea() {
                                         />
                                         <p className="text-xs text-muted-foreground">*Max 500 characters.</p>
                                     </div>
+
                                 </div>
                             )}
 

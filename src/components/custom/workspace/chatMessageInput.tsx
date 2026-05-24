@@ -435,6 +435,7 @@ export default function ChatMessageInput({ attachments, setAttachments }: ChatMe
      *  - Text-like files  → { kind: "text",   name, text }
      *  - Images / PDFs    → { kind: "inline",  name, type, data }  (base64)
      */
+
     const fileToApiPart = (file: File): Promise<
         | { kind: "text"; name: string; text: string }
         | { kind: "inline"; name: string; type: string; data: string }
@@ -779,8 +780,8 @@ export default function ChatMessageInput({ attachments, setAttachments }: ChatMe
                     userInput: currentContent,
                     attachments: apiAttachments,
                     isThinking: isThinking,
-                    systemPrompt: systemPromptString,
-                    tools: WORKSPACE_TOOL_DECLARATIONS
+                    systemPrompt: systemPromptString + (settings.enableTools ? "" : "User has disabled tools. Do not use any tool. You can mention that tool are disabled."),
+                    tools: settings.enableTools ? WORKSPACE_TOOL_DECLARATIONS : undefined
                 }),
                 signal: controller.signal
             });

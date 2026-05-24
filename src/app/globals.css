@@ -430,6 +430,81 @@ body {
   @apply leading-relaxed pl-1;
 }
 
+/* ── Tiptap Task List / Checklists ────────────────────────────────────────── */
+
+/* Strip bullet/margin from the container — ul-level only */
+.tiptap ul[data-type="taskList"] {
+  list-style: none !important;
+  padding-left: 0 !important;
+  margin-left: 0 !important;
+  @apply my-4 space-y-1;
+}
+
+/*
+ * Layout for each task item is handled entirely by inline styles in the
+ * CustomTaskItem React NodeView — these classes only add visual decoration.
+ */
+
+/* ── Checkbox ── */
+.task-checkbox {
+  -webkit-appearance: none;
+  appearance: none;
+  accent-color: var(--primary);
+  width: 1rem;
+  height: 1rem;
+  border: 1.5px solid var(--border);
+  border-radius: 4px;
+  background-color: transparent;
+  cursor: pointer;
+  display: grid;
+  place-content: center;
+  flex-shrink: 0;
+  transition:
+    background-color 0.15s ease,
+    border-color 0.15s ease,
+    box-shadow 0.15s ease;
+}
+
+.task-checkbox:hover {
+  border-color: var(--primary);
+  background-color: color-mix(in oklch, var(--primary) 12%, transparent);
+  box-shadow: 0 0 0 3px color-mix(in oklch, var(--primary) 15%, transparent);
+}
+
+.task-checkbox:checked {
+  background-color: var(--primary);
+  border-color: var(--primary);
+}
+
+/* Checkmark drawn with clip-path */
+.task-checkbox::before {
+  content: "";
+  width: 0.5rem;
+  height: 0.5rem;
+  transform: scale(0);
+  transition: transform 0.12s cubic-bezier(0.34, 1.56, 0.64, 1);
+  clip-path: polygon(14% 44%, 0 58%, 38% 96%, 100% 16%, 84% 0%, 38% 68%);
+  background-color: var(--primary-foreground);
+}
+
+.task-checkbox:checked::before {
+  transform: scale(1);
+}
+
+/* ── Task item text content ── */
+.task-item-content {
+  flex: 1;
+  min-width: 0;
+}
+
+.task-item-content.task-item-checked {
+  text-decoration: line-through;
+  text-decoration-color: var(--muted-foreground);
+  opacity: 0.55;
+  transition: opacity 0.2s ease;
+}
+
+
 .tiptap blockquote {
   @apply my-4 pl-4 py-1 italic text-muted-foreground bg-transparent border-l-2 border-primary flex items-start;
 }

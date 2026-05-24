@@ -387,7 +387,7 @@ export default function ChatsTab({ tabId, initialChatId }: ChatsTabProps) {
                                                 }
                                                 setIsSearchOpen(false);
                                             }}>
-                                                <p className="text-sm">{chat.title.length > 20 ? chat.title.slice(0, 20).trimEnd().concat("...") : chat.title}</p>
+                                                <p className="text-sm pointer-events-none">{chat.title.length > 20 ? chat.title.slice(0, 20).trimEnd().concat("...") : chat.title}</p>
                                             </div>
                                         </TooltipTrigger>
                                         <TooltipContent side="right" sideOffset={16}>

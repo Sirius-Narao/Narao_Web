@@ -13,4 +13,5 @@ export interface Settings {
     plan: Plan;
     aiName: string;
     spellcheckLanguages: string[];
+    enableTools: boolean;
 }

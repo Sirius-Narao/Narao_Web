@@ -10,6 +10,9 @@ import StarterKit from '@tiptap/starter-kit';
 import { Markdown } from 'tiptap-markdown';
 import "katex/dist/katex.min.css";
 import Placeholder from '@tiptap/extension-placeholder';
+import { Extension, textInputRule } from '@tiptap/core';
+import TaskList from '@tiptap/extension-task-list';
+import { CustomTaskItem } from './customTaskItem';
 
 import { SpellcheckHoverMenu } from './spellcheckHoverMenu';
 import { MathAwareCodeBlock } from './mathAwareCodeBlock';
@@ -20,6 +23,34 @@ import { TableHeader } from '@tiptap/extension-table-header';
 import { TableCell } from '@tiptap/extension-table-cell';
 import { Color } from '@tiptap/extension-color';
 import { TextStyle } from '@tiptap/extension-text-style';
+
+/** Custom Tiptap extension to automatically replace markdown arrow patterns upon typing. */
+export const MarkdownArrows = Extension.create({
+    name: 'markdownArrows',
+
+    addInputRules() {
+        return [
+            // Arrows
+            textInputRule({
+                find: /->$/,
+                replace: '→',
+            }),
+            textInputRule({
+                find: /<-$/,
+                replace: '←',
+            }),
+            textInputRule({
+                find: /=>$/,
+                replace: '⇒',
+            }),
+            // Dashes — em dash must come before en dash (longer pattern first)
+            textInputRule({
+                find: /--$/,
+                replace: '—',
+            })
+        ];
+    },
+});
 
 /** Decode HTML entities in a string (e.g. &lt; → <, &gt; → >, &amp; → &) */
 const decodeHtmlEntities = (s: string) =>
@@ -124,7 +155,12 @@ export default function Editor() {
             }),
             SpellcheckExtension.configure({
                 getLanguages: () => settings.spellcheckLanguages || ['en-US'],
-            })
+            }),
+            TaskList,
+            CustomTaskItem.configure({
+                nested: true,
+            }),
+            MarkdownArrows,
         ],
         content: prepareContent(content),
         editorProps: {

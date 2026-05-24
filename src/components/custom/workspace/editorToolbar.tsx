@@ -19,6 +19,7 @@ import {
     Code2,
     List,
     ListOrdered,
+    ListTodo,
     Table,
     ChevronDown,
     Sigma,
@@ -59,6 +60,7 @@ export function EditorToolbar() {
                 isCodeBlock: e.isActive("codeBlock"),
                 isBulletList: e.isActive("bulletList"),
                 isOrderedList: e.isActive("orderedList"),
+                isTaskList: e.isActive("taskList"),
                 isTable: e.isActive("table"),
                 isH1: e.isActive("heading", { level: 1 }),
                 isH2: e.isActive("heading", { level: 2 }),
@@ -153,6 +155,13 @@ export function EditorToolbar() {
             isActive: editorState?.isOrderedList,
             action: () => editor?.chain().focus().toggleOrderedList().run(),
             shortcut: "Ctrl+Shift+7",
+        },
+        {
+            label: "Task List",
+            icon: <ListTodo size={14} />,
+            isActive: editorState?.isTaskList,
+            action: () => editor?.chain().focus().toggleTaskList().run(),
+            shortcut: "Ctrl+Shift+9",
         },
     ];
 

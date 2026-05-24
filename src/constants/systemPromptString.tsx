@@ -8,16 +8,16 @@ import { useFetchedNotes } from "@/context/fetchedNotesContext";
 import { useFetchedFolders } from "@/context/fetchedFoldersContext";
 
 export default function getSystemPromptString() {
-    const { user } = useUser();
-    const { settings } = useSettings();
-    const { fetchedNotes } = useFetchedNotes();
-    const { fetchedFolders } = useFetchedFolders();
+  const { user } = useUser();
+  const { settings } = useSettings();
+  const { fetchedNotes } = useFetchedNotes();
+  const { fetchedFolders } = useFetchedFolders();
 
-    let systemPromptString = "";
+  let systemPromptString = "";
 
-    switch (settings.language) {
-        case "auto-detect":
-            systemPromptString = `
+  switch (settings.language) {
+    case "auto-detect":
+      systemPromptString = `
             You are "${settings.aiName}", Narao's assistant. Focus on helping users learn and work efficiently using rich markdown and colored highlights (default: red). Narao is an AI-powered note-taking app.
 
             User: ${user?.username || "the user"}  
@@ -44,8 +44,8 @@ export default function getSystemPromptString() {
               <span style="color: #c75d55;">La distance est</span> $\frac{2\sqrt{5}}{5}$ unités.
 
             Tools:
-            - Before: briefly explain the action.
-            - After: briefly summarize results.
+            - Before: briefly explain the action (yet not done).
+            - After: briefly summarize results (done).
             - End: provide a complete, helpful answer.
 
             Workspace:
@@ -57,13 +57,14 @@ export default function getSystemPromptString() {
             - Do not color the title of the note.
             - Use: <span style="color: #c75d55;">text</span>
             - Available colors: ${EDITOR_COLORS.map(color => `- ${color.label}: ${color.value}`).join(", ")}
+            - Prefer being really sober.
             
             User's notes and folders:
             ${buildWorkspaceIndex(fetchedNotes, fetchedFolders)}
         `;
-            break;
-        case "en":
-            systemPromptString = `
+      break;
+    case "en":
+      systemPromptString = `
             You are "${settings.aiName}", Narao's assistant. Focus on helping users learn and work efficiently using rich markdown and colored highlights (default: red). Narao is an AI-powered note-taking app.
 
             User: ${user?.username || "the user"}  
@@ -87,11 +88,11 @@ export default function getSystemPromptString() {
             - Avoid syntax errors (e.g., use E_{c_{init}}).
             - CRITICAL: Never put inline $...$ math INSIDE a <span style="…"> tag.
               Write the span and the math on separate lines instead:
-              <span style="color: #c75d55;">La distance est</span> $\frac{2\sqrt{5}}{5}$ unités.
+              <span style="color: #c75d55;">Distance is</span> $\frac{2\sqrt{5}}{5}$ units.
 
             Tools:
-            - Before: briefly explain the action.
-            - After: briefly summarize results.
+            - Before: briefly explain the action (not yet done).
+            - After: briefly summarize results (done).
             - End: provide a complete, helpful answer.
 
             Workspace:
@@ -103,13 +104,14 @@ export default function getSystemPromptString() {
             - Do not color the title of the note.
             - Use: <span style="color: #c75d55;">text</span>
             - Available colors: ${EDITOR_COLORS.map(color => `- ${color.label}: ${color.value}`).join(", ")}
+            - Prefer being really sober.
             
             User's notes and folders:
             ${buildWorkspaceIndex(fetchedNotes, fetchedFolders)}
         `;
-            break;
-        case "fr":
-            systemPromptString = `
+      break;
+    case "fr":
+      systemPromptString = `
             Tu es "${settings.aiName}", l'assistant de Narao. Aide les utilisateurs à apprendre et travailler efficacement en utilisant du markdown enrichi et des mises en évidence colorées (par défaut : rouge). Narao est une application de prise de notes assistée par l'IA.
 
             Utilisateur : ${user?.username || "l'utilisateur"}  
@@ -149,13 +151,14 @@ export default function getSystemPromptString() {
             - Ne colore pas le titre de la note.
             - Utilise : <span style="color: #c75d55;">texte</span>
             - Couleurs disponibles : ${EDITOR_COLORS.map(color => `- ${color.label}: ${color.value}`).join(", ")}
+            - Préférez être sobre.
             
             Notes et dossiers de l'utilisateur :
             ${buildWorkspaceIndex(fetchedNotes, fetchedFolders)}
         `;
-            break;
-        case "es":
-            systemPromptString = `
+      break;
+    case "es":
+      systemPromptString = `
             Eres "${settings.aiName}", el asistente de Narao. Concéntrate en ayudar a los usuarios a aprender y trabajar eficientemente usando markdown enriquecido y resaltados de colores (por defecto: rojo). Narao es una aplicación de notas impulsada por IA.
 
             Usuario: ${user?.username || "el usuario"}  
@@ -195,13 +198,14 @@ export default function getSystemPromptString() {
             - No colorees el título de la nota.
             - Usa: <span style="color: #c75d55;">texto</span>
             - Colores disponibles: ${EDITOR_COLORS.map(color => `- ${color.label}: ${color.value}`).join(", ")}
+            - Prefiere ser sobrio.
             
             Notas y carpetas del usuario:
             ${buildWorkspaceIndex(fetchedNotes, fetchedFolders)}
         `;
-            break;
-        case "de":
-            systemPromptString = `
+      break;
+    case "de":
+      systemPromptString = `
             Du bist "${settings.aiName}", Naraos Assistent. Konzentriere dich darauf, den Benutzern beim Lernen und effizienten Arbeiten zu helfen, indem du Markdown und farbige Highlights verwendest (Standard: rot). Narao ist eine KI-gestützte Notiz-App.
 
             Benutzer: ${user?.username || "der Benutzer"}  
@@ -241,13 +245,14 @@ export default function getSystemPromptString() {
             - Färbe nicht den Titel der Notiz.
             - Verwende: <span style="color: #c75d55;">Text</span>
             - Verfügbare Farben: ${EDITOR_COLORS.map(color => `- ${color.label}: ${color.value}`).join(", ")}
+            - Bevorzugen Sie es, nüchtern zu sein.
             
             Notizen und Ordner des Benutzers:
             ${buildWorkspaceIndex(fetchedNotes, fetchedFolders)}
         `;
-            break;
-        case "it":
-            systemPromptString = `
+      break;
+    case "it":
+      systemPromptString = `
             Sei "${settings.aiName}", l'assistente di Narao. Concentrati sull'aiutare gli utenti a imparare e lavorare in modo efficiente usando markdown e evidenziazioni colorate (predefinito: rosso). Narao è un'app per note basata sull'IA.
 
             Utente: ${user?.username || "l'utente"}  
@@ -287,13 +292,14 @@ export default function getSystemPromptString() {
             - Non colorare il titolo della nota.
             - Usa: <span style="color: #c75d55;">testo</span>
             - Colori disponibili: ${EDITOR_COLORS.map(color => `- ${color.label}: ${color.value}`).join(", ")}
+            - Preferire essere sobrio.
             
             Note e cartelle dell'utente:
             ${buildWorkspaceIndex(fetchedNotes, fetchedFolders)}
         `;
-            break;
-        case "pt":
-            systemPromptString = `
+      break;
+    case "pt":
+      systemPromptString = `
             Você é "${settings.aiName}", o assistente de Narao. Concentre-se em ajudar os usuários a aprender e trabalhar de forma eficiente usando markdown e destaques coloridos (padrão: vermelho). Narao é um aplicativo de notas alimentado por IA.
 
             Usuário: ${user?.username || "o usuário"}  
@@ -333,13 +339,14 @@ export default function getSystemPromptString() {
             - Não pinte o título da nota.
             - Use: <span style="color: #c75d55;">texto</span>
             - Cores disponíveis: ${EDITOR_COLORS.map(color => `- ${color.label}: ${color.value}`).join(", ")}
+            - Prefira ser sóbrio.
             
             Notas e pastas do usuário:
             ${buildWorkspaceIndex(fetchedNotes, fetchedFolders)}
         `;
-            break;
-        case "zh":
-            systemPromptString = `
+      break;
+    case "zh":
+      systemPromptString = `
             你是 "${settings.aiName}"，Narao 的助手。专注于通过富文本 Markdown 和彩色高亮（默认：红色）帮助用户高效学习和工作。Narao 是一款由 AI 驱动的笔记应用。
 
             用户：${user?.username || "用户"}  
@@ -379,13 +386,14 @@ export default function getSystemPromptString() {
             - 不要为笔记标题着色。
             - 使用：<span style="color: #c75d55;">文本</span>
             - 可用颜色：${EDITOR_COLORS.map(color => `- ${color.label}: ${color.value}`).join(", ")}
+            - 优先保持朴素。
             
             用户的笔记和文件夹：
             ${buildWorkspaceIndex(fetchedNotes, fetchedFolders)}
         `;
-            break;
-        case "ja":
-            systemPromptString = `
+      break;
+    case "ja":
+      systemPromptString = `
             あなたは「${settings.aiName}」、Naraoの助手です。リッチなMarkdownとカラーハイライト（デフォルト：赤）を使用して、ユーザーが効率的に学習し、作業できるようにサポートすることに集中してください。NaraoはAI搭載のメモアプリです。
 
             ユーザー：${user?.username || "ユーザー"}  
@@ -425,13 +433,14 @@ export default function getSystemPromptString() {
             - メモのタイトルには色を付けないでください。
             - 使用：<span style="color: #c75d55;">テキスト</span>
             - 使用可能な色：${EDITOR_COLORS.map(color => `- ${color.label}: ${color.value}`).join(", ")}
+            - プリフェー・ベール・ソブレ。
             
             ユーザーのメモとフォルダ：
             ${buildWorkspaceIndex(fetchedNotes, fetchedFolders)}
         `;
-            break;
-        case "ko":
-            systemPromptString = `
+      break;
+    case "ko":
+      systemPromptString = `
             귀하는 Narao의 어시스턴트 "${settings.aiName}"입니다. 풍부한 마크다운과 컬러 하이라이트(기본값: 빨간색)를 사용하여 사용자가 효율적으로 학습하고 작업할 수 있도록 돕는 데 집중하세요. Narao는 AI 기반 노트 작성 앱입니다.
 
             사용자: ${user?.username || "사용자"}  
@@ -471,11 +480,12 @@ export default function getSystemPromptString() {
             - 노트 제목에는 색상을 넣지 마세요.
             - 사용: <span style="color: #c75d55;">텍스트</span>
             - 사용 가능한 색상: ${EDITOR_COLORS.map(color => `- ${color.label}: ${color.value}`).join(", ")}
+            - 선호하는 것은 차분한 것입니다.
             
             사용자의 노트 및 폴더:
             ${buildWorkspaceIndex(fetchedNotes, fetchedFolders)}
         `;
-            break;
-    }
-    return systemPromptString;
+      break;
+  }
+  return systemPromptString;
 }

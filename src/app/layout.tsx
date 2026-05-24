@@ -1,5 +1,5 @@
 import type { Metadata } from "next";
-import { Alan_Sans, Fira_Mono } from "next/font/google";
+import { Alan_Sans, Fira_Mono, Old_Standard_TT } from "next/font/google";
 import "./globals.css";
 import { ThemeProvider } from "@/components/theme-provider";
 import { Toaster } from "@/components/ui/sonner";
@@ -20,13 +20,13 @@ const firaMono = Fira_Mono({
 
 export const metadata: Metadata = {
   title: "Narao",
-  description: "Narao, the AI note-taking application that truly works along with you.",
+  description: "Narao, the AI note-taking application that helps you work and learn actively.",
   icons: {
     icon: "/favicon.ico",
   },
   openGraph: {
     title: "Narao",
-    description: "Narao, the AI note-taking application that truly works along with you.",
+    description: "Narao, the AI note-taking application that helps you work and learn actively.",
     images: [
       {
         url: "/favicon.ico",
