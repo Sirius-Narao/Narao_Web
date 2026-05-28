@@ -534,19 +534,19 @@ export default function FoldersTab({ accessedNote, setAccessedNote, setIsNoteOpe
                     {tagToDisplay.map((tag, index) => (
                         <div key={index} className="w-2 h-2 rounded-full -ml-1" style={{ backgroundColor: tag.color }}></div>
                     ))}
-                    {tags.length > 3 && <p className="text-xs text-muted-foreground pl-0.5">+{tags.length - 3}</p>}
+                    {tags.length > 3 && <p className="text-xs text-muted-foreground pl-0.5">+{tags.length - 3} Tags</p>}
                 </div>
             );
         }
 
         return (
-            <div className="flex items-center">
+            <div className="flex items-center backdrop-blur-sm">
                 {tags.map((tag, index) => (
-                    <div key={index} className="flex items-center gap-2">
-                        <div className="h-2 w-2 rounded-full group-hover:scale-110 transition-all duration-200" style={{ backgroundColor: tag.color }}></div>
-                        <p className="text-xs font-medium text-center truncate w-full px-1 mt-1">{tag.name}</p>
+                    <div key={index} className="flex items-center">
+                        <div className="h-2 w-2 rounded-full -ml-1" style={{ backgroundColor: tag.color }}></div>
                     </div>
                 ))}
+                <p className="text-xs text-muted-foreground ml-1">{tags.length} Tags</p>
             </div>
         );
     };
@@ -932,7 +932,7 @@ export default function FoldersTab({ accessedNote, setAccessedNote, setIsNoteOpe
                                                     </div>
                                                 ) : (
                                                     <div
-                                                        className="group flex flex-col items-center gap-2 p-4 hover:bg-muted/50 rounded-xl cursor-pointer w-32 h-28 justify-center transition-all duration-200 border border-transparent hover:border-sidebar-border fade-up"
+                                                        className="group flex flex-col items-center gap-2 p-4 hover:bg-muted/50 rounded-xl cursor-pointer w-32 h-28 justify-center transition-all duration-200 border border-transparent hover:border-sidebar-border fade-up overflow-hidden"
                                                         style={{ animationDelay: `${folders.length * 100 + index * 100}ms` }}
                                                         draggable
                                                         onDragStart={() => setDragItem({ type: 'note', id: note.id })}
@@ -942,7 +942,7 @@ export default function FoldersTab({ accessedNote, setAccessedNote, setIsNoteOpe
                                                     >
                                                         <FileText className="w-10 h-10 text-foreground/50 group-hover:text-foreground group-hover:scale-110 transition-all duration-200" />
                                                         <p className="text-xs font-medium text-center truncate w-full px-1 mt-1">{note.title}</p>
-                                                        {note.tags && note.tags.length > 0 && <div className="absolute top-2 right-2 border-border border rounded-full px-1 pl-2 bg-popover/60">
+                                                        {note.tags && note.tags.length > 0 && <div className="absolute -top-6 border-border border rounded-full px-1 pl-2 bg-popover/60 group-hover:top-2 group-hover:scale-120 opacity-20 group-hover:opacity-100 transition-all duration-200">
                                                             {handleDisplayTags(note.tags)}
                                                         </div>}
                                                     </div>
