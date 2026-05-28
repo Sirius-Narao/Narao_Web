@@ -569,46 +569,173 @@ export default function FoldersTab({ accessedNote, setAccessedNote, setIsNoteOpe
     return (
         <div className="relative flex flex-col gap-2 h-full">
             {/* Toolbar */}
-            <div className="flex items-center gap-2 relative w-full h-14">
-                <div className="flex items-center gap-2 absolute left-2 rounded-3xl bg-popover border border-border p-1">
-                    <Tooltip>
-                        <TooltipTrigger asChild>
-                            <Button variant="ghost" className={cn("w-9 h-9 p-0 rounded-full cursor-pointer", path === "/" && "opacity-50")} onClick={goBack} disabled={path === "/"}>
-                                <MoveLeft size={24} />
-                            </Button>
-                        </TooltipTrigger>
-                        <TooltipContent className="flex items-center gap-2">
-                            <p>Go Back</p>
-                            <KbdGroup>
-                                <Kbd className="bg-popover text-foreground">Ctrl + Z</Kbd>
-                            </KbdGroup>
-                        </TooltipContent>
-                    </Tooltip>
-                    <Tooltip>
-                        <TooltipTrigger asChild>
-                            <Button variant="ghost" className={cn("w-9 h-9 p-0 rounded-full cursor-pointer", pathHistory.length <= 2 && "opacity-50")} onClick={goForward} disabled={pathHistory.length <= 2}>
-                                <MoveRight size={24} />
-                            </Button>
-                        </TooltipTrigger>
-                        <TooltipContent className="flex items-center gap-2">
-                            <p>Go Forward</p>
-                            <KbdGroup>
-                                <Kbd className="bg-popover text-foreground">Ctrl + Shift + Z</Kbd>
-                            </KbdGroup>
-                        </TooltipContent>
-                    </Tooltip>
+            <div className="flex flex-col gap-2 relative w-full">
+                <div className="flex items-center gap-2 relative w-full h-14">
+                    <div className="flex items-center gap-2 absolute left-2 rounded-3xl bg-popover border border-border p-1">
+                        <Tooltip>
+                            <TooltipTrigger asChild>
+                                <Button variant="ghost" className={cn("w-9 h-9 p-0 rounded-full cursor-pointer", path === "/" && "opacity-50")} onClick={goBack} disabled={path === "/"}>
+                                    <MoveLeft size={24} />
+                                </Button>
+                            </TooltipTrigger>
+                            <TooltipContent className="flex items-center gap-2">
+                                <p>Go Back</p>
+                                <KbdGroup className="hidden sm:inline-flex">
+                                    <Kbd className="bg-popover text-foreground">Ctrl + Z</Kbd>
+                                </KbdGroup>
+                            </TooltipContent>
+                        </Tooltip>
+                        <Tooltip>
+                            <TooltipTrigger asChild>
+                                <Button variant="ghost" className={cn("w-9 h-9 p-0 rounded-full cursor-pointer", pathHistory.length <= 2 && "opacity-50")} onClick={goForward} disabled={pathHistory.length <= 2}>
+                                    <MoveRight size={24} />
+                                </Button>
+                            </TooltipTrigger>
+                            <TooltipContent className="flex items-center gap-2">
+                                <p>Go Forward</p>
+                                <KbdGroup className="hidden sm:inline-flex">
+                                    <Kbd className="bg-popover text-foreground">Ctrl + Shift + Z</Kbd>
+                                </KbdGroup>
+                            </TooltipContent>
+                        </Tooltip>
+                    </div>
+
+                    {/* Centered Searchbar for large screens */}
+                    <div className="hidden lg:flex absolute left-1/2 -translate-x-1/2 w-[400px]">
+                        <Popover open={searchOpen} onOpenChange={setSearchOpen}>
+                            <PopoverAnchor asChild>
+                                <div className="w-full rounded-3xl bg-popover border border-border p-1">
+                                    <InputGroup className="w-full cursor-pointer px-2 bg-transparent! border-none! shadow-none!">
+                                        <InputGroupAddon align="inline-end" className="cursor-pointer">
+                                            <InputGroupText className="cursor-pointer">
+                                                <Search size={18} />
+                                            </InputGroupText>
+                                        </InputGroupAddon>
+                                        <InputGroupInput
+                                            ref={searchInputRef}
+                                            placeholder="Search..."
+                                            className="cursor-pointer"
+                                            onChange={(e) => { setSearchOpen(true); setSearchQuery(e.target.value) }}
+                                            value={searchQuery}
+                                        />
+                                    </InputGroup>
+                                </div>
+                            </PopoverAnchor>
+                            <PopoverContent className="w-[464px] py-4 border border-border bg-card/80 backdrop-blur-md shadow-lg scrollbar-no-bg! hidden lg:block" onOpenAutoFocus={(e) => e.preventDefault()}>
+                                {searchQuery.length > 0 ? (
+                                    (() => {
+                                        const filteredFolders = fetchedFolders.filter(f => f.name.toLowerCase().includes(searchQuery.toLowerCase()));
+                                        const filteredNotes = fetchedNotes.filter(n => n.title.toLowerCase().includes(searchQuery.toLowerCase()));
+
+                                        if (filteredFolders.length === 0 && filteredNotes.length === 0) {
+                                            return (
+                                                <div className="flex flex-col items-center justify-center py-8 gap-3 text-foreground/50">
+                                                    <CircleSlash size={36} strokeWidth={1.5} />
+                                                    <div className="text-center">
+                                                        <p className="font-medium text-foreground">No matches found</p>
+                                                    </div>
+                                                </div>
+                                            );
+                                        }
+
+                                        return (
+                                            <div className="max-h-[300px] overflow-y-auto">
+                                                {filteredFolders.length > 0 && (
+                                                    <div className="mb-4">
+                                                        <p className="text-xs text-muted-foreground mb-1 px-4">Folders</p>
+                                                        {filteredFolders.map(folder => (
+                                                            <div key={folder.id} className="cursor-pointer hover:bg-foreground/10 p-2 px-4 flex items-center gap-2 rounded-lg transition-colors" onClick={() => navigateToFolderAbsolutePath(getFolderPath(folder.id))}>
+                                                                <FolderIcon size={16} className="text-primary" />
+                                                                <p className="text-sm">{folder.name}</p>
+                                                            </div>
+                                                        ))}
+                                                    </div>
+                                                )}
+                                                {filteredNotes.length > 0 && (
+                                                    <div>
+                                                        <p className="text-xs text-muted-foreground mb-1 px-4">Notes</p>
+                                                        {filteredNotes.map(note => (
+                                                            <div key={note.id} className="cursor-pointer hover:bg-foreground/10 p-2 px-4 flex items-center gap-2 rounded-lg transition-colors" onClick={() => navigateToFolderAbsolutePath(getNotePath(note.id))}>
+                                                                <FileText size={16} className="text-muted-foreground" />
+                                                                <p className="text-sm">{note.title}</p>
+                                                            </div>
+                                                        ))}
+                                                    </div>
+                                                )}
+                                            </div>
+                                        );
+                                    })()
+                                ) : (
+                                    <div className="flex items-center justify-center py-8 gap-3 text-foreground/50">
+                                        <Search size={36} strokeWidth={1.5} />
+                                        <p className="font-medium">Search folders & notes</p>
+                                    </div>
+                                )}
+                            </PopoverContent>
+                        </Popover>
+                    </div>
+
+                    <div className="absolute right-2 flex items-center gap-1 bg-popover border border-border rounded-3xl p-1">
+                        <DropdownMenu open={isDropdownCreateNewOpen} onOpenChange={setIsDropdownCreateNewOpen}>
+                            <Tooltip>
+                                <TooltipTrigger asChild>
+                                    <DropdownMenuTrigger asChild>
+                                        <Button variant="ghost" className="w-9 h-9 p-0 rounded-full cursor-pointer">
+                                            <Plus size={24} />
+                                        </Button>
+                                    </DropdownMenuTrigger>
+                                </TooltipTrigger>
+                                <TooltipContent>
+                                    <p>Create New</p>
+                                </TooltipContent>
+                            </Tooltip>
+                            <DropdownMenuContent align="end" className="p-1">
+                                <DropdownMenuItem className="gap-2 cursor-pointer group" onClick={createFolder}>
+                                    <FolderIcon size={16} className="group-hover:text-primary" /> New Folder
+                                    <KbdGroup className="ml-auto hidden sm:inline-flex"><Kbd className="bg-card text-foreground">Ctrl+Shift+N</Kbd></KbdGroup>
+                                </DropdownMenuItem>
+                                <DropdownMenuItem className="gap-2 cursor-pointer group" onClick={() => setCreateNoteDialogOpen(true)}>
+                                    <FileText size={16} className="group-hover:text-primary" /> New Note
+                                    <KbdGroup className="ml-auto hidden sm:inline-flex"><Kbd className="bg-card text-foreground">Ctrl+N</Kbd></KbdGroup>
+                                </DropdownMenuItem>
+                            </DropdownMenuContent>
+                        </DropdownMenu>
+
+                        <DropdownMenu>
+                            <Tooltip>
+                                <TooltipTrigger asChild>
+                                    <DropdownMenuTrigger asChild>
+                                        <Button variant="ghost" className="w-9 h-9 p-0 rounded-full cursor-pointer">
+                                            <MoreVertical size={24} />
+                                        </Button>
+                                    </DropdownMenuTrigger>
+                                </TooltipTrigger>
+                                <TooltipContent>
+                                    <p>Sort & More</p>
+                                </TooltipContent>
+                            </Tooltip>
+                            <DropdownMenuContent align="end" className="p-2">
+                                <div className="flex flex-col">
+                                    <Toggle aria-label="Ascending" size="sm" variant="default" className="justify-start gap-2 cursor-pointer hover:bg-accent/50 hover:text-accent-foreground" onClick={() => setSortOrder("asc")} pressed={sortOrder === "asc"}>
+                                        <AArrowUp size={16} /> Ascending
+                                    </Toggle>
+                                    <Toggle aria-label="Descending" size="sm" variant="default" className="justify-start gap-2 cursor-pointer hover:bg-accent/50 hover:text-accent-foreground" onClick={() => setSortOrder("desc")} pressed={sortOrder === "desc"}>
+                                        <AArrowDown size={16} /> Descending
+                                    </Toggle>
+                                </div>
+                            </DropdownMenuContent>
+                        </DropdownMenu>
+                    </div>
                 </div>
 
-                <div className="w-full flex justify-center ">
+                {/* Searchbar at bottom - hidden on large screens */}
+                <div className="w-full lg:hidden">
                     <Popover open={searchOpen} onOpenChange={setSearchOpen}>
-                        <PopoverAnchor asChild className="w-[40%]">
+                        <PopoverAnchor asChild className="w-[96%] md:w-[97%] absolute top-16 left-2 z-50">
                             <div className="rounded-3xl bg-popover border border-border p-1">
-                                <InputGroup className="w-[100%] cursor-pointer px-2 bg-transparent! border-none! shadow-none!">
+                                <InputGroup className="w-full cursor-pointer px-2 bg-transparent! border-none! shadow-none!">
                                     <InputGroupAddon align="inline-end" className="cursor-pointer">
                                         <InputGroupText className="cursor-pointer">
-                                            <KbdGroup>
-                                                <Kbd className="bg-card text-muted-foreground">Ctrl + Alt + K</Kbd>
-                                            </KbdGroup>
                                             <Search size={18} />
                                         </InputGroupText>
                                     </InputGroupAddon>
@@ -622,7 +749,7 @@ export default function FoldersTab({ accessedNote, setAccessedNote, setIsNoteOpe
                                 </InputGroup>
                             </div>
                         </PopoverAnchor>
-                        <PopoverContent className="md:w-[464px] w-[200px] py-4 border border-border bg-card/80 backdrop-blur-md shadow-lg scrollbar-no-bg!" onOpenAutoFocus={(e) => e.preventDefault()}>
+                        <PopoverContent className="w-80 md:w-100 py-4 border border-border bg-card/80 backdrop-blur-md shadow-lg scrollbar-no-bg! lg:hidden block" onOpenAutoFocus={(e) => e.preventDefault()}>
                             {searchQuery.length > 0 ? (
                                 (() => {
                                     const filteredFolders = fetchedFolders.filter(f => f.name.toLowerCase().includes(searchQuery.toLowerCase()));
@@ -675,65 +802,13 @@ export default function FoldersTab({ accessedNote, setAccessedNote, setIsNoteOpe
                         </PopoverContent>
                     </Popover>
                 </div>
-
-                <div className="absolute right-2 flex items-center gap-1 bg-popover border border-border rounded-3xl p-1">
-                    <DropdownMenu open={isDropdownCreateNewOpen} onOpenChange={setIsDropdownCreateNewOpen}>
-                        <Tooltip>
-                            <TooltipTrigger asChild>
-                                <DropdownMenuTrigger asChild>
-                                    <Button variant="ghost" className="w-9 h-9 p-0 rounded-full cursor-pointer">
-                                        <Plus size={24} />
-                                    </Button>
-                                </DropdownMenuTrigger>
-                            </TooltipTrigger>
-                            <TooltipContent>
-                                <p>Create New</p>
-                            </TooltipContent>
-                        </Tooltip>
-                        <DropdownMenuContent align="end" className="p-1">
-                            <DropdownMenuItem className="gap-2 cursor-pointer group" onClick={createFolder}>
-                                <FolderIcon size={16} className="group-hover:text-primary" /> New Folder
-                                <KbdGroup className="ml-auto"><Kbd className="bg-card text-foreground">Ctrl+Shift+N</Kbd></KbdGroup>
-                            </DropdownMenuItem>
-                            <DropdownMenuItem className="gap-2 cursor-pointer group" onClick={() => setCreateNoteDialogOpen(true)}>
-                                <FileText size={16} className="group-hover:text-primary" /> New Note
-                                <KbdGroup className="ml-auto"><Kbd className="bg-card text-foreground">Ctrl+N</Kbd></KbdGroup>
-                            </DropdownMenuItem>
-                        </DropdownMenuContent>
-                    </DropdownMenu>
-
-                    <DropdownMenu>
-                        <Tooltip>
-                            <TooltipTrigger asChild>
-                                <DropdownMenuTrigger asChild>
-                                    <Button variant="ghost" className="w-9 h-9 p-0 rounded-full cursor-pointer">
-                                        <MoreVertical size={24} />
-                                    </Button>
-                                </DropdownMenuTrigger>
-                            </TooltipTrigger>
-                            <TooltipContent>
-                                <p>Sort & More</p>
-                            </TooltipContent>
-                        </Tooltip>
-                        <DropdownMenuContent align="end" className="p-2">
-                            <div className="flex flex-col">
-                                <Toggle aria-label="Ascending" size="sm" variant="default" className="justify-start gap-2 cursor-pointer hover:bg-accent/50 hover:text-accent-foreground" onClick={() => setSortOrder("asc")} pressed={sortOrder === "asc"}>
-                                    <AArrowUp size={16} /> Ascending
-                                </Toggle>
-                                <Toggle aria-label="Descending" size="sm" variant="default" className="justify-start gap-2 cursor-pointer hover:bg-accent/50 hover:text-accent-foreground" onClick={() => setSortOrder("desc")} pressed={sortOrder === "desc"}>
-                                    <AArrowDown size={16} /> Descending
-                                </Toggle>
-                            </div>
-                        </DropdownMenuContent>
-                    </DropdownMenu>
-                </div>
             </div>
 
             {/* Content Area */}
             <ContextMenu>
                 <ContextMenuTrigger className="w-full flex-1 min-h-0">
                     <ScrollArea className="h-full w-full">
-                        <div className="flex flex-wrap gap-4 p-4 content-start">
+                        <div className="flex flex-wrap lg:gap-4 gap-2 lg:p-4 p-0 pt-12 justify-center md:justify-start">
                             {path !== "/" && (
                                 <div
                                     className={cn(

@@ -161,20 +161,20 @@ export default function Chat() {
                 {/* Main scrollable area container */}
                 <div className="flex-1 relative w-full h-full overflow-hidden">
                     {/* Fixed fade effects at top and bottom */}
-                    <div className="absolute top-0 left-0 w-[calc(100%-12px)] h-16 bg-gradient-to-b from-card to-transparent pointer-events-none z-20" key={"fade-top"} />
+                    <div className="absolute md:top-0 top-[-2px] left-0 md:w-[calc(100%-12px)] w-full h-16 bg-gradient-to-b from-card to-transparent pointer-events-none z-20" key={"fade-top"} />
 
                     {isLoadingChats ? (
                         <div className="flex items-center justify-center h-[60vh]">
-                            <p className="text-muted-foreground animate-pulse text-3xl font-medium">
+                            <p className="text-muted-foreground animate-pulse text-2xl md:text-3xl font-medium">
                                 {displayText.slice(0, displayText.length - 1)}
                             </p>
-                            <p className="text-primary animate-pulse text-3xl font-medium">
+                            <p className="text-primary animate-pulse text-2xl md:text-3xl font-medium">
                                 {displayText.slice(displayText.length - 1, displayText.length)}
                             </p>
                         </div>
                     ) : (
                         <div ref={scrollAreaRef} className="h-full w-full">
-                            <ScrollArea className="h-full w-full px-[12%]">
+                            <ScrollArea className="h-full w-full md:px-[12%] px-2">
                                 <div className="h-20 " key={"padding-top"}></div>
 
                                 {chatMessages.map((message, index) => (
@@ -182,8 +182,8 @@ export default function Chat() {
                                 ))}
                                 {chatMessages.length === 0 && (
                                     <div className="flex flex-col items-center justify-center h-[50vh]">
-                                        <p className="text-3xl font-medium text-muted-foreground fade-up fade-up-delay-1 text-center">Hi, I'm {settings.aiName}.</p>
-                                        <p className="text-4xl font-medium fade-up fade-up-delay-2 text-center">How can I help you today?</p>
+                                        <p className="text-2xl md:text-3xl font-medium text-muted-foreground fade-up fade-up-delay-1 text-center">Hi, I'm {settings.aiName}.</p>
+                                        <p className="text-3xl md:text-4xl font-medium fade-up fade-up-delay-2 text-center">How can I help you today?</p>
                                     </div>
                                 )}
 
@@ -208,7 +208,7 @@ export default function Chat() {
                         <ArrowDown />
                     </Button>
 
-                    <div className="absolute bottom-0 left-0 w-[calc(100%-12px)] h-32 bg-gradient-to-t from-card to-transparent pointer-events-none z-20" key={"fade-bottom"} />
+                    <div className="absolute md:bottom-0 bottom-[-1px] left-0 md:w-[calc(100%-12px)] w-full h-32 bg-gradient-to-t from-card to-transparent pointer-events-none z-20" key={"fade-bottom"} />
                 </div>
 
                 <ChatMessageInput attachments={attachments} setAttachments={setAttachments} />

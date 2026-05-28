@@ -21,6 +21,7 @@ import { InputGroup, InputGroupAddon, InputGroupInput, InputGroupText } from "@/
 import { Kbd, KbdGroup } from "@/components/ui/kbd";
 import handleSearch from "@/lib/handleSearch";
 import { useTabs } from "@/context/tabsContext";
+import { cn } from "@/lib/utils";
 
 interface ChatsTabProps {
     tabId: string;
@@ -207,7 +208,7 @@ export default function ChatsTab({ tabId, initialChatId }: ChatsTabProps) {
 
     return (
         <div className="flex flex-col h-full relative">
-            <div className="flex items-center absolute top-1 left-0 right-0 z-50 p-1 rounded-3xl w-fit bg-popover/40 backdrop-blur-md shadow-lg mx-auto ">
+            <div className="flex items-center absolute top-1 left-0 right-0 z-50 p-1 rounded-3xl w-fit bg-popover/40 backdrop-blur-md shadow-lg mx-auto max-w-[calc(100%-2rem)]">
                 {isRenamingChat ? (
                     <Input
                         value={tempChatTitle}
@@ -219,19 +220,19 @@ export default function ChatsTab({ tabId, initialChatId }: ChatsTabProps) {
                             if (e.key === "Enter") { setIsRenamingChat(false); renameChat(); }
                             if (e.key === "Escape") setIsRenamingChat(false);
                         }}
-                        className="text-center border-none shadow-none text-lg! font-medium focus-visible:ring-0 w-full bg-transparent! w-[364px]"
+                        className="text-center border-none shadow-none text-lg! font-medium focus-visible:ring-0 w-full bg-transparent! w-[364px] md:w-[364px] sm:w-[200px] xs:w-[150px] "
                     />
                 ) : currentChatId ? (
-                    <Button variant="ghost" className="text-lg p-2 rounded-3xl px-4 cursor-pointer" onClick={handleRenameChat}>{chatTitle}</Button>
+                    <Button variant="ghost" className="text-lg md:p-2 rounded-3xl md:px-4 p-2 py-1.5 cursor-pointer text-sm md:text-lg" onClick={handleRenameChat}>{chatTitle}</Button>
                 ) : (
-                    <span className="text-lg font-medium p-2 rounded-3xl px-4">New Chat</span>
+                    <span className="text-lg font-medium md:p-2 rounded-3xl md:px-4 p-2 py-1.5 text-sm md:text-lg">New Chat</span>
                 )}
             </div>
             <div className="absolute right-2 flex items-center gap-1 rounded-3xl p-1 mt-1 z-50 bg-popover/40 backdrop-blur-md shadow-lg">
                 <Tooltip>
                     <TooltipTrigger asChild>
-                        <Button variant="ghost" className="w-10 h-10 p-0 rounded-full cursor-pointer" onClick={() => handleNewChat()}>
-                            <PenSquare size={24} />
+                        <Button variant="ghost" className="w-8 h-8 md:w-10 md:h-10 p-0 rounded-full cursor-pointer" onClick={() => handleNewChat()}>
+                            <PenSquare size={14} className="md:size-4" />
                         </Button>
                     </TooltipTrigger>
                     <TooltipContent>
@@ -243,8 +244,8 @@ export default function ChatsTab({ tabId, initialChatId }: ChatsTabProps) {
                     <Tooltip>
                         <TooltipTrigger asChild>
                             <DropdownMenuTrigger asChild>
-                                <Button variant="ghost" className="w-10 h-10 p-0 rounded-full cursor-pointer">
-                                    <MoreVertical size={24} />
+                                <Button variant="ghost" className="w-8 h-8 md:w-10 md:h-10 p-0 rounded-full cursor-pointer">
+                                    <MoreVertical size={14} className="md:size-4" />
                                 </Button>
                             </DropdownMenuTrigger>
                         </TooltipTrigger>
@@ -277,14 +278,14 @@ export default function ChatsTab({ tabId, initialChatId }: ChatsTabProps) {
 
             {/* Search panel — collapses to a round button, expands on click */}
             <div
-                className="absolute top-0 left-0 z-50"
+                className="absolute top-1 left-0 z-50"
                 style={{
                     transition: "width 300ms cubic-bezier(0.34, 1.56, 0.64, 1), background 250ms ease",
-                    width: isSearchOpen ? "min(320px, 90vw)" : "2.5rem",
+                    width: isSearchOpen ? "min(280px, 85vw)" : "2.5rem",
                 }}
             >
                 {/* Collapsed: round search button */}
-                <div className="flex items-center justify-center p-1 rounded-3xl w-fit bg-popover/40 backdrop-blur-md shadow-lg absolute top-0 left-0 z-50 border border-border " style={{
+                <div className={cn("flex items-center justify-center md:p-1 p-0 rounded-3xl w-fit bg-popover/40 backdrop-blur-md shadow-lg absolute top-0 left-0 z-50 transition-all duration-300", `${isSearchOpen && "translate-y-12 md:translate-y-0"}`)} style={{
                     transition: "opacity 200ms ease, transform 200ms ease",
                     opacity: isSearchOpen ? 0 : 1,
                     pointerEvents: isSearchOpen ? "none" : "auto",
@@ -325,16 +326,16 @@ export default function ChatsTab({ tabId, initialChatId }: ChatsTabProps) {
                         transition: "opacity 250ms ease, transform 300ms cubic-bezier(0.34, 1.56, 0.64, 1)",
                         opacity: isSearchOpen ? 1 : 0,
                         pointerEvents: isSearchOpen ? "auto" : "none",
-                        transform: isSearchOpen ? "scale(1) translateY(0)" : "scale(0.92) translateY(-6px)",
+                        transform: isSearchOpen ? "scale(1) translateY(0px)" : "scale(0.92) translateY(-6px)",
                         transformOrigin: "top left",
                     }}
-                    className="flex flex-col bg-card/30 backdrop-blur-md p-2 rounded-xl shadow-xl border border-border"
+                    className={cn("flex flex-col bg-card/30 backdrop-blur-md p-2 rounded-xl shadow-xl border border-border transition-all duration-300", `${isSearchOpen && "md:translate-y-0 translate-y-12"}`)}
                 >
                     {/* Search input row */}
                     <InputGroup className="w-full shadow-md dark:bg-popover/40 bg-popover/40 backdrop-blur-md! border-border ">
                         <InputGroupAddon align="inline-end" className="cursor-pointer">
                             <InputGroupText className="bg-transparent cursor-pointer">
-                                <KbdGroup>
+                                <KbdGroup className="hidden sm:inline-flex">
                                     <Kbd className="bg-popover text-muted-foreground">Ctrl + K</Kbd>
                                 </KbdGroup>
                                 <Search size={15} />

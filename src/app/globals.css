@@ -395,23 +395,23 @@ body {
 
 /* TipTap Editor Styles matching MarkdownRenderer */
 .tiptap {
-  font-family: var(--font-sans);
+  font-family: var(--font-serif);
 }
 
 .tiptap h1 {
-  @apply my-6 text-2xl font-bold text-foreground/90 tracking-tight;
+  @apply my-6 text-xl md:text-2xl font-bold text-foreground/90 tracking-tight;
 }
 
 .tiptap h2 {
-  @apply my-5 text-xl font-semibold text-foreground/90 tracking-tight;
+  @apply my-5 text-lg md:text-xl font-semibold text-foreground/90 tracking-tight;
 }
 
 .tiptap h3 {
-  @apply my-4 text-lg font-semibold text-foreground/80 tracking-tight;
+  @apply my-4 text-base md:text-lg font-semibold text-foreground/80 tracking-tight;
 }
 
 .tiptap p {
-  @apply mb-4 last:mb-0 leading-relaxed text-foreground/95;
+  @apply mb-4 last:mb-0 leading-relaxed text-sm md:text-base text-foreground/95;
 }
 
 .tiptap a {

@@ -215,7 +215,7 @@ export function EditorToolbar() {
                     >
                         <span className="text-[11px] font-medium w-4">¶</span>
                         <span>Paragraph</span>
-                        <kbd className="ml-auto bg-card text-muted-foreground px-1.5 py-0.5 rounded text-[10px] border border-border">Ctrl+Alt+0</kbd>
+                        <kbd className="ml-auto bg-card text-muted-foreground px-1.5 py-0.5 rounded text-[10px] border border-border hidden sm:inline-block">Ctrl+Alt+0</kbd>
                     </DropdownMenuItem>
                     {headingLevels.map(h => (
                         <DropdownMenuItem
@@ -225,7 +225,7 @@ export function EditorToolbar() {
                         >
                             <span className="w-4 flex items-center justify-center">{h.icon}</span>
                             <span>{h.label}</span>
-                            <kbd className="ml-auto bg-card text-muted-foreground px-1.5 py-0.5 rounded text-[10px] border border-border">{h.shortcut}</kbd>
+                            <kbd className="ml-auto bg-card text-muted-foreground px-1.5 py-0.5 rounded text-[10px] border border-border hidden sm:inline-block">{h.shortcut}</kbd>
                         </DropdownMenuItem>
                     ))}
                 </DropdownMenuContent>
@@ -248,7 +248,7 @@ export function EditorToolbar() {
                     </TooltipTrigger>
                     <TooltipContent className="flex items-center gap-2 text-xs">
                         <span>{btn.label}</span>
-                        <kbd className="bg-card text-muted-foreground px-1.5 py-0.5 rounded text-[10px] border border-border">{btn.shortcut}</kbd>
+                        <kbd className="bg-card text-muted-foreground px-1.5 py-0.5 rounded text-[10px] border border-border hidden sm:inline-block">{btn.shortcut}</kbd>
                     </TooltipContent>
                 </Tooltip>
             ))}
@@ -270,7 +270,7 @@ export function EditorToolbar() {
                     </TooltipTrigger>
                     <TooltipContent className="flex items-center gap-2 text-xs">
                         <span>{btn.label}</span>
-                        <kbd className="bg-card text-muted-foreground px-1.5 py-0.5 rounded text-[10px] border border-border">{btn.shortcut}</kbd>
+                        <kbd className="bg-card text-muted-foreground px-1.5 py-0.5 rounded text-[10px] border border-border hidden sm:inline-block">{btn.shortcut}</kbd>
                     </TooltipContent>
                 </Tooltip>
             ))}

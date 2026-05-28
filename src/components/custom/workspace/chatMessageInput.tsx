@@ -74,7 +74,7 @@ export default function ChatMessageInput({ attachments, setAttachments }: ChatMe
     const { fetchedFolders, setFetchedFolders } = useFetchedFolders();
 
     // Model Settings+
-    const [currentModel, setCurrentModel] = useState<keyof Models>("gemini-2.5-flash")
+    const [currentModel, setCurrentModel] = useState<keyof Models>("gemini-3-flash-preview")
 
     // Popover Settings
     // const [isSelectingModelPopoverOpen, setIsSelectingModelPopoverOpen] = useState(false)
@@ -1678,7 +1678,7 @@ export default function ChatMessageInput({ attachments, setAttachments }: ChatMe
                     </div>
                 </div>
             )}
-            <div className="absolute flex flex-col w-full sm:w-[90%] lg:w-[60%] bottom-0 left-0 sm:left-[5%] lg:left-[20%] right-0 sm:right-[5%] lg:right-[20%] gap-2 z-50 px-4 sm:px-0" >
+            <div className="absolute flex flex-col w-full sm:w-full lg:w-[60%] bottom-0 left-0 sm:left-0 lg:left-[20%] right-0 sm:right-0 lg:right-[20%] gap-2 z-50 px-0 md:px-4" >
 
 
                 {/* Quote Preview */}
@@ -1959,7 +1959,7 @@ export default function ChatMessageInput({ attachments, setAttachments }: ChatMe
                                 {mentionQuery !== null && mentionSuggestions.length > 0 && (
                                     <div
                                         ref={mentionListRef}
-                                        className="mention-suggestions"
+                                        className="mention-suggestions md:w-full w-64 left-2 right-auto"
                                         role="listbox"
                                     >
                                         <p className="mention-suggestions-label">Notes &amp; Folders</p>
@@ -1986,7 +1986,7 @@ export default function ChatMessageInput({ attachments, setAttachments }: ChatMe
                                                 <span className="mention-suggestion-type">{item.type}</span>
                                             </div>
                                         ))}
-                                        <p className="mention-suggestions-hint"><kbd>Tab</kbd> to confirm · <kbd>↑↓</kbd> to navigate · <kbd>Esc</kbd> to dismiss</p>
+                                        <p className="mention-suggestions-hint"><kbd className="hidden sm:inline-block">Tab</kbd> to confirm · <kbd className="hidden sm:inline-block">↑↓</kbd> to navigate · <kbd className="hidden sm:inline-block">Esc</kbd> to dismiss</p>
                                     </div>
                                 )}
                             </div>

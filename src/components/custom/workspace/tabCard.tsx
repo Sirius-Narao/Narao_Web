@@ -107,7 +107,7 @@ export default function TabCard({ tab, index }: TabCardProps) {
                                 </Button>
                             </TooltipTrigger>
                             <TooltipContent className="dark:bg-card bg-card text-muted-foreground p-1">
-                                <KbdGroup>
+                                <KbdGroup className="hidden sm:inline-flex">
                                     <Kbd>Ctrl + N</Kbd>
                                 </KbdGroup>
                             </TooltipContent>

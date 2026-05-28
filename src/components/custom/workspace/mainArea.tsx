@@ -1,7 +1,7 @@
 'use client'
 
 import { Button } from "@/components/ui/button";
-import { SidebarInset } from "@/components/ui/sidebar";
+import { SidebarInset, SidebarTrigger } from "@/components/ui/sidebar";
 import { Tooltip, TooltipContent, TooltipTrigger } from "@/components/ui/tooltip";
 import { Folders, MessageCircle, Pen, Plus } from "lucide-react";
 import { useCallback, useEffect, useState } from "react";
@@ -249,11 +249,15 @@ export default function MainArea() {
     };
 
     return (
-        <SidebarInset className="bg-background">
+        <SidebarInset className="bg-background overflow-hidden md:overflow-auto">
             <SelectionQuoteMenu />
             {/* ─── Top Toolbar / Tab Bar ─────────────────────────────────────── */}
-            <div className="bg-background text-foreground h-12 w-[calc(100%-0.5rem)] rounded-lg absolute top-3 pr-1 flex items-center justify-between z-10 transition-all duration-300">
+            <div className="bg-background text-foreground md:h-12 h-10 md:w-[calc(100%-0.5rem)] w-[calc(100vw-3rem)] rounded-lg absolute top-2 pr-1 flex items-center justify-between z-10 transition-all duration-300">
                 <div className="w-full flex justify-left gap-1 items-center">
+                    {/* Mobile sidebar trigger */}
+                    <div className="md:hidden flex-shrink-0">
+                        <SidebarTrigger />
+                    </div>
                     {/* Tab list */}
                     <div className="flex gap-1 max-w-[calc(100%-2.5rem)] overflow-hidden flex-shrink-0">
                         {tabs.map((tab, index) => (
@@ -276,24 +280,24 @@ export default function MainArea() {
                             </TooltipContent>
                         </Tooltip>
                         <DropdownMenuContent align="start" className="p-2">
-                            <DropdownMenuItem className="group cursor-pointer relative min-w-[240px]" onClick={handleOpenFolders}>
+                            <DropdownMenuItem className="group cursor-pointer relative md:min-w-[240px] min-w-32" onClick={handleOpenFolders}>
                                 <Folders size={16} className="text-muted-foreground group-hover:text-accent-foreground" />
                                 Open Folders
-                                <KbdGroup>
+                                <KbdGroup className="hidden sm:inline-flex">
                                     <Kbd className="bg-card text-foreground absolute right-2">Ctrl + Shift + U</Kbd>
                                 </KbdGroup>
                             </DropdownMenuItem>
                             <DropdownMenuItem className="group cursor-pointer relative" onClick={handleNewNote}>
                                 <Pen size={16} className="text-muted-foreground group-hover:text-accent-foreground" />
                                 New Note
-                                <KbdGroup>
+                                <KbdGroup className="hidden sm:inline-flex">
                                     <Kbd className="bg-card text-foreground absolute right-2">Ctrl + Shift + I</Kbd>
                                 </KbdGroup>
                             </DropdownMenuItem>
                             <DropdownMenuItem className="group cursor-pointer relative" onClick={handleNewChat}>
                                 <MessageCircle size={16} className="text-muted-foreground group-hover:text-accent-foreground" />
                                 New Chat
-                                <KbdGroup>
+                                <KbdGroup className="hidden sm:inline-flex">
                                     <Kbd className="bg-card text-foreground absolute right-2">Ctrl + Shift + O</Kbd>
                                 </KbdGroup>
                             </DropdownMenuItem>
@@ -303,7 +307,7 @@ export default function MainArea() {
             </div>
 
             {/* ─── Main Content Area ─────────────────────────────────────────── */}
-            <div key={activeTab?.id} className="bg-card text-foreground h-[calc(100%-4.5rem)] w-[calc(100%-0.5rem)] rounded-lg absolute bottom-2 p-4 border border-sidebar-border overflow-hidden">
+            <div key={activeTab?.id} className="bg-card text-foreground md:h-[calc(100%-4.5rem)] h-[calc(100vh-3.5rem)] w-full md:w-[calc(100%-0.5rem)] rounded-none md:rounded-lg absolute md:bottom-2 bottom-0 p-4 border border-sidebar-border overflow-hidden">
                 {renderContent()}
             </div>
         </SidebarInset>

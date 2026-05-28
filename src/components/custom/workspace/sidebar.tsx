@@ -511,12 +511,12 @@ export default function SidebarArea() {
     return (
         <Sidebar variant="inset" className="bg-transparent">
             {/* --------------------------- Header --------------------------- */}
-            <SidebarHeader className=" px-0">
-                <header className="flex items-center p-0  group-data-[state=collapsed]:px-1">
+            <SidebarHeader className="px-0 md:pt-1">
+                <header className="flex items-center p-0 group-data-[state=collapsed]:px-1">
                     {/* Logo and Narao text */}
                     <div className={cn(
-                        "flex items-center gap-2 w-fit min-w-10 border border-sidebar-border rounded-full p-1 px-4 bg-card transition-all duration-200",
-                        "group-data-[state=collapsed]:w-10 group-data-[state=collapsed]:h-10 group-data-[state=collapsed]:p-2"
+                        "flex items-center gap-2 w-fit min-w-10 border border-sidebar-border rounded-full p-1 px-4 bg-card",
+                        "group-data-[state=collapsed]:h-10 group-data-[state=collapsed]:p-2 group-data-[state=collapsed]:opacity-0"
                     )}>
                         <Image src="/favicon.ico" alt="Logo" width={24} height={24} className="group-data-[state=collapsed]:hidden transition-all duration-200" />
                         <span className="text-xl font-bold transition-all duration-200 group-data-[state=collapsed]:hidden">
@@ -527,11 +527,11 @@ export default function SidebarArea() {
             </SidebarHeader>
             <Tooltip>
                 <TooltipTrigger asChild>
-                    <SidebarTrigger className="absolute top-4 right-3.5" />
+                    <SidebarTrigger className="absolute top-4 right-3.5 md:top-3" />
                 </TooltipTrigger>
                 <TooltipContent side="bottom" className="flex items-center gap-2">
                     <p>{state === "collapsed" ? "Open" : "Close"}</p>
-                    <KbdGroup>
+                    <KbdGroup className="hidden sm:inline-flex">
                         <Kbd className="bg-popover text-foreground">Ctrl + B</Kbd>
                     </KbdGroup>
                 </TooltipContent>
@@ -539,7 +539,7 @@ export default function SidebarArea() {
 
 
             {/* --------------------------- Content --------------------------- */}
-            <SidebarContent className=" overflow-hidden pt-[2.5px] relative justify-start">
+            <SidebarContent className="overflow-hidden pt-[2.5px] relative justify-start">
                 {/* New feature: AI reviews */}
                 {state === "collapsed" ? (
                     <Tooltip>
@@ -672,7 +672,7 @@ export default function SidebarArea() {
                         </TooltipTrigger>
                         <TooltipContent className="flex items-center gap-2">
                             <p>Settings</p>
-                            <KbdGroup>
+                            <KbdGroup className="hidden sm:inline-flex">
                                 <Kbd className="bg-popover text-foreground">Ctrl + ,</Kbd>
                             </KbdGroup>
                         </TooltipContent>

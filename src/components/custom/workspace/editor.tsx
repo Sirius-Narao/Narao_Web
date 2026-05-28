@@ -165,7 +165,7 @@ export default function Editor() {
         content: prepareContent(content),
         editorProps: {
             attributes: {
-                class: "w-full min-h-[50vh] bg-transparent border-none outline-none resize-none text-foreground text-lg leading-relaxed font-sans focus:outline-none",
+                class: "font-serif w-full min-h-[50vh] bg-transparent border-none outline-none resize-none text-foreground text-lg leading-relaxed focus:outline-none",
             },
         },
         onUpdate: ({ editor }) => {
@@ -209,14 +209,14 @@ export default function Editor() {
 
     return (
         <div className="bg-transparent w-full h-full relative">
-            <div className="absolute top-0 w-[calc(100%-2rem)] h-12 bg-gradient-to-b from-card to-transparent pointer-events-none z-50" />
-            <div className="absolute bottom-0 w-[calc(100%-2rem)] h-12 bg-gradient-to-t from-card to-transparent pointer-events-none z-50" />
+            <div className="absolute top-0 w-[calc(100%-2rem)] h-12 bg-gradient-to-b from-card to-transparent pointer-events-none z-50 md:block hidden" />
+            <div className="absolute bottom-0 w-[calc(100%-2rem)] h-12 bg-gradient-to-t from-card to-transparent pointer-events-none z-50 sm:block hidden" />
 
-            <div className="w-full h-full px-[12%] py-12 overflow-y-auto scrollbar-no-bg! pb-[50vh]">
+            <div className="w-full h-full md:px-[12%] sm:px-4 md:py-12 py-0 overflow-y-auto scrollbar-no-bg! pb-[50vh]">
                 <div className="max-w-4xl mx-auto flex flex-col gap-1 outline-none tiptap-wrapper ">
                     <EditorContent
                         editor={editor}
-                        className="w-full flex-grow max-w-none "
+                        className="w-full flex-grow max-w-none font-serif"
                     />
                 </div>
             </div>

@@ -1,6 +1,7 @@
 import { Button } from "@/components/ui/button";
 import Editor from "./editor";
 import { EditorToolbar } from "./editorToolbar";
+import { MobileEditorToolbar } from "./mobileEditorToolbar";
 import { Tooltip, TooltipContent, TooltipTrigger } from "@/components/ui/tooltip";
 import { Note } from "@/types/folderStructureTypes";
 import { useUser } from "@/context/userContext";
@@ -414,7 +415,7 @@ export default function NotesTab({ accessedNote, setAccessedNote, initialNoteId 
     return (
         <EditorProvider>
             <div className="flex flex-col relative h-full">
-                <div className="flex items-center gap-2 w-full relative p-1 sticky top-0 z-10">
+                <div className="flex items-center justify-between w-full relative p-1 sticky top-0 z-10">
                     {/* Title pill */}
                     <div className="w-fit h-fit flex items-center justify-center bg-popover rounded-3xl border border-border p-1 shrink-0">
                         <Tooltip>
@@ -429,9 +430,9 @@ export default function NotesTab({ accessedNote, setAccessedNote, initialNoteId 
                                         if (e.key === "Enter") { setIsRenamingNote(false); renameNote(); }
                                         if (e.key === "Escape") setIsRenamingNote(false);
                                     }}
-                                    className="text-center border-none shadow-none text-lg! font-medium focus-visible:ring-0 w-full bg-transparent! w-[364px]"
+                                    className="text-center border-none shadow-none text-base! md:text-lg! font-medium focus-visible:ring-0 w-full bg-transparent! w-[364px]"
                                 /> :
-                                    <Button variant="ghost" className="max-w-96 text-foreground text-lg truncate" onClick={() => { setRenamingNoteId(accessedNote?.id || null), setIsRenamingNote(true) }}>
+                                    <Button variant="ghost" className="max-w-96 text-foreground text-base md:text-lg truncate" onClick={() => { setRenamingNoteId(accessedNote?.id || null), setIsRenamingNote(true) }}>
                                         {accessedNote?.title || "New Note"}
                                     </Button>}
                             </TooltipTrigger>
@@ -439,8 +440,8 @@ export default function NotesTab({ accessedNote, setAccessedNote, initialNoteId 
                         </Tooltip>
                     </div>
 
-                    {/* Formatting toolbar — centered between title and save */}
-                    <div className="flex-1 flex justify-center">
+                    {/* Formatting toolbar — centered between title and save (hidden on mobile) */}
+                    <div className="hidden md:flex flex-1 justify-center">
                         <EditorToolbar />
                     </div>
 
@@ -455,7 +456,7 @@ export default function NotesTab({ accessedNote, setAccessedNote, initialNoteId 
                                 </TooltipTrigger>
                                 <TooltipContent className="flex items-center gap-2">
                                     <p>Save</p>
-                                    <KbdGroup><Kbd>Ctrl + S</Kbd></KbdGroup>
+                                    <KbdGroup className="hidden sm:inline-flex"><Kbd>Ctrl + S</Kbd></KbdGroup>
                                 </TooltipContent>
                             </Tooltip>
                         ) : (
@@ -536,6 +537,8 @@ export default function NotesTab({ accessedNote, setAccessedNote, initialNoteId 
                         </DropdownMenu>
                     </div>
                 </div>
+                {/* Mobile toolbar that appears above keypad */}
+                <MobileEditorToolbar />
                 <div 
                     className="flex-1 overflow-hidden" 
                     data-quote-source={accessedNote?.title || "New Note"}
