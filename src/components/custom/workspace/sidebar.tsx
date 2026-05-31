@@ -210,7 +210,7 @@ export default function SidebarArea() {
     // Get all unique tags from settings with their counts from notes
     const getAllTagsWithCounts = useCallback(() => {
         const tagMap = new Map<string, { name: string; color: string; count: number }>();
-        
+
         // First, add all tags from settings
         if (settings.tags) {
             settings.tags.forEach(tag => {
@@ -220,7 +220,7 @@ export default function SidebarArea() {
                 }
             });
         }
-        
+
         // Then, count how many notes use each tag
         fetchedNotes.forEach(note => {
             if (note.tags) {
@@ -235,7 +235,7 @@ export default function SidebarArea() {
                 });
             }
         });
-        
+
         return Array.from(tagMap.values()).sort((a, b) => b.count - a.count);
     }, [fetchedNotes, settings.tags]);
 
@@ -261,7 +261,7 @@ export default function SidebarArea() {
         }
 
         const newTag = { name: newTagName.trim(), color: newTagColor };
-        
+
         // Add the new tag to settings
         const updatedSettings = {
             ...settings,
@@ -269,13 +269,13 @@ export default function SidebarArea() {
         };
         setSettings(updatedSettings);
         setTempSettings(updatedSettings);
-        
+
         // Save to Supabase
         await supabase
             .from('profiles')
             .update({ settings: updatedSettings })
             .eq('id', user.id);
-        
+
         setNewTagName("");
         setNewTagColor("#3b82f6");
         toast.info(`Tag ${newTag.name} created. You can now add it to notes.`, { position: 'bottom-right' });
@@ -286,7 +286,7 @@ export default function SidebarArea() {
         if (!user) return;
 
         // Find all notes with this tag and remove it
-        const notesToUpdate = fetchedNotes.filter(note => 
+        const notesToUpdate = fetchedNotes.filter(note =>
             note.tags?.some(t => t.name.toLowerCase() === tagName.toLowerCase())
         );
 
@@ -316,7 +316,7 @@ export default function SidebarArea() {
         };
         setSettings(updatedSettings);
         setTempSettings(updatedSettings);
-        
+
         // Save to Supabase
         await supabase
             .from('profiles')
@@ -611,12 +611,13 @@ export default function SidebarArea() {
                 <AnimatePresence>
                     {announceFetched ? announce && showAnnounce && (
                         <motion.div
-                            initial={{ opacity: 0, y: 20 }}
-                            animate={{ opacity: 1, y: 0 }}
+                            initial={{ opacity: 0, y: 20, scale: 0.75 }}
+                            animate={{ opacity: 1, y: 0, scale: 1 }}
                             exit={{
                                 opacity: 0,
-                                y: 100,
-                                transition: { duration: 0.3, ease: "easeIn" }
+                                y: 20,
+                                scale: 0.75,
+                                transition: { duration: 0.2, ease: "easeInOut" }
                             }}
                             transition={{ type: "spring", stiffness: 300, damping: 25 }}
                             className="group-data-[state=collapsed]:hidden"
@@ -914,20 +915,20 @@ export default function SidebarArea() {
                                                 />
                                                 <Tooltip>
                                                     <TooltipTrigger asChild>
-                                                    <div className="relative w-9 h-9 rounded-full border border-border overflow-hidden shrink-0 cursor-pointer">
-                                                        
-                                                                <input
-                                                                    type="color"
-                                                                    value={newTagColor}
-                                                                    onChange={(e) => setNewTagColor(e.target.value)}
-                                                                    className="absolute -inset-2 w-[200%] h-[200%] cursor-pointer"
-                                                                />
-                                                            
-                                                    </div>
-                                                </TooltipTrigger>
-                                                <TooltipContent>
-                                                    <p>Choose color</p>
-                                                </TooltipContent>
+                                                        <div className="relative w-9 h-9 rounded-full border border-border overflow-hidden shrink-0 cursor-pointer">
+
+                                                            <input
+                                                                type="color"
+                                                                value={newTagColor}
+                                                                onChange={(e) => setNewTagColor(e.target.value)}
+                                                                className="absolute -inset-2 w-[200%] h-[200%] cursor-pointer"
+                                                            />
+
+                                                        </div>
+                                                    </TooltipTrigger>
+                                                    <TooltipContent>
+                                                        <p>Choose color</p>
+                                                    </TooltipContent>
                                                 </Tooltip>
                                                 <Button onClick={handleCreateTag} disabled={!newTagName.trim()} style={{ backgroundColor: newTagColor }} className={cn(handleTextTagColor(newTagColor), "flex items-center gap-2 hover:opacity-80 transition-opacity")}>
                                                     <p>Add</p>
@@ -946,7 +947,7 @@ export default function SidebarArea() {
                                                     {getAllTagsWithCounts().map((tag) => (
                                                         <div key={tag.name} className="flex items-center justify-between p-2 pl-4 rounded-3xl border border-border hover:bg-muted/50 transition-all">
                                                             <div className="flex items-center gap-3">
-                                                                <div 
+                                                                <div
                                                                     className="w-4 h-4 rounded-full"
                                                                     style={{ backgroundColor: tag.color }}
                                                                 />
@@ -986,28 +987,28 @@ export default function SidebarArea() {
                             </DialogFooter>
                         </div>
                     </DialogContent>
-                
-                {/* Delete tag confirmation dialog */}
-                <Dialog open={isDeleteConfirmOpen} onOpenChange={setIsDeleteConfirmOpen}>
-                    <DialogContent className="w-xl" showCloseButton={false}>
-                        <DialogHeader>
-                            <DialogTitle>Delete Tag</DialogTitle>
-                            <DialogDescription>
-                                Are you sure you want to delete the tag "{tagToDelete?.name}"? This will remove it from all notes.
-                            </DialogDescription>
-                        </DialogHeader>
-                        <DialogFooter>
-                            <Button variant="ghost" onClick={() => setIsDeleteConfirmOpen(false)}>
-                                Cancel
-                            </Button>
-                            <Button variant="destructive" onClick={() => tagToDelete && handleDeleteTag(tagToDelete.name)}>
-                                Delete
-                            </Button>
-                        </DialogFooter>
-                    </DialogContent>
-                </Dialog>
 
-</Dialog>
+                    {/* Delete tag confirmation dialog */}
+                    <Dialog open={isDeleteConfirmOpen} onOpenChange={setIsDeleteConfirmOpen}>
+                        <DialogContent className="w-xl" showCloseButton={false}>
+                            <DialogHeader>
+                                <DialogTitle>Delete Tag</DialogTitle>
+                                <DialogDescription>
+                                    Are you sure you want to delete the tag "{tagToDelete?.name}"? This will remove it from all notes.
+                                </DialogDescription>
+                            </DialogHeader>
+                            <DialogFooter>
+                                <Button variant="ghost" onClick={() => setIsDeleteConfirmOpen(false)}>
+                                    Cancel
+                                </Button>
+                                <Button variant="destructive" onClick={() => tagToDelete && handleDeleteTag(tagToDelete.name)}>
+                                    Delete
+                                </Button>
+                            </DialogFooter>
+                        </DialogContent>
+                    </Dialog>
+
+                </Dialog>
             </SidebarFooter>
         </Sidebar>
     );

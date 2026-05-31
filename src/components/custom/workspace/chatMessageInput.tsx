@@ -1,6 +1,6 @@
 import { Button } from "@/components/ui/button"
 import { Tooltip, TooltipContent, TooltipTrigger } from "@/components/ui/tooltip"
-import { ArrowUp, Edit, FileImage, FileTypeCorner, Leaf, Lightbulb, Mic, Mic2, MicOff, Plus, Square, Trash2, X, Zap, FileText, Folder } from "lucide-react"
+import { ArrowUp, Edit, FileImage, FileTypeCorner, Leaf, Lightbulb, Mic, Mic2, MicOff, Plus, Square, Trash2, X, Zap, FileText, Folder, Wrench } from "lucide-react"
 import { useState, useRef, useEffect, useCallback, useMemo, Dispatch, SetStateAction } from "react"
 import { useChatMessages } from "@/context/chatMessagesContext"
 import { ChatMessage, ChatAttachment, Models, ToolCall, MessagePart } from "@/types/chatType"
@@ -17,12 +17,13 @@ import { WORKSPACE_TOOL_DECLARATIONS, buildWorkspaceIndex, executeToolCall } fro
 import { useFetchedNotes } from "@/context/fetchedNotesContext"
 import { useFetchedFolders } from "@/context/fetchedFoldersContext"
 import { useAudioRecorder } from "@/hooks/useAudioRecorder"
-import WaveformAnimation from "@/components/custom/WaveformAnimation"
+import PremiumWaveform from "@/components/custom/PremiumWaveform"
 import { EDITOR_COLORS } from "@/constants/editorColors"
 import { useSettings } from "@/context/settingsContext"
 import getSystemPromptString from "@/constants/systemPromptString"
 import { useReviews } from "@/context/reviewContext"
 import { SelectionQuote, getSelectionQuoteMarkdown } from "./selectionQuote"
+import { Switch } from "@/components/ui/switch"
 
 // ── @mention types ──────────────────────────────────────────────────────────
 type MentionItem = { id: string; title: string; type: "note" | "folder"; path?: string; color?: string };
@@ -59,6 +60,9 @@ export default function ChatMessageInput({ attachments, setAttachments }: ChatMe
     const [recordingDuration, setRecordingDuration] = useState(0)
     const recordingTimerRef = useRef<ReturnType<typeof setInterval> | null>(null)
 
+    // Auto-attach flag: set to true when user presses ✓ during recording
+    const [pendingAutoAttach, setPendingAutoAttach] = useState(false)
+
     // ── @mention state ──────────────────────────────────────────────────────
     const [mentionQuery, setMentionQuery] = useState<string | null>(null) // null = closed
     const [mentionStart, setMentionStart] = useState<number>(-1)          // caret pos of "@"
@@ -86,7 +90,7 @@ export default function ChatMessageInput({ attachments, setAttachments }: ChatMe
     const { pendingEdit, clearEdit, pendingRegenerate, clearRegenerate, pendingQuickSend, clearQuickSend } = useEditMessage()
 
     // settings context
-    const { settings } = useSettings();
+    const { settings, setSettings } = useSettings();
 
     // review context
     const { reviews, setReviews } = useReviews();
@@ -276,7 +280,9 @@ export default function ChatMessageInput({ attachments, setAttachments }: ChatMe
     }
     const handleMicToggle = async () => {
         if (isRecording) {
-            stopRecording()
+            // Stop and discard the recording
+            resetRecording()
+            setRecordingDuration(0)
         } else if (hasRecording) {
             // Discard existing recording and start fresh
             resetRecording()
@@ -286,24 +292,28 @@ export default function ChatMessageInput({ attachments, setAttachments }: ChatMe
         }
     }
     const handleDiscardRecording = () => {
+        setPendingAutoAttach(false)
         resetRecording()
         setRecordingDuration(0)
     }
-    const handleSendRecording = async () => {
-        if (!user || !audioBlob) return
-        const result = await uploadRecording(user.id)
-        if (!result) {
-            toast.error("Failed to upload voice recording", { position: "bottom-right" })
-            return
-        }
-        // Create a synthetic File from the blob to re-use the existing attachment flow
-        const ext = audioBlob.type.includes("mp4") ? "mp4" : "webm"
-        const file = new File([audioBlob], `voice-${Date.now()}.${ext}`, { type: audioBlob.type })
+    const handleSendRecording = useCallback(async (blob: Blob) => {
+        if (!user) return
+        const ext = blob.type.includes("mp4") ? "mp4" : "webm"
+        // Attach optimistically as a local File
+        const file = new File([blob], `voice-${Date.now()}.${ext}`, { type: blob.type })
         setAttachments(prev => [...prev, file])
         resetRecording()
         setRecordingDuration(0)
         toast.success("Voice note attached!", { position: "bottom-right", duration: 2000 })
-    }
+    }, [user, resetRecording, setAttachments])
+
+    // Auto-attach: fires as soon as MediaRecorder's onstop delivers the blob
+    useEffect(() => {
+        if (pendingAutoAttach && audioBlob) {
+            setPendingAutoAttach(false)
+            handleSendRecording(audioBlob)
+        }
+    }, [pendingAutoAttach, audioBlob, handleSendRecording])
 
     // When an edit is requested: just populate the input and focus.
     // Deletion happens only when the user actually sends.
@@ -1791,23 +1801,11 @@ export default function ChatMessageInput({ attachments, setAttachments }: ChatMe
                 }
 
                 < div className="flex gap-2 items-center items-end pb-1" >
-                    <div className={cn("rounded-[30px] p-2 border-1 border-border transition-all duration-200 shadow-lg", pendingEdit ? "bg-primary/10 border-primary/20 backdrop-blur-sm" : "bg-popover")}>
-                        <Tooltip>
-                            <TooltipTrigger asChild>
-                                <Button
-                                    variant="ghost"
-                                    size="icon"
-                                    className="h-10 w-10 rounded-full"
-                                    disabled={attachments.length >= 3}
-                                    onClick={() => { if (attachments.length < 3) fileInputRef.current?.click(); else toast.error("Maximum 3 attachments allowed", { position: "bottom-right", duration: 1000 }) }}
-                                >
-                                    <Plus />
-                                </Button>
-                            </TooltipTrigger>
-                            <TooltipContent><p>Attach Image, PDF, or Text/Code file</p><p className="text-xs text-muted-foreground text-center">Increase credits' usage</p></TooltipContent>
-                        </Tooltip>
-                    </div>
-                    <div className={cn("flex w-full rounded-[30px] border-1 border-border shadow-lg px-2 py-1 items-end justify-center gap-2 transition-all duration-200 z-100", pendingEdit ? "bg-primary/10 border-primary/20 backdrop-blur-md" : "bg-popover")}>
+                    <div className={cn(
+                        "flex w-full rounded-[30px] border-1 border-border shadow-lg px-2 py-1 justify-center gap-2 transition-all duration-200 z-100",
+                        (isRecording || hasRecording) ? "items-center h-[50px]" : "items-end",
+                        pendingEdit ? "bg-primary/10 border-primary/20 backdrop-blur-md" : "bg-popover"
+                    )}>
                         <input
                             type="file"
                             ref={fileInputRef}
@@ -1819,270 +1817,318 @@ export default function ChatMessageInput({ attachments, setAttachments }: ChatMe
                                 e.target.value = "";
                             }}
                         />
-                        <div className="flex items-center pb-1 gap-1">
 
-                            <Tooltip>
-                                <TooltipTrigger asChild>
-                                    <Button
-                                        variant="ghost"
-                                        size="icon"
-                                        className="h-10 w-10 rounded-full"
-                                        onClick={() => setIsThinking(!isThinking)}
-                                    >
-                                        <Lightbulb className={isThinking ? "text-primary transition-all duration-100" : "text-foreground transition-all duration-100"} />
-                                    </Button>
-                                </TooltipTrigger>
-                                <TooltipContent>
-                                    <p>Think Deeper</p>
-                                    <p className="text-xs text-muted-foreground">Improved reasoning, higher latency</p>
-                                </TooltipContent>
-                            </Tooltip>
-                        </div>
-                        {isRecording ? (
-                            <div className="flex flex-col items-center justify-center w-full py-1 gap-1">
-                                <WaveformAnimation analyserNode={analyserNode} isRecording={isRecording} barCount={32} />
-                                <span className="text-xs text-destructive font-mono font-semibold animate-pulse">
-                                    {formatDuration(recordingDuration)}
-                                </span>
-                            </div>
-                        ) : hasRecording ? (
-                            <div className="flex flex-col items-center justify-center w-full py-1 gap-1.5">
-                                <WaveformAnimation analyserNode={null} isRecording={false} barCount={32} />
-                                {audioURL && (
-                                    <audio controls src={audioURL} className="h-7 w-full max-w-[240px]" />
-                                )}
+                        {/* No review mode — audio is auto-attached on stop */}
+
+                        {(isRecording || hasRecording) ? (
+                            <div className="flex items-center justify-between w-full h-[40px] px-2 animate-in fade-in zoom-in-95 duration-200">
+                                {/* Left: Subdued Plus button/icon */}
+                                <Button
+                                    type="button"
+                                    variant="ghost"
+                                    size="icon"
+                                    className="h-10 w-10 rounded-full text-muted-foreground/30 hover:bg-transparent cursor-not-allowed flex-shrink-0"
+                                    disabled
+                                >
+                                    <Plus size={20} />
+                                </Button>
+
+                                {/* Center: Premium Waveform Animation & Timer */}
+                                <div className="flex items-center flex-grow min-w-0 mx-2">
+                                    {/* Premium Waveform Animation */}
+                                    <div className="flex items-center gap-3 flex-shrink-0">
+                                        {/* Timer (subtle and premium) */}
+                                        <span className="text-xs font-mono font-medium text-muted-foreground bg-muted/40 dark:bg-muted/10 px-2 py-0.5 rounded-full select-none">
+                                            {formatDuration(recordingDuration)}
+                                        </span>
+
+                                        {/* Elegant Waveform Container */}
+                                        <div className="flex-grow flex items-center justify-center h-[40px] px-2">
+                                            <PremiumWaveform
+                                                analyserNode={analyserNode}
+                                                isRecording={isRecording}
+                                                barCount={40}
+                                            />
+                                        </div>
+                                    </div>
+                                </div>
+
+                                {/* Right: Cancel (X) and Confirm/Submit (✓) buttons */}
+                                <div className="flex items-center gap-1.5 flex-shrink-0">
+                                    {/* Discard Recording */}
+                                    <Tooltip>
+                                        <TooltipTrigger asChild>
+                                            <Button
+                                                type="button"
+                                                variant="ghost"
+                                                size="icon"
+                                                onClick={handleDiscardRecording}
+                                                className="h-10 w-10 rounded-full text-muted-foreground hover:text-destructive hover:bg-destructive/10 transition-colors"
+                                            >
+                                                <X size={20} />
+                                            </Button>
+                                        </TooltipTrigger>
+                                        <TooltipContent>
+                                            <p>Discard recording</p>
+                                        </TooltipContent>
+                                    </Tooltip>
+
+                                    {/* Stop & Auto-Attach Recording */}
+                                    <Tooltip>
+                                        <TooltipTrigger asChild>
+                                            <Button
+                                                type="button"
+                                                variant="default"
+                                                size="icon"
+                                                onClick={() => {
+                                                    setPendingAutoAttach(true)
+                                                    stopRecording()
+                                                }}
+                                                className="h-10 w-10 rounded-full flex items-center justify-center transition-all shadow-md bg-primary text-primary-foreground hover:bg-primary/95"
+                                            >
+                                                <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
+                                                    <path d="M20 6 9 17l-5-5" />
+                                                </svg>
+                                            </Button>
+                                        </TooltipTrigger>
+                                        <TooltipContent>
+                                            <p>Stop &amp; attach voice note</p>
+                                        </TooltipContent>
+                                    </Tooltip>
+                                </div>
                             </div>
                         ) : (
-                            <div className="relative w-full">
-                                {/* Single contenteditable div — no mirror needed */}
-                                <div
-                                    ref={editorRef}
-                                    contentEditable
-                                    suppressContentEditableWarning
-                                    role="textbox"
-                                    aria-multiline="true"
-                                    aria-label={`Ask ${settings.aiName} anything...`}
-                                    data-placeholder={`Ask ${settings.aiName} anything...`}
-                                    className="mention-editor w-full focus:outline-none outline-none scrollbar-no-bg"
-                                    onInput={(e) => {
-                                        const el = e.currentTarget
-                                        const walk = (node: Node): string => {
-                                            if (node.nodeType === Node.TEXT_NODE) return node.textContent ?? ""
-                                            if ((node as Element).tagName === "BR") return "\n"
-                                            // For mention-token spans, return their text as-is
-                                            if ((node as HTMLElement).classList?.contains("mention-token")) return node.textContent ?? ""
-                                            return Array.from(node.childNodes).map(walk).join("")
-                                        }
-                                        const text = walk(el)
-                                        setContent(text)
-                                        setChatInputHTML(el.innerHTML) // Sync HTML structure for persistence (chips)
-
-                                        // Detect @mention trigger using caret offset
-                                        const sel = window.getSelection()
-                                        if (!sel || sel.rangeCount === 0) return
-                                        const range = sel.getRangeAt(0).cloneRange()
-                                        range.selectNodeContents(el)
-                                        range.setEnd(sel.getRangeAt(0).endContainer, sel.getRangeAt(0).endOffset)
-                                        const caretOffset = range.toString().length
-
-                                        const slice = text.slice(0, caretOffset)
-                                        const match = slice.match(/@([\w\s.-]*)$/)
-                                        if (match) {
-                                            const atPos = caretOffset - match[0].length
-                                            setMentionStart(atPos)
-                                            setMentionQuery(match[1])
-                                        } else {
-                                            closeMention()
-                                        }
-                                    }}
-                                    onKeyDown={(e) => {
-                                        // @mention navigation
-                                        if (mentionQuery !== null && mentionSuggestions.length > 0) {
-                                            if (e.key === "ArrowDown") {
-                                                e.preventDefault()
-                                                setMentionIndex(i => (i + 1) % mentionSuggestions.length)
-                                                return
-                                            }
-                                            if (e.key === "ArrowUp") {
-                                                e.preventDefault()
-                                                setMentionIndex(i => (i - 1 + mentionSuggestions.length) % mentionSuggestions.length)
-                                                return
-                                            }
-                                            if (e.key === "Tab" || e.key === "Enter") {
-                                                e.preventDefault()
-                                                confirmMention(mentionSuggestions[mentionIndex])
-                                                return
-                                            }
-                                            if (e.key === "Escape") {
-                                                e.preventDefault()
-                                                closeMention()
-                                                return
-                                            }
-                                        }
-
-                                        if (e.key === "Enter" && !e.shiftKey) {
-                                            e.preventDefault()
-                                            handleSend()
-                                            return
-                                        }
-                                        // Shift+Enter inserts a newline naturally
-                                    }}
-                                    onBlur={() => {
-                                        // Brief delay so click on suggestion registers first
-                                        setTimeout(() => closeMention(), 150)
-                                    }}
-                                    onPaste={(e) => {
-                                        // Strip HTML on paste — insert plain text only
-                                        e.preventDefault()
-                                        const text = e.clipboardData.getData("text/plain")
-                                        document.execCommand("insertText", false, text)
-                                    }}
-                                    onClick={(e) => {
-                                        // Event delegation for mention-tokens (restored from innerHTML)
-                                        const target = e.target as HTMLElement
-                                        const chip = target.closest(".mention-token") as HTMLElement
-                                        if (chip) {
-                                            const id = chip.dataset.mentionId
-                                            const type = chip.dataset.mentionType
-                                            const title = chip.textContent?.slice(1) || "Item"
-                                            if (id && type) {
-                                                if (type === "note") {
-                                                    openTab({ type: "note", title, noteId: id })
-                                                } else if (type === "folder") {
-                                                    openTab({ type: "folder", title, location: chip.dataset.path || "/" })
-                                                }
-                                            }
-                                        }
-                                    }}
-                                />
-                                {/* @mention suggestion dropdown */}
-                                {mentionQuery !== null && mentionSuggestions.length > 0 && (
-                                    <div
-                                        ref={mentionListRef}
-                                        className="mention-suggestions md:w-full w-64 left-2 right-auto"
-                                        role="listbox"
-                                    >
-                                        <p className="mention-suggestions-label">Notes &amp; Folders</p>
-                                        {mentionSuggestions.map((item, idx) => (
-                                            <div
-                                                key={item.id}
-                                                role="option"
-                                                aria-selected={idx === mentionIndex}
-                                                className={cn(
-                                                    "mention-suggestion-item",
-                                                    idx === mentionIndex && "mention-suggestion-item--active"
-                                                )}
-                                                onMouseDown={(e) => {
-                                                    e.preventDefault() // prevent blur
-                                                    confirmMention(item)
-                                                }}
-                                                onMouseEnter={() => setMentionIndex(idx)}
-                                            >
-                                                {item.type === "note"
-                                                    ? <FileText size={13} className="mention-suggestion-icon mention-suggestion-icon--note" />
-                                                    : <Folder size={13} className="mention-suggestion-icon mention-suggestion-icon--folder" />
-                                                }
-                                                <span className="mention-suggestion-title">{item.title}</span>
-                                                <span className="mention-suggestion-type">{item.type}</span>
+                            <>
+                                <div className="pb-1">
+                                    <Popover>
+                                        <Tooltip>
+                                            <TooltipTrigger asChild>
+                                                <PopoverTrigger asChild>
+                                                    <Button
+                                                        variant="ghost"
+                                                        size="icon"
+                                                        className="h-10 w-10 rounded-full"
+                                                        disabled={attachments.length >= 3}
+                                                    >
+                                                        <Plus />
+                                                    </Button>
+                                                </PopoverTrigger>
+                                            </TooltipTrigger>
+                                            <TooltipContent><p>Add files and more</p></TooltipContent>
+                                        </Tooltip>
+                                        <PopoverContent className="p-1 w-56" align="start" alignOffset={-10} sideOffset={16}>
+                                            <div className="flex flex-col items-start">
+                                                <Button
+                                                    variant="ghost"
+                                                    className="h-full w-full rounded-lg justify-start items-center text-left"
+                                                    onClick={() => { if (attachments.length < 3) fileInputRef.current?.click(); else toast.error("Maximum 3 attachments allowed", { position: "bottom-right", duration: 1000 }) }}
+                                                >
+                                                    <Plus />
+                                                    <span>Add Attachment</span>
+                                                </Button>
+                                                <div className="h-px bg-border w-[85%] mx-auto my-1"></div>
+                                                <div
+                                                    className="h-full w-full rounded-lg justify-between items-center text-left flex gap-2 hover:bg-accent hover:text-accent-foreground dark:hover:bg-accent/50 py-2 px-3 cursor-pointer"
+                                                    onClick={(e: React.MouseEvent<HTMLDivElement>) => { e.stopPropagation(); setIsThinking(!isThinking) }}
+                                                >
+                                                    <div className="flex items-center gap-2">
+                                                        <Lightbulb className="w-4 h-4" />
+                                                        <span className="text-sm font-medium">Think Longer</span>
+                                                    </div>
+                                                    <Switch
+                                                        checked={isThinking}
+                                                    />
+                                                </div>
+                                                <div
+                                                    className="h-full w-full rounded-lg justify-between items-center text-left flex gap-2 hover:bg-accent hover:text-accent-foreground dark:hover:bg-accent/50 py-2 px-3 cursor-pointer"
+                                                    onClick={(e: React.MouseEvent<HTMLDivElement>) => { e.stopPropagation(); setSettings({ ...settings, enableTools: !settings.enableTools }) }}
+                                                >
+                                                    <div className="flex items-center gap-2">
+                                                        <Wrench className="w-4 h-4" />
+                                                        <span className="text-sm font-medium">Enable Tools</span>
+                                                    </div>
+                                                    <Switch
+                                                        checked={settings.enableTools}
+                                                    />
+                                                </div>
                                             </div>
-                                        ))}
-                                        <p className="mention-suggestions-hint"><kbd className="hidden sm:inline-block">Tab</kbd> to confirm · <kbd className="hidden sm:inline-block">↑↓</kbd> to navigate · <kbd className="hidden sm:inline-block">Esc</kbd> to dismiss</p>
-                                    </div>
-                                )}
-                            </div>
-                        )}
-                        <div className="flex items-center pb-1 gap-1">
-                            {/* <Popover open={isSelectingModelPopoverOpen}>
-                            <Tooltip>
-                                <TooltipTrigger asChild>
-                                    <PopoverTrigger asChild>
-                                        <Button
-                                            variant="ghost"
-                                            className="rounded-full"
-                                            onClick={() => setIsSelectingModelPopoverOpen(!isSelectingModelPopoverOpen)}
-                                        >
-                                            <p className="text-xs">{models[currentModel]}</p>
-                                        </Button>
-                                    </PopoverTrigger>
-                                </TooltipTrigger>
-                                <TooltipContent><p>Choose Model</p></TooltipContent>
-                            </Tooltip>
-                            <PopoverContent className="w-fit rounded-full p-2">
-                                <div className="flex gap-2">
-                                    <p className="text-xs">Choose Model</p>
-                                    <div className="w-full h-[1px] bg-foreground/10"></div>
-                                    {(Object.keys(models) as Array<keyof Models>).map((model) => (
-                                        <div key={model}>
-                                            <Button
-                                                variant="outline"
-                                                className="rounded-full"
-                                                onClick={() => {
-                                                    setCurrentModel(model)
-                                                    setIsSelectingModelPopoverOpen(false)
-                                                }}
-                                            >
-                                                {model === "gemini-2.5-flash" && <Zap className="" />}
-                                                {model === "gemini-3-flash-preview" && <Lightbulb className="" />}
-                                                {model === "gemini-3.1-flash-lite-preview" && <Leaf className="" />}
-                                                <p className="text-xs">{models[model]}</p>
-                                            </Button>
-                                        </div>
-                                    ))}
+                                        </PopoverContent>
+                                    </Popover>
                                 </div>
-                            </PopoverContent>
-                        </Popover> */}
-                            {hasRecording && (
-                                <Tooltip>
-                                    <TooltipTrigger asChild>
-                                        <Button
-                                            variant="ghost"
-                                            size="icon"
-                                            className="h-10 w-10 rounded-full text-destructive hover:text-destructive"
-                                            onClick={handleDiscardRecording}
+                                <div className="relative w-full">
+                                    {/* Single contenteditable div — no mirror needed */}
+                                    <div
+                                        ref={editorRef}
+                                        contentEditable
+                                        suppressContentEditableWarning
+                                        role="textbox"
+                                        aria-multiline="true"
+                                        aria-label={`Ask ${settings.aiName} anything...`}
+                                        data-placeholder={`Ask ${settings.aiName} anything...`}
+                                        className="mention-editor w-full focus:outline-none outline-none scrollbar-no-bg"
+                                        onInput={(e) => {
+                                            const el = e.currentTarget
+                                            const walk = (node: Node): string => {
+                                                if (node.nodeType === Node.TEXT_NODE) return node.textContent ?? ""
+                                                if ((node as Element).tagName === "BR") return "\n"
+                                                // For mention-token spans, return their text as-is
+                                                if ((node as HTMLElement).classList?.contains("mention-token")) return node.textContent ?? ""
+                                                return Array.from(node.childNodes).map(walk).join("")
+                                            }
+                                            const text = walk(el)
+                                            setContent(text)
+                                            setChatInputHTML(el.innerHTML) // Sync HTML structure for persistence (chips)
+
+                                            // Detect @mention trigger using caret offset
+                                            const sel = window.getSelection()
+                                            if (!sel || sel.rangeCount === 0) return
+                                            const range = sel.getRangeAt(0).cloneRange()
+                                            range.selectNodeContents(el)
+                                            range.setEnd(sel.getRangeAt(0).endContainer, sel.getRangeAt(0).endOffset)
+                                            const caretOffset = range.toString().length
+
+                                            const slice = text.slice(0, caretOffset)
+                                            const match = slice.match(/@([\w\s.-]*)$/)
+                                            if (match) {
+                                                const atPos = caretOffset - match[0].length
+                                                setMentionStart(atPos)
+                                                setMentionQuery(match[1])
+                                            } else {
+                                                closeMention()
+                                            }
+                                        }}
+                                        onKeyDown={(e) => {
+                                            // @mention navigation
+                                            if (mentionQuery !== null && mentionSuggestions.length > 0) {
+                                                if (e.key === "ArrowDown") {
+                                                    e.preventDefault()
+                                                    setMentionIndex(i => (i + 1) % mentionSuggestions.length)
+                                                    return
+                                                }
+                                                if (e.key === "ArrowUp") {
+                                                    e.preventDefault()
+                                                    setMentionIndex(i => (i - 1 + mentionSuggestions.length) % mentionSuggestions.length)
+                                                    return
+                                                }
+                                                if (e.key === "Tab" || e.key === "Enter") {
+                                                    e.preventDefault()
+                                                    confirmMention(mentionSuggestions[mentionIndex])
+                                                    return
+                                                }
+                                                if (e.key === "Escape") {
+                                                    e.preventDefault()
+                                                    closeMention()
+                                                    return
+                                                }
+                                            }
+
+                                            if (e.key === "Enter" && !e.shiftKey) {
+                                                e.preventDefault()
+                                                handleSend()
+                                                return
+                                            }
+                                            // Shift+Enter inserts a newline naturally
+                                        }}
+                                        onBlur={() => {
+                                            // Brief delay so click on suggestion registers first
+                                            setTimeout(() => closeMention(), 150)
+                                        }}
+                                        onPaste={(e) => {
+                                            // Strip HTML on paste — insert plain text only
+                                            e.preventDefault()
+                                            const text = e.clipboardData.getData("text/plain")
+                                            document.execCommand("insertText", false, text)
+                                        }}
+                                        onClick={(e) => {
+                                            // Event delegation for mention-tokens (restored from innerHTML)
+                                            const target = e.target as HTMLElement
+                                            const chip = target.closest(".mention-token") as HTMLElement
+                                            if (chip) {
+                                                const id = chip.dataset.mentionId
+                                                const type = chip.dataset.mentionType
+                                                const title = chip.textContent?.slice(1) || "Item"
+                                                if (id && type) {
+                                                    if (type === "note") {
+                                                        openTab({ type: "note", title, noteId: id })
+                                                    } else if (type === "folder") {
+                                                        openTab({ type: "folder", title, location: chip.dataset.path || "/" })
+                                                    }
+                                                }
+                                            }
+                                        }}
+                                    />
+                                    {/* @mention suggestion dropdown */}
+                                    {mentionQuery !== null && mentionSuggestions.length > 0 && (
+                                        <div
+                                            ref={mentionListRef}
+                                            className="mention-suggestions md:w-full w-64 left-2 right-auto"
+                                            role="listbox"
                                         >
-                                            <Trash2 size={18} />
-                                        </Button>
-                                    </TooltipTrigger>
-                                    <TooltipContent><p>Discard recording</p></TooltipContent>
-                                </Tooltip>
-                            )}
-                            <Tooltip>
-                                <TooltipTrigger asChild>
-                                    <Button
-                                        variant={isRecording ? "destructive" : "ghost"}
-                                        size="icon"
-                                        className={cn(
-                                            "h-10 w-10 rounded-full transition-all duration-200",
-                                            isRecording && "animate-pulse shadow-lg shadow-destructive/40"
-                                        )}
-                                        onClick={handleMicToggle}
-                                    >
-                                        {isRecording ? <MicOff size={18} /> : <Mic size={18} />}
-                                    </Button>
-                                </TooltipTrigger>
-                                <TooltipContent>
-                                    <p>{isRecording ? "Stop recording" : hasRecording ? "Re-record" : "Voice note"}</p>
-                                </TooltipContent>
-                            </Tooltip>
-                            <Tooltip>
-                                <TooltipTrigger asChild>
-                                    <Button
-                                        variant="default"
-                                        size="icon"
-                                        onClick={() => hasRecording ? handleSendRecording() : isLoading ? handleStop() : handleSend()}
-                                        disabled={(!hasRecording && !isLoading && content.trim().length === 0 && attachments.length === 0) || user?.credits_left === 0}
-                                        className="h-10 w-10 rounded-full p-0 flex items-center justify-center"
-                                    >
-                                        {isLoading && !hasRecording ? (
-                                            <Square size={20} className="fill-current" />
-                                        ) : (
-                                            <ArrowUp size={20} />
-                                        )}
-                                    </Button>
-                                </TooltipTrigger>
-                                <TooltipContent><p>{hasRecording ? "Send voice note" : isLoading ? "Stop generating" : "Send Message"}</p></TooltipContent>
-                            </Tooltip>
-                        </div>
+                                            <p className="mention-suggestions-label">Notes &amp; Folders</p>
+                                            {mentionSuggestions.map((item, idx) => (
+                                                <div
+                                                    key={item.id}
+                                                    role="option"
+                                                    aria-selected={idx === mentionIndex}
+                                                    className={cn(
+                                                        "mention-suggestion-item",
+                                                        idx === mentionIndex && "mention-suggestion-item--active"
+                                                    )}
+                                                    onMouseDown={(e) => {
+                                                        e.preventDefault() // prevent blur
+                                                        confirmMention(item)
+                                                    }}
+                                                    onMouseEnter={() => setMentionIndex(idx)}
+                                                >
+                                                    {item.type === "note"
+                                                        ? <FileText size={13} className="mention-suggestion-icon mention-suggestion-icon--note" />
+                                                        : <Folder size={13} className="mention-suggestion-icon mention-suggestion-icon--folder" />
+                                                    }
+                                                    <span className="mention-suggestion-title">{item.title}</span>
+                                                    <span className="mention-suggestion-type">{item.type}</span>
+                                                </div>
+                                            ))}
+                                            <p className="mention-suggestions-hint"><kbd className="hidden sm:inline-block">Tab</kbd> to confirm · <kbd className="hidden sm:inline-block">↑↓</kbd> to navigate · <kbd className="hidden sm:inline-block">Esc</kbd> to dismiss</p>
+                                        </div>
+                                    )}
+                                </div>
+                                <div className="flex items-center pb-1 gap-1">
+                                    <Tooltip>
+                                        <TooltipTrigger asChild>
+                                            <Button
+                                                variant="ghost"
+                                                size="icon"
+                                                className="h-10 w-10 rounded-full transition-all duration-200 hover:text-destructive hover:bg-transparent dark:hover:bg-transparent"
+                                                // onClick={handleMicToggle}
+                                            >
+                                                <MicOff size={18} />
+                                            </Button>
+                                        </TooltipTrigger>
+                                        <TooltipContent>
+                                            <p>Voice note coming soon</p>
+                                        </TooltipContent>
+                                    </Tooltip>
+                                    <Tooltip>
+                                        <TooltipTrigger asChild>
+                                            <Button
+                                                variant="default"
+                                                size="icon"
+                                                onClick={() => isLoading ? handleStop() : handleSend()}
+                                                disabled={(!isLoading && content.trim().length === 0 && attachments.length === 0) || user?.credits_left === 0}
+                                                className="h-10 w-10 rounded-full p-0 flex items-center justify-center"
+                                            >
+                                                {isLoading ? (
+                                                    <Square size={20} className="fill-current" />
+                                                ) : (
+                                                    <ArrowUp size={20} />
+                                                )}
+                                            </Button>
+                                        </TooltipTrigger>
+                                        <TooltipContent><p>{isLoading ? "Stop generating" : "Send Message"}</p></TooltipContent>
+                                    </Tooltip>
+                                </div>
+                            </>
+                        )}
                     </div>
                 </div >
             </div >

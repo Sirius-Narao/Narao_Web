@@ -530,7 +530,7 @@ export default function FoldersTab({ accessedNote, setAccessedNote, setIsNoteOpe
         if (tags.length > 3) {
             const tagToDisplay = tags.slice(0, 3);
             return (
-                <div className="flex items-center">
+                <div className="flex items-center backdrop-blur-sm">
                     {tagToDisplay.map((tag, index) => (
                         <div key={index} className="w-2 h-2 rounded-full -ml-1" style={{ backgroundColor: tag.color }}></div>
                     ))}

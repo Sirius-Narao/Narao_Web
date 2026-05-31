@@ -8,9 +8,9 @@ import { useUser } from "@/context/userContext";
 import { supabase } from "@/lib/supabaseClient";
 import { useContent } from "@/context/contentContext";
 import { Skeleton } from "@/components/ui/skeleton";
+import HomeChatMessageInput from "./homeChatMessageInput";
 
 export default function HomeTab({ setIsNoteOpened, setAccessedNote }: { setIsNoteOpened: (value: boolean) => void, setAccessedNote: (value: Note) => void }) {
-    const headingText = useTypingTextAnimation(["Hey, what would you like to do? ", "Anything to learn or create? ", "Or just a simple chat? ", "I'm getting bored... "], 5000);
     const { openTab, closeTab, activeTabId } = useTabs();
     const { user } = useUser();
     const { setContent } = useContent();
@@ -46,9 +46,12 @@ export default function HomeTab({ setIsNoteOpened, setAccessedNote }: { setIsNot
         if (fetchedNotes.length === 0) return <p className="text-lg font-medium whitespace-pre text-muted-foreground">No notes found</p>;
         const notes = [...fetchedNotes].sort((a, b) => b.updatedAt.getTime() - a.updatedAt.getTime()).slice(0, 5);
         return notes.map((note, index) => (
-            <div key={note.id} className="flex items-center gap-2 cursor-pointer fade-up bg-muted-foreground/10 hover:bg-muted-foreground/20 rounded-full px-4 py-2 transition-all duration-200" style={{ animationDelay: `${index * 100}ms` }} onClick={() => openNote(note)}>
+            <div key={note.id} className="flex items-center gap-2 cursor-pointer fade-up bg-muted-foreground/10 hover:bg-muted-foreground/20 rounded-full px-4 py-1 transition-all duration-200 md:px-4 md:py-2" style={{ animationDelay: `${index * 100}ms` }} onClick={() => openNote(note)}>
                 <FileText className="w-4 h-4 text-muted-foreground" />
-                <p className="text-lg font-medium whitespace-pre text-muted-foreground">
+                <p className="text-md font-medium whitespace-pre text-muted-foreground md:hidden block">
+                    {note.title.length > 15 ? note.title.substring(0, 15).trim() + "..." : note.title}
+                </p>
+                <p className="text-md font-medium whitespace-pre text-muted-foreground md:block hidden">
                     {note.title}
                 </p>
             </div>
@@ -57,25 +60,17 @@ export default function HomeTab({ setIsNoteOpened, setAccessedNote }: { setIsNot
 
     return (
         <div className="flex items-center justify-center h-full flex-col">
-            <div className="flex flex-col items-center gap-8 bg-popover/40 backdrop-blur-xl px-24 py-16 rounded-[3rem] border border-input shadow-2xl shadow-primary/20 fade-up relative overflow-hidden">
-                <h1 className="text-3xl font-bold tracking-tight whitespace-pre fade-up z-50">
-                    {headingText.slice(0, -1)}
-                    <span className="text-primary">{headingText.slice(-1)}</span>
-                </h1>
+            <div className="flex flex-col items-center md:max-w-2xl w-full py-2 mt-32">
 
-                <div className="flex gap-2 z-50">
-                    <Button variant="outline" className="rounded-full fade-up cursor-pointer text-lg px-10 py-6 bg-background/50 backdrop-blur-sm border-input hover:border-primary/50 hover:bg-primary/5 transition-all duration-300 group" style={{ animationDelay: `100ms` }} onClick={() => { openTab({ type: "folder", title: "Folders" }), closeTab(activeTabId!) }}>
-                        <FolderOpen className="w-5 h-5 ml-2 group-hover:scale-110 transition-transform" />
-                        <p className="mr-2">Open Folder</p>
-                    </Button>
-                    <Button variant="outline" className="rounded-full fade-up cursor-pointer text-lg px-10 py-6 bg-background/50 backdrop-blur-sm border-input hover:border-primary/50 hover:bg-primary/5 transition-all duration-300 group" style={{ animationDelay: `200ms` }} onClick={() => { openTab({ type: "note", title: "Notes" }), closeTab(activeTabId!) }}>
-                        <BookOpen className="w-5 h-5 ml-2 group-hover:scale-110 transition-transform" />
-                        <p className="mr-2">Create Note</p>
-                    </Button>
-                    <Button variant="outline" className="rounded-full fade-up cursor-pointer text-lg px-10 py-6 bg-background/50 backdrop-blur-sm border-input hover:border-primary/50 hover:bg-primary/5 transition-all duration-300 group" style={{ animationDelay: `300ms` }} onClick={() => { openTab({ type: "chat", title: "New Chat" }), closeTab(activeTabId!) }}>
-                        <MessageCircle className="w-5 h-5 ml-2 group-hover:scale-110 transition-transform" />
-                        <p className="mr-2">New Chat</p>
-                    </Button>
+
+                <div className="relative flex items-center justify-center w-full pt-1 px-1 group">
+                    {/* Animated AI Glow Effect */}
+                    <div className="absolute inset-0 bg-gradient-to-r from-folder-blue via-folder-purple to-folder-indigo opacity-25 blur-lg rounded-2xl animate-gradient"></div>
+
+                    {/* Input Container */}
+                    <div className="relative z-10 w-full">
+                        <HomeChatMessageInput />
+                    </div>
                 </div>
 
                 {/* <Tooltip>
@@ -92,19 +87,21 @@ export default function HomeTab({ setIsNoteOpened, setAccessedNote }: { setIsNot
                 </Tooltip> */}
             </div>
             <div className="flex flex-col gap-2 fade-up mt-12 mb-2">
-                <p className="text-lg font-medium whitespace-pre fade-up text-muted-foreground">
+                <p className="text-lg break-words font-medium fade-up text-muted-foreground text-center">
                     Or get back into something you were working on?
                 </p>
             </div>
-            {mostRecentNotes() ? <div className="flex gap-2 max-w-[60%] w-full flex-wrap items-center justify-center">
-                {mostRecentNotes()}
-            </div> : <div className="flex gap-2 max-w-[60%] w-full flex-wrap items-center justify-center">
-                <Skeleton className="w-[40%] h-10 rounded-full" />
-                <Skeleton className="w-[30%] h-10 rounded-full" />
-                <Skeleton className="w-[40%] h-10 rounded-full" />
-                <Skeleton className="w-[40%] h-10 rounded-full" />
-                <Skeleton className="w-[40%] h-10 rounded-full" />
-            </div>}
-        </div>
+            {
+                mostRecentNotes() ? <div className="flex gap-2 md:max-w-[60%] max-w-[100%] w-full flex-wrap items-center justify-center mt-2 md:mt-0">
+                    {mostRecentNotes()}
+                </div> : <div className="flex gap-2 md:max-w-[60%] max-w-[100%] w-full flex-wrap items-center justify-center">
+                    <Skeleton className="w-[40%] h-10 rounded-full" />
+                    <Skeleton className="w-[30%] h-10 rounded-full" />
+                    <Skeleton className="w-[40%] h-10 rounded-full" />
+                    <Skeleton className="w-[40%] h-10 rounded-full" />
+                    <Skeleton className="w-[40%] h-10 rounded-full" />
+                </div>
+            }
+        </div >
     );
 }

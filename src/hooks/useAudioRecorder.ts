@@ -62,8 +62,12 @@ export function useAudioRecorder(): UseAudioRecorderReturn {
                 setAudioBlob(blob);
                 setAudioURL(url);
 
-                // Cleanup audio context
-                audioContext.close();
+                // Cleanup audio context and null the ref so reset() doesn't
+                // try to close it a second time (InvalidStateError).
+                if (audioContextRef.current === audioContext && audioContextRef.current.state !== "closed") {
+                    audioContext.close();
+                }
+                audioContextRef.current = null;
                 setAnalyserNode(null);
 
                 // Stop tracks
@@ -128,10 +132,10 @@ export function useAudioRecorder(): UseAudioRecorderReturn {
             streamRef.current.getTracks().forEach((t) => t.stop());
             streamRef.current = null;
         }
-        if (audioContextRef.current) {
+        if (audioContextRef.current && audioContextRef.current.state !== "closed") {
             audioContextRef.current.close();
-            audioContextRef.current = null;
         }
+        audioContextRef.current = null;
         setAnalyserNode(null);
     }, [audioURL]);
 

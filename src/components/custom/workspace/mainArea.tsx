@@ -24,6 +24,7 @@ import TabCard from "./tabCard";
 import HomeTab from "./homeTab";
 import { SelectionQuoteMenu } from "./selectionQuoteMenu";
 import { Kbd, KbdGroup } from "@/components/ui/kbd";
+import { useIsMobile } from "@/hooks/use-mobile";
 
 export default function MainArea() {
     const { userAuth, setUserAuth } = useUserAuth();
@@ -33,6 +34,7 @@ export default function MainArea() {
     const { setFetchedNotes } = useFetchedNotes();
     const { setCurrentChatId, setChatMessages, setChatTitle, removeTabState } = useChatMessages();
     const { setContent } = useContent();
+    const isMobile = useIsMobile();
 
     const { tabs, activeTab, openTab, closeTab, activeTabId, setActiveTabId } = useTabs();
 
@@ -117,7 +119,7 @@ export default function MainArea() {
 
     // ─── Open tab helpers ─────────────────────────────────────────────────────
     const handleOpenFolders = useCallback(() => {
-        if (tabs.length < 24) {
+        if (tabs.length < (isMobile ? 3 : 24)) {
             if (activeTab.type === "home") {
                 closeTab(activeTabId);
             }
@@ -128,7 +130,7 @@ export default function MainArea() {
     }, [openTab, tabs.length]);
 
     const handleNewNote = useCallback(() => {
-        if (tabs.length < 24) {
+        if (tabs.length < (isMobile ? 3 : 24)) {
             if (activeTab.type === "home") {
                 closeTab(activeTabId);
             }
@@ -141,7 +143,7 @@ export default function MainArea() {
     }, [openTab, setContent, tabs.length]);
 
     const handleNewChat = useCallback(() => {
-        if (tabs.length < 24) {
+        if (tabs.length < (isMobile ? 3 : 24)) {
             if (activeTab.type === "home") {
                 closeTab(activeTabId);
             }
@@ -252,14 +254,14 @@ export default function MainArea() {
         <SidebarInset className="bg-background overflow-hidden md:overflow-auto">
             <SelectionQuoteMenu />
             {/* ─── Top Toolbar / Tab Bar ─────────────────────────────────────── */}
-            <div className="bg-background text-foreground md:h-12 h-10 md:w-[calc(100%-0.5rem)] w-[calc(100vw-3rem)] rounded-lg absolute top-2 pr-1 flex items-center justify-between z-10 transition-all duration-300">
+            <div className="bg-background text-foreground md:h-12 h-14 w-[100%] absolute md:top-2 top-0 flex items-center justify-between z-10 transition-all duration-300">
                 <div className="w-full flex justify-left gap-1 items-center">
                     {/* Mobile sidebar trigger */}
                     <div className="md:hidden flex-shrink-0">
                         <SidebarTrigger />
                     </div>
                     {/* Tab list */}
-                    <div className="flex gap-1 max-w-[calc(100%-2.5rem)] overflow-hidden flex-shrink-0">
+                    <div className="flex gap-1 max-w-[calc(100%-5.5rem)] md:max-w-[calc(100%-4rem)] overflow-hidden flex-shrink-0">
                         {tabs.map((tab, index) => (
                             <TabCard key={tab.id} tab={tab} index={index} />
                         ))}
@@ -307,7 +309,7 @@ export default function MainArea() {
             </div>
 
             {/* ─── Main Content Area ─────────────────────────────────────────── */}
-            <div key={activeTab?.id} className="bg-card text-foreground md:h-[calc(100%-4.5rem)] h-[calc(100vh-3.5rem)] w-full md:w-[calc(100%-0.5rem)] rounded-none md:rounded-lg absolute md:bottom-2 bottom-0 p-4 border border-sidebar-border overflow-hidden">
+            <div key={activeTab?.id} className="bg-card text-foreground md:h-[calc(100%-4.5rem)] h-[calc(100%-3.5rem)] w-full md:w-[calc(100%-0.5rem)] rounded-none md:rounded-lg absolute md:bottom-2 bottom-0 p-4 border border-sidebar-border overflow-hidden">
                 {renderContent()}
             </div>
         </SidebarInset>

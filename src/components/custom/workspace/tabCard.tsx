@@ -9,6 +9,7 @@ import { useChatMessages } from "@/context/chatMessagesContext";
 import { Tooltip, TooltipContent, TooltipTrigger } from "@/components/ui/tooltip";
 import { Dialog, DialogClose, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { Kbd, KbdGroup } from "@/components/ui/kbd";
+import { useIsMobile } from "@/hooks/use-mobile";
 
 interface TabCardProps {
     tab: Tab;
@@ -19,6 +20,7 @@ export default function TabCard({ tab, index }: TabCardProps) {
     const { activeTabId, setActiveTabId, closeTab, moveTab, tabs } = useTabs();
     const { removeTabState } = useChatMessages();
     const isActive = tab.id === activeTabId;
+    const isMobile = useIsMobile();
 
     // ─── Check Saving Dialog ────────────────────────────────────────────────
     const [openCheckSavingDialog, setOpenCheckSavingDialog] = useState(false);
@@ -77,7 +79,7 @@ export default function TabCard({ tab, index }: TabCardProps) {
                         onDragLeave={handleDragLeave}
                         onClick={() => setActiveTabId(tab.id)}
                         className={cn(
-                            "relative bg-card border border-border transition-all duration-100 rounded-3xl h-9 px-4 flex items-center group hover:bg-accent flex-shrink min-w-10 overflow-hidden cursor-pointer select-none fade-up",
+                            "relative bg-card border border-border transition-all duration-100 rounded-3xl h-9 px-4 flex items-center group hover:bg-accent flex-shrink min-w-10 overflow-hidden cursor-pointer select-none fade-up pr-8 md:pr-4",
                             isActive && "bg-accent text-accent-foreground hover:bg-accent/80"
                         )}
                     >
@@ -90,10 +92,10 @@ export default function TabCard({ tab, index }: TabCardProps) {
                             </div>
                             <p className="text-sm truncate select-none">{displayTitle}</p>
                         </div>
-                        {activeTabId !== tab.id ? <Button
+                        {activeTabId !== tab.id || !isMobile ? <Button
                             variant="ghost"
                             onClick={handleClose}
-                            className="absolute right-1 w-7 h-7 p-0 rounded-full opacity-0 group-hover:opacity-100 dark:hover:bg-card/60 hover:bg-secondary transition-all duration-100 scale-90 cursor-pointer"
+                            className="absolute right-1 w-7 h-7 p-0 rounded-full opacity-100 md:opacity-0 md:group-hover:opacity-100 dark:hover:bg-card/60 hover:bg-secondary transition-all duration-100 scale-90 cursor-pointer z-50"
                         >
                             <X className="w-4 h-4" />
                         </Button> : <Tooltip>
@@ -101,7 +103,7 @@ export default function TabCard({ tab, index }: TabCardProps) {
                                 <Button
                                     variant="ghost"
                                     onClick={handleClose}
-                                    className="absolute right-1 w-7 h-7 p-0 rounded-full opacity-0 group-hover:opacity-100 dark:hover:bg-card/60 hover:bg-secondary transition-all duration-100 scale-90 cursor-pointer"
+                                    className="absolute right-1 w-7 h-7 p-0 rounded-full opacity-100 md:opacity-0 md:group-hover:opacity-100 dark:hover:bg-card/60 hover:bg-secondary transition-all duration-100 scale-90 cursor-pointer z-50"
                                 >
                                     <X className="w-4 h-4" />
                                 </Button>
