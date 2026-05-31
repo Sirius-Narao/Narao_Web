@@ -307,7 +307,7 @@ export default function MainArea() {
             </div>
 
             {/* ─── Main Content Area ─────────────────────────────────────────── */}
-            <div key={activeTab?.id} className="bg-card text-foreground md:h-[calc(100%-4.5rem)] h-[calc(100vh-3.5rem)] w-full md:w-[calc(100%-0.5rem)] rounded-none md:rounded-lg absolute md:bottom-2 bottom-0 p-4 border border-sidebar-border overflow-hidden">
+            <div key={activeTab?.id} className="bg-card text-foreground md:h-[calc(100%-4.5rem)] h-[calc(100%-3.5rem)] w-full md:w-[calc(100%-0.5rem)] rounded-none md:rounded-lg absolute md:bottom-2 bottom-0 p-4 border border-sidebar-border overflow-hidden">
                 {renderContent()}
             </div>
         </SidebarInset>
