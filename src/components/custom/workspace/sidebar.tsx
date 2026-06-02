@@ -519,7 +519,7 @@ export default function SidebarArea() {
                         "group-data-[state=collapsed]:h-10 group-data-[state=collapsed]:p-2 group-data-[state=collapsed]:opacity-0"
                     )}>
                         <Image src="/favicon.ico" alt="Logo" width={24} height={24} className="group-data-[state=collapsed]:hidden transition-all duration-200" />
-                        <span className="text-xl font-bold transition-all duration-200 group-data-[state=collapsed]:hidden">
+                        <span className="text-xl font-bold font-serif transition-all duration-200 group-data-[state=collapsed]:hidden">
                             Narao
                         </span>
                     </div>
@@ -539,7 +539,7 @@ export default function SidebarArea() {
 
 
             {/* --------------------------- Content --------------------------- */}
-            <SidebarContent className="overflow-hidden pt-[2.5px] relative justify-start">
+            <SidebarContent className="overflow-hidden pt-1.5 relative justify-start">
                 {/* New feature: AI reviews */}
                 {state === "collapsed" ? (
                     <Tooltip>
@@ -547,7 +547,7 @@ export default function SidebarArea() {
                             <Button
                                 variant="ghost"
                                 size="icon"
-                                className="flex items-center justify-center p-3 bg-card rounded-full border border-sidebar-border w-fit h-fit mx-auto transition-all duration-200 relative absolute top-0 left-1"
+                                className="flex items-center justify-center p-3 bg-card rounded-full border border-sidebar-border w-fit h-fit mx-auto transition-all duration-200 relative absolute top-1 left-1"
                                 onClick={() => { setOpen(true); setInboxExpanded(true) }}
                             >
                                 <InboxIcon className="h-6 w-6" />

@@ -2098,7 +2098,7 @@ export default function ChatMessageInput({ attachments, setAttachments }: ChatMe
                                             <Button
                                                 variant="ghost"
                                                 size="icon"
-                                                className="h-10 w-10 rounded-full transition-all duration-200 hover:text-destructive hover:bg-transparent dark:hover:bg-transparent"
+                                                className="h-10 w-10 rounded-full transition-all duration-200 hover:text-destructive hover:bg-transparent dark:hover:bg-transparent md:inline-flex hidden"
                                                 // onClick={handleMicToggle}
                                             >
                                                 <MicOff size={18} />

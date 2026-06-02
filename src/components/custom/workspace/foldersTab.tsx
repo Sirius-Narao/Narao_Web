@@ -680,7 +680,7 @@ export default function FoldersTab({ accessedNote, setAccessedNote, setIsNoteOpe
                             <Tooltip>
                                 <TooltipTrigger asChild>
                                     <DropdownMenuTrigger asChild>
-                                        <Button variant="ghost" className="w-9 h-9 p-0 rounded-full cursor-pointer">
+                                        <Button variant="ghost" className="w-9 h-9 p-0 rounded-full active:scale-100">
                                             <Plus size={24} />
                                         </Button>
                                     </DropdownMenuTrigger>
@@ -705,7 +705,7 @@ export default function FoldersTab({ accessedNote, setAccessedNote, setIsNoteOpe
                             <Tooltip>
                                 <TooltipTrigger asChild>
                                     <DropdownMenuTrigger asChild>
-                                        <Button variant="ghost" className="w-9 h-9 p-0 rounded-full cursor-pointer">
+                                        <Button variant="ghost" className="w-9 h-9 p-0 rounded-full active:scale-100">
                                             <MoreVertical size={24} />
                                         </Button>
                                     </DropdownMenuTrigger>

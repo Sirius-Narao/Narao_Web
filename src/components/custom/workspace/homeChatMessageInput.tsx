@@ -1,5 +1,5 @@
 import { useSettings } from "@/context/settingsContext";
-import { useState, useRef, useCallback, useEffect, useMemo } from "react";
+import { useState, useRef, useCallback, useEffect, useMemo, useImperativeHandle, forwardRef } from "react";
 import { Button } from "@/components/ui/button";
 import { Tooltip, TooltipContent, TooltipTrigger } from "@/components/ui/tooltip";
 import { ArrowUp, Edit, FileImage, FileTypeCorner, Leaf, Lightbulb, Mic, Mic2, MicOff, Plus, Square, Trash2, X, Zap, FileText, Folder, Wrench } from "lucide-react";
@@ -26,9 +26,25 @@ import { Switch } from "@/components/ui/switch";
 // ── @mention types ──────────────────────────────────────────────────────────
 type MentionItem = { id: string; title: string; type: "note" | "folder"; path?: string; color?: string };
 
-export default function HomeChatMessageInput() {
+export interface HomeChatMessageInputRef {
+    setContent: (content: string) => void;
+}
+
+interface HomeChatMessageInputProps {}
+
+const HomeChatMessageInput = forwardRef<HomeChatMessageInputRef, HomeChatMessageInputProps>((props, ref) => {
     const { settings, setSettings } = useSettings();
     const [content, setContent] = useState("");
+
+    // Expose setContent to parent via ref
+    useImperativeHandle(ref, () => ({
+        setContent: (newContent: string) => {
+            setContent(newContent);
+            if (editorRef.current) {
+                editorRef.current.innerHTML = newContent;
+            }
+        }
+    }), []);
     const [isLoading, setIsLoading] = useState(false);
     const [isThinking, setIsThinking] = useState(false);
     const [attachments, setAttachments] = useState<File[]>([]);
@@ -1479,7 +1495,7 @@ export default function HomeChatMessageInput() {
                                             <Button
                                                 variant="ghost"
                                                 size="icon"
-                                                className="h-10 w-10 rounded-full transition-all duration-200 hover:text-destructive hover:bg-transparent dark:hover:bg-transparent"
+                                                className="h-10 w-10 rounded-full transition-all duration-200 hover:text-destructive hover:bg-transparent dark:hover:bg-transparent md:inline-flex hidden"
                                                 // onClick={handleMicToggle}
                                             >
                                                 <MicOff size={18} />
@@ -1518,4 +1534,8 @@ export default function HomeChatMessageInput() {
             </div>
         </>
     );
-}
+});
+
+HomeChatMessageInput.displayName = 'HomeChatMessageInput';
+
+export default HomeChatMessageInput;

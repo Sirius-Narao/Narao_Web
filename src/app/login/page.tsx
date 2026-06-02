@@ -57,7 +57,7 @@ export default function SignupPage() {
     }
 
     return (
-        <div className="bg-background text-foreground min-h-screen w-full pt-48">
+        <div className="bg-background text-foreground min-h-dvh w-full pt-48">
             <Navbar user={user} />
             <div className="flex flex-col items-center justify-center gap-4">
                 <FieldGroup className="w-full sm:w-[400px] md:w-[524px] mx-auto">

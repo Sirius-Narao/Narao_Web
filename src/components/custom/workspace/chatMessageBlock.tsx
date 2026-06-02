@@ -27,7 +27,7 @@ const THINKING_PHRASES = [
 
 type ToolName = keyof typeof TOOL_NAMES
 const TOOL_NAMES = {
-    "get_all_notes_and_folders": { loading: "Getting All Notes and Folders...", done: "Get All Notes and Folders", icon: <FolderSearch className="w-3 h-3 shrink-0 text-primary/70" /> },
+    // "get_all_notes_and_folders": { loading: "Getting All Notes and Folders...", done: "Get All Notes and Folders", icon: <FolderSearch className="w-3 h-3 shrink-0 text-primary/70" /> },
     "read_note": { loading: "Reading Note(s)...", done: "Read Note(s)", icon: <BookOpen className="w-3 h-3 shrink-0 text-primary/70" /> },
     "create_note": { loading: "Creating Note(s)...", done: "Created Note(s)", icon: <FilePlus className="w-3 h-3 shrink-0 text-primary/70" /> },
     "delete_note": { loading: "Deleting Note(s)...", done: "Deleted Note(s)", icon: <FileMinus className="w-3 h-3 shrink-0 text-primary/70" /> },
@@ -41,7 +41,7 @@ const TOOL_NAMES = {
     "change_color_folder": { loading: "Changing Folder Color(s)...", done: "Changed Folder Color(s)", icon: <Palette className="w-3 h-3 shrink-0 text-primary/70" /> },
 }
 
-function ToolCallCard({ part }: { part: any }) {
+export function ToolCallCard({ part }: { part: any }) {
     const [isExpanded, setIsExpanded] = useState(false);
     const { fetchedNotes } = useFetchedNotes();
     const { fetchedFolders } = useFetchedFolders();

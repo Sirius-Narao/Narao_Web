@@ -16,7 +16,7 @@ import { ReviewProvider } from "@/context/reviewContext";
 
 export default function Workspace() {
     return (
-        <div className="bg-background h-screen w-screen relative selection:bg-primary/50">
+        <div className="bg-background h-dvh w-screen relative selection:bg-primary/50">
 
             <SidebarProvider>
                 <TabsProvider>

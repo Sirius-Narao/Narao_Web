@@ -272,7 +272,7 @@ export default function MainArea() {
                         <Tooltip>
                             <TooltipTrigger asChild>
                                 <DropdownMenuTrigger asChild>
-                                    <Button variant="ghost" className="w-9 h-9 p-0 rounded-full cursor-pointer">
+                                    <Button variant="ghost" className="w-9 h-9 p-0 rounded-full active:scale-100">
                                         <Plus size={24} />
                                     </Button>
                                 </DropdownMenuTrigger>

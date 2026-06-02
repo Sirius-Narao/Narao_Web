@@ -246,6 +246,13 @@
 
 body {
   letter-spacing: var(--tracking-normal);
+  min-height: 100dvh;
+  min-height: -webkit-fill-available;
+}
+
+html {
+  height: -webkit-fill-available;
+  height: 100dvh;
 }
 
 @layer base {

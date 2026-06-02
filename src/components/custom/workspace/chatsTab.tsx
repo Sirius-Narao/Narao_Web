@@ -244,7 +244,7 @@ export default function ChatsTab({ tabId, initialChatId }: ChatsTabProps) {
                     <Tooltip>
                         <TooltipTrigger asChild>
                             <DropdownMenuTrigger asChild>
-                                <Button variant="ghost" className="w-8 h-8 md:w-10 md:h-10 p-0 rounded-full cursor-pointer">
+                                <Button variant="ghost" className="w-8 h-8 md:w-10 md:h-10 p-0 rounded-full cursor-pointer active:scale-100">
                                     <MoreVertical size={14} className="md:size-4" />
                                 </Button>
                             </DropdownMenuTrigger>

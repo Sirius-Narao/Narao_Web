@@ -3,7 +3,7 @@ import Image from "next/image";
 
 export default function PricingPage() {
     return (
-        <div className="bg-background text-foreground min-h-screen w-full">
+        <div className="bg-background text-foreground min-h-dvh w-full">
             <div className="">
 
             </div>

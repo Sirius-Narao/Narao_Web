@@ -23,14 +23,14 @@ export default function LandingPage() {
     <div className="bg-background text-foreground min-h-[2000px] w-full flex flex-col items-center relative">
       <Navbar user={user} />
       <div className="w-full">
-        <div className="w-full h-screen flex flex-col items-center justify-center relative overflow-hidden">
+        <div className="w-full h-dvh flex flex-col items-center justify-center relative overflow-hidden">
           <Image
             src={heroBg}
             alt="Hero Background"
             fill
             className="object-cover opacity-30"
           />
-          <div className="w-[70%] min-w-[600px] h-screen flex flex-col items-center justify-center relative overflow-hidden">
+          <div className="w-[70%] min-w-[600px] h-dvh flex flex-col items-center justify-center relative overflow-hidden">
             <h1 className="text-7xl font-extrabold tracking-tighter mb-4 z-10 text-center">A note-taking app powered by AI</h1>
             <p className="text-xl text-muted-foreground max-w-2xl text-center z-10 mt-2">
               Write your own notes in your own folders, and let AI manage your workspace as if it were you.
@@ -59,7 +59,7 @@ export default function LandingPage() {
         </div>
 
         {/* Placeholder content to enable scrolling */}
-        <div className="h-screen w-full flex items-center justify-center bg-muted/30">
+        <div className="h-dvh w-full flex items-center justify-center bg-muted/30">
           <h2 className="text-4xl font-bold">Scroll to see the magic</h2>
         </div>
       </div>

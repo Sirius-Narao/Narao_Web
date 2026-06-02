@@ -1,6 +1,6 @@
 import { Button } from "@/components/ui/button";
-import useTypingTextAnimation from "@/lib/typingTextAnimation";
-import { ArrowUp, BookOpen, FileText, FolderOpen, MessageCircle } from "lucide-react";
+import { ScrollArea } from "@/components/ui/scroll-area";
+import { Book, BookOpenText, FileText, FlaskConical, Folder, Lightbulb, Sparkles } from "lucide-react";
 import { useTabs } from "@/context/tabsContext";
 import { useFetchedNotes } from "@/context/fetchedNotesContext";
 import { Note } from "@/types/folderStructureTypes";
@@ -8,14 +8,33 @@ import { useUser } from "@/context/userContext";
 import { supabase } from "@/lib/supabaseClient";
 import { useContent } from "@/context/contentContext";
 import { Skeleton } from "@/components/ui/skeleton";
-import HomeChatMessageInput from "./homeChatMessageInput";
+import HomeChatMessageInput, { HomeChatMessageInputRef } from "./homeChatMessageInput";
+import { MarkdownRenderer } from "./MarkdownRenderer";
+import { useSettings } from "@/context/settingsContext";
+import { ToolCallCard } from "./chatMessageBlock";
+import { useState, useEffect, useRef } from "react";
+
+type MessagePart = { type: 'text'; content: string } | { type: 'toolCall'; toolCall: any };
 
 export default function HomeTab({ setIsNoteOpened, setAccessedNote }: { setIsNoteOpened: (value: boolean) => void, setAccessedNote: (value: Note) => void }) {
     const { openTab, closeTab, activeTabId } = useTabs();
     const { user } = useUser();
     const { setContent } = useContent();
-
+    const { settings } = useSettings();
     const { fetchedNotes, loading: notesLoading } = useFetchedNotes();
+    const inputRef = useRef<HomeChatMessageInputRef>(null);
+
+    const quickPrompts = [
+        { label: "Brainstorm", icon: Lightbulb, prompt: "Help me brainstorm ideas for my current project. I want to explore different perspectives and generate creative solutions." },
+        { label: "Make a quiz", icon: FlaskConical, prompt: "Create a quiz for me to test my knowledge on this topic. Include different types of questions and provide explanations for the answers." },
+        { label: "Explain", icon: BookOpenText, prompt: "Explain this concept to me in a clear and simple way. Break it down into manageable parts and provide examples to help me understand better." },
+    ];
+
+    const handlePillClick = (prompt: string) => {
+        if (inputRef.current) {
+            inputRef.current.setContent(prompt);
+        }
+    };
 
     const openNote = async (note: Note) => {
         if (!user) return;
@@ -60,16 +79,31 @@ export default function HomeTab({ setIsNoteOpened, setAccessedNote }: { setIsNot
 
     return (
         <div className="flex items-center justify-center h-full flex-col">
-            <div className="flex flex-col items-center md:max-w-2xl w-full py-2 mt-32">
+            <div className="flex flex-col items-center md:max-w-2xl w-full">
 
+                {/* Quick prompt pills */}
+                <div className="flex gap-2 flex-wrap justify-center mb-4">
+                    {quickPrompts.map((item, index) => (
+                        <Button
+                            variant="ghost"
+                            key={item.label}
+                            onClick={() => handlePillClick(item.prompt)}
+                            className="flex items-center gap-2 px-4 py-2 rounded-full hover:bg-secondary border border-border hover:border-border/40 transition-all duration-200 fade-up"
+                            style={{ animationDelay: `${index * 100 + 200}ms` }}
+                        >
+                            <item.icon className="w-4 h-4 text-muted-foreground" />
+                            <span className="text-sm font-medium text-foreground">{item.label}</span>
+                        </Button>
+                    ))}
+                </div>
 
-                <div className="relative flex items-center justify-center w-full pt-1 px-1 group">
+                <div className="relative flex items-center justify-center w-full pt-1 px-1 group fade-up" style={{animationDelay: "100ms"}}>
                     {/* Animated AI Glow Effect */}
                     <div className="absolute inset-0 bg-gradient-to-r from-folder-blue via-folder-purple to-folder-indigo opacity-25 blur-lg rounded-2xl animate-gradient"></div>
 
                     {/* Input Container */}
                     <div className="relative z-10 w-full">
-                        <HomeChatMessageInput />
+                        <HomeChatMessageInput ref={inputRef} />
                     </div>
                 </div>
 
