@@ -25,14 +25,15 @@ export default function HomeTab({ setIsNoteOpened, setAccessedNote }: { setIsNot
     const inputRef = useRef<HomeChatMessageInputRef>(null);
 
     const quickPrompts = [
-        { label: "Brainstorm", icon: Lightbulb, prompt: "Help me brainstorm ideas for my current project. I want to explore different perspectives and generate creative solutions." },
-        { label: "Make a quiz", icon: FlaskConical, prompt: "Create a quiz for me to test my knowledge on this topic. Include different types of questions and provide explanations for the answers." },
-        { label: "Explain", icon: BookOpenText, prompt: "Explain this concept to me in a clear and simple way. Break it down into manageable parts and provide examples to help me understand better." },
+        { label: "Brainstorm", icon: Lightbulb, prompt: "Help me brainstorm ideas for {this topic}. I want to explore different perspectives and generate creative solutions." },
+        { label: "Make a quiz", icon: FlaskConical, prompt: "Create a quiz for me to test my knowledge on {this topic}. Include different types of questions and provide explanations for the answers." },
+        { label: "Explain", icon: BookOpenText, prompt: "Explain {this topic} to me in a clear and simple way. Break it down into manageable parts and provide examples to help me understand better." },
     ];
 
     const handlePillClick = (prompt: string) => {
         if (inputRef.current) {
             inputRef.current.setContent(prompt);
+            inputRef.current.focusAndSelectText("{this topic}");
         }
     };
 
@@ -91,7 +92,7 @@ export default function HomeTab({ setIsNoteOpened, setAccessedNote }: { setIsNot
                             className="flex items-center gap-2 px-4 py-2 rounded-full hover:bg-secondary border border-border hover:border-border/40 transition-all duration-200 fade-up"
                             style={{ animationDelay: `${index * 100 + 200}ms` }}
                         >
-                            <item.icon className="w-4 h-4 text-muted-foreground" />
+                            <item.icon className="w-4 h-4 text-primary" />
                             <span className="text-sm font-medium text-foreground">{item.label}</span>
                         </Button>
                     ))}

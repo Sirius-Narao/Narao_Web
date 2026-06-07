@@ -1,5 +1,5 @@
 import { ScrollArea } from "@/components/ui/scroll-area";
-import ChatMessageInput from "./chatMessageInput";
+import ChatMessageInput, { ChatMessageInputRef } from "./chatMessageInput";
 import { useState, useEffect, useRef } from "react";
 import ChatMessageBlock from "./chatMessageBlock";
 import { useChatMessages } from "@/context/chatMessagesContext";
@@ -7,7 +7,7 @@ import { supabase } from "@/lib/supabaseClient";
 import { useUser } from "@/context/userContext";
 import { ChatMessage } from "@/types/chatType";
 import { Button } from "@/components/ui/button";
-import { ArrowDown } from "lucide-react";
+import { ArrowDown, Lightbulb, FlaskConical, BookOpenText } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { useIsLoading } from "@/context/isLoadingContext";
 import { EditMessageProvider } from "@/context/editMessageContext";
@@ -24,6 +24,7 @@ export default function Chat() {
     const { chatMessages, setChatMessages, currentChatId, chatCache } = useChatMessages();
     const bottomRef = useRef<HTMLDivElement>(null);
     const scrollAreaRef = useRef<HTMLDivElement>(null);
+    const inputRef = useRef<ChatMessageInputRef>(null);
     const [isAtBottom, setIsAtBottom] = useState(true);
     const [attachments, setAttachments] = useState<File[]>([])
     // for typing animation
@@ -33,6 +34,19 @@ export default function Chat() {
 
     // settings
     const { settings } = useSettings();
+
+    const quickPrompts = [
+        { label: "Brainstorm", icon: Lightbulb, prompt: "Help me brainstorm ideas for {this topic}. I want to explore different perspectives and generate creative solutions." },
+        { label: "Make a quiz", icon: FlaskConical, prompt: "Create a quiz for me to test my knowledge on {this topic}. Include different types of questions and provide explanations for the answers." },
+        { label: "Explain", icon: BookOpenText, prompt: "Explain {this topic} to me in a clear and simple way. Break it down into manageable parts and provide examples to help me understand better." },
+    ];
+
+    const handlePillClick = (prompt: string) => {
+        if (inputRef.current) {
+            inputRef.current.setContent(prompt);
+            inputRef.current.focusAndSelectText("{this topic}");
+        }
+    };
 
     // Fetch messages when currentChatId changes
     useEffect(() => {
@@ -184,6 +198,22 @@ export default function Chat() {
                                     <div className="flex flex-col items-center justify-center h-[50vh]">
                                         <p className="text-2xl md:text-3xl font-medium text-muted-foreground fade-up fade-up-delay-1 text-center">Hi, I'm {settings.aiName}.</p>
                                         <p className="text-3xl md:text-4xl font-medium fade-up fade-up-delay-2 text-center">How can I help you today?</p>
+                                        
+                                        {/* Quick prompt pills */}
+                                        <div className="flex gap-2 flex-wrap justify-center mt-8">
+                                            {quickPrompts.map((item, index) => (
+                                                <Button
+                                                    variant="ghost"
+                                                    key={item.label}
+                                                    onClick={() => handlePillClick(item.prompt)}
+                                                    className="flex items-center gap-2 px-4 py-2 rounded-full hover:bg-secondary border border-border hover:border-border/40 transition-all duration-200 fade-up"
+                                                    style={{ animationDelay: `${index * 100 + 300}ms` }}
+                                                >
+                                                    <item.icon className="w-4 h-4 text-primary" />
+                                                    <span className="text-sm font-medium text-foreground">{item.label}</span>
+                                                </Button>
+                                            ))}
+                                        </div>
                                     </div>
                                 )}
 
@@ -211,7 +241,7 @@ export default function Chat() {
                     <div className="absolute md:bottom-0 bottom-[-1px] left-0 md:w-[calc(100%-12px)] w-full h-32 bg-gradient-to-t from-card to-transparent pointer-events-none z-20" key={"fade-bottom"} />
                 </div>
 
-                <ChatMessageInput attachments={attachments} setAttachments={setAttachments} />
+                <ChatMessageInput ref={inputRef} attachments={attachments} setAttachments={setAttachments} />
             </div>
         </EditMessageProvider>
     )

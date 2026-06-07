@@ -23,6 +23,7 @@ import { TableHeader } from '@tiptap/extension-table-header';
 import { TableCell } from '@tiptap/extension-table-cell';
 import { Color } from '@tiptap/extension-color';
 import { TextStyle } from '@tiptap/extension-text-style';
+import Image from '@tiptap/extension-image';
 
 /** Custom Tiptap extension to automatically replace markdown arrow patterns upon typing. */
 export const MarkdownArrows = Extension.create({
@@ -145,6 +146,13 @@ export default function Editor() {
             TableRow,
             TableHeader,
             TableCell,
+            Image.configure({
+                inline: true,
+                allowBase64: false,
+                HTMLAttributes: {
+                    class: 'rounded-lg max-w-full h-auto my-4',
+                },
+            }),
             Markdown.configure({
                 html: true,
                 transformPastedText: true,

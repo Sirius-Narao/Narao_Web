@@ -8,6 +8,7 @@ import { Separator } from "@/components/ui/separator";
 import { supabase } from "@/lib/supabaseClient";
 import { cn } from "@/lib/utils";
 import { User } from "@supabase/supabase-js";
+import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { Eye, EyeOff, Info, Loader2 } from "lucide-react";
 import { useRouter } from "next/navigation";
 import { useEffect, useState } from "react";
@@ -20,6 +21,10 @@ export default function SignupPage() {
     const [clicked, setClicked] = useState(false);
     const [user, setUser] = useState<User | undefined>(undefined)
 
+    const [dialogOpen, setDialogOpen] = useState(false);
+    const [dialogType, setDialogType] = useState<'success' | 'error'>('success');
+    const [dialogMessage, setDialogMessage] = useState("");
+
     const signIn = async () => {
         const { error } = await supabase.auth.signInWithPassword({
             email,
@@ -27,10 +32,12 @@ export default function SignupPage() {
         });
 
         if (error) {
-            alert(error.message);
+            setDialogType('error');
+            setDialogMessage(error.message);
+            setDialogOpen(true);
         } else {
-            alert("Signed up successfully 📬");
-            router.push("/workspace");
+            setDialogType('success');
+            setDialogOpen(true);
         }
         setClicked(false);
     };
@@ -61,14 +68,14 @@ export default function SignupPage() {
             <Navbar user={user} />
             <div className="flex flex-col items-center justify-center gap-4">
                 <FieldGroup className="w-full sm:w-[400px] md:w-[524px] mx-auto">
-                    <p className="text-2xl font-bold text-center">Sign Up With Google</p>
+                    <p className="text-2xl font-bold text-center">Log In With Google</p>
                     <Separator />
                     <Field>
-                        <Button>Sign Up With Google (Coming Soon)</Button>
+                        <Button>Log In With Google (Coming Soon)</Button>
                     </Field>
 
 
-                    <p className="text-2xl font-bold text-center mt-10">Sign Up With Email</p>
+                    <p className="text-2xl font-bold text-center mt-10">Log In With Email</p>
                     <Separator />
                     <Field>
                         <FieldLabel htmlFor="signup-email">
@@ -93,39 +100,30 @@ export default function SignupPage() {
                         <div className="relative">
                             <Input
                                 id="signup-password"
-                                placeholder="••••••••"
-                                type="password"
+                                placeholder="Password"
+                                type={showPassword ? "text" : "password"}
                                 required
                                 value={password}
                                 onChange={(e) => setPassword(e.target.value)}
                                 className="pr-10"
+                                onKeyDown={(e) => {
+                                    if (e.key === "Enter") {
+                                        if (password.length > 0 && (password.length < 8 || !/[A-Z]/.test(password) || !/[a-z]/.test(password) || !/[0-9]/.test(password))) {
+                                            return;
+                                        } else {
+                                            signIn();
+                                            setClicked(true);
+                                        }
+                                    }
+                                }}
+
                             />
                             <Button
                                 type="button"
                                 variant="ghost"
                                 size="sm"
                                 className="absolute right-0 top-0 h-full px-3 py-2 hover:bg-transparent cursor-pointer"
-                                onMouseDown={(e) => {
-                                    const input = e.currentTarget.parentElement?.querySelector('input');
-                                    if (input) {
-                                        input.type = input.type === 'password' ? 'text' : 'password';
-                                    }
-                                    setShowPassword(!showPassword);
-                                }}
-                                onMouseUp={(e) => {
-                                    const input = e.currentTarget.parentElement?.querySelector('input');
-                                    if (input) {
-                                        input.type = input.type === 'password' ? 'text' : 'password';
-                                    }
-                                    setShowPassword(!showPassword);
-                                }}
-                                onMouseLeave={(e) => {
-                                    const input = e.currentTarget.parentElement?.querySelector('input');
-                                    if (input) {
-                                        input.type = input.type === 'password' ? 'text' : 'password';
-                                    }
-                                    setShowPassword(!showPassword);
-                                }}
+                                onClick={() => setShowPassword(!showPassword)}
                             >
                                 {showPassword ? <EyeOff className="text-primary" size={20} /> : <Eye className="text-muted-foreground" size={20} />}
                             </Button>
@@ -145,6 +143,30 @@ export default function SignupPage() {
                     </Button>
                 </FieldGroup>
             </div>
+            <Dialog open={dialogOpen} onOpenChange={setDialogOpen}>
+                <DialogContent showCloseButton={false} className="sm:max-w-md">
+                    <DialogHeader>
+                        <DialogTitle className="text-xl font-bold">
+                            {dialogType === 'success' ? 'Login Successful 🎉' : 'Login Failed 😕'}
+                        </DialogTitle>
+                        <DialogDescription className="text-md mt-2">
+                            {dialogType === 'success' 
+                                ? 'You have successfully logged in. Where would you like to go next?'
+                                : dialogMessage}
+                        </DialogDescription>
+                    </DialogHeader>
+                    <DialogFooter className="flex flex-row justify-end gap-2 mt-4">
+                        {dialogType === 'success' ? (
+                            <>
+                                <Button variant="outline" onClick={() => router.push("/")} className="w-full sm:w-auto">Back to Menu</Button>
+                                <Button onClick={() => router.push("/workspace")} className="w-full sm:w-auto">Go to Workspace</Button>
+                            </>
+                        ) : (
+                            <Button onClick={() => setDialogOpen(false)} className="w-full sm:w-auto">Acknowledge</Button>
+                        )}
+                    </DialogFooter>
+                </DialogContent>
+            </Dialog>
         </div >
     );
 }

@@ -7,23 +7,47 @@ import { TabsProvider } from "@/context/tabsContext";
 import { SettingsOpenProvider } from "@/context/settingOpenContext";
 import { ContentProvider } from "@/context/contentContext";
 import { ChatMessagesProvider } from "@/context/chatMessagesContext";
-import { UserAuthProvider } from "@/context/userAuthContext";
+import { UserAuthProvider, useUserAuth } from "@/context/userAuthContext";
 import { UserProvider } from "@/context/userContext";
 import { FetchedFoldersProvider } from "@/context/fetchedFoldersContext";
 import { FetchedNotesProvider } from "@/context/fetchedNotesContext";
 import { IsLoadingProvider } from "@/context/isLoadingContext";
 import { ReviewProvider } from "@/context/reviewContext";
+import { redirect } from "next/navigation";
+import { Suspense, useEffect, useState } from "react";
+import { supabase } from "@/lib/supabaseClient";
+import { Spinner } from "@/components/ui/spinner";
 
 export default function Workspace() {
-    return (
-        <div className="bg-background h-dvh w-screen relative selection:bg-primary/50">
+    const { userAuth, setUserAuth } = useUserAuth();
+    const [isAuthLoading, setIsAuthLoading] = useState(true);
 
-            <SidebarProvider>
-                <TabsProvider>
-                    <SettingsOpenProvider>
-                        <ContentProvider>
-                            <ChatMessagesProvider>
-                                <UserAuthProvider>
+    // auth fetch
+    useEffect(() => {
+        const fetchUserAuth = async () => {
+            const { data } = await supabase.auth.getUser();
+            setUserAuth(data.user);
+            setIsAuthLoading(false);
+        }
+        fetchUserAuth();
+    }, [])
+
+    if (isAuthLoading) {
+        return <div className="flex items-center justify-center w-screen h-screen bg-black"><Spinner /></div>; // Or a loading spinner if preferred
+    }
+
+    if (!userAuth) {
+        return redirect("/login");
+    }
+
+    return (
+        <Suspense fallback={<div className="flex items-center justify-center w-screen h-screen bg-black"><Spinner /></div>}>
+            <div className="bg-background h-dvh w-screen relative selection:bg-primary/50">
+                <SidebarProvider>
+                    <TabsProvider>
+                        <SettingsOpenProvider>
+                            <ContentProvider>
+                                <ChatMessagesProvider>
                                     <UserProvider>
                                         <FetchedFoldersProvider>
                                             <FetchedNotesProvider>
@@ -36,13 +60,12 @@ export default function Workspace() {
                                             </FetchedNotesProvider>
                                         </FetchedFoldersProvider>
                                     </UserProvider>
-                                </UserAuthProvider>
-                            </ChatMessagesProvider>
-                        </ContentProvider>
-                    </SettingsOpenProvider>
-                </TabsProvider>
-            </SidebarProvider>
-
-        </div>
+                                </ChatMessagesProvider>
+                            </ContentProvider>
+                        </SettingsOpenProvider>
+                    </TabsProvider>
+                </SidebarProvider>
+            </div>
+        </Suspense>
     );
 }

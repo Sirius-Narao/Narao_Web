@@ -12,14 +12,52 @@ import {
     ListOrdered,
     ListTodo,
     Quote,
+    Image as ImageIcon,
 } from "lucide-react";
 import { useState, useEffect, useRef } from "react";
+import { useUser } from "@/context/userContext";
 
 export function MobileEditorToolbar() {
     const { editor } = useEditorInstance();
+    const { user } = useUser();
     const [isVisible, setIsVisible] = useState(false);
     const [viewportHeight, setViewportHeight] = useState(0);
     const toolbarRef = useRef<HTMLDivElement>(null);
+    const fileInputRef = useRef<HTMLInputElement>(null);
+
+    const handleImageUpload = async (event: React.ChangeEvent<HTMLInputElement>) => {
+        const file = event.target.files?.[0];
+        if (!file || !user) return;
+
+        try {
+            const formData = new FormData();
+            formData.append('file', file);
+            formData.append('userId', user.id);
+
+            const response = await fetch('/api/upload', {
+                method: 'POST',
+                body: formData,
+            });
+
+            if (!response.ok) {
+                throw new Error('Failed to upload image');
+            }
+
+            const data = await response.json();
+            
+            // Insert the image into the editor
+            editor?.chain().focus().setImage({ src: data.url }).run();
+        } catch (error) {
+            console.error('Error uploading image:', error);
+        } finally {
+            // Reset the file input
+            event.target.value = '';
+        }
+    };
+
+    const handleImageClick = () => {
+        fileInputRef.current?.click();
+    };
 
     const editorState = useEditorState({
         editor,
@@ -127,6 +165,11 @@ export function MobileEditorToolbar() {
             isActive: editorState?.isTaskList,
             action: () => editor?.chain().focus().toggleTaskList().run(),
         },
+        {
+            icon: <ImageIcon size={18} />,
+            isActive: false,
+            action: handleImageClick,
+        },
     ];
 
     if (!isVisible || viewportHeight === 0) return null;
@@ -172,6 +215,13 @@ export function MobileEditorToolbar() {
                     ))}
                 </div>
             </div>
+            <input
+                ref={fileInputRef}
+                type="file"
+                accept="image/jpeg,image/png,image/jpg"
+                onChange={handleImageUpload}
+                className="hidden"
+            />
         </div>
     );
 }

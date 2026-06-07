@@ -5,6 +5,7 @@ import { ThemeProvider } from "@/components/theme-provider";
 import { Toaster } from "@/components/ui/sonner";
 import { SettingsProvider } from "@/context/settingsContext";
 import { Analytics } from "@vercel/analytics/next"
+import { UserAuthProvider } from "@/context/userAuthContext";
 
 const alanSans = Alan_Sans({
   variable: "--font-alan-sans",
@@ -67,7 +68,9 @@ export default function RootLayout({
         <Analytics />
         <SettingsProvider>
           <ThemeProvider>
-            {children}
+            <UserAuthProvider>
+              {children}
+            </UserAuthProvider>
             <Toaster />
           </ThemeProvider>
         </SettingsProvider>

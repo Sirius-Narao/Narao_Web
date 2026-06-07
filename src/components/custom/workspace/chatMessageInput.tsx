@@ -1,7 +1,7 @@
 import { Button } from "@/components/ui/button"
 import { Tooltip, TooltipContent, TooltipTrigger } from "@/components/ui/tooltip"
-import { ArrowUp, Edit, FileImage, FileTypeCorner, Leaf, Lightbulb, Mic, Mic2, MicOff, Plus, Square, Trash2, X, Zap, FileText, Folder, Wrench } from "lucide-react"
-import { useState, useRef, useEffect, useCallback, useMemo, Dispatch, SetStateAction } from "react"
+import { ArrowUp, Edit, FileImage, FileTypeCorner, Leaf, Lightbulb, Mic, Mic2, Plus, Square, Trash2, X, Zap, FileText, Folder, Wrench } from "lucide-react"
+import { useState, useRef, useEffect, useCallback, useMemo, Dispatch, SetStateAction, useImperativeHandle, forwardRef } from "react"
 import { useChatMessages } from "@/context/chatMessagesContext"
 import { ChatMessage, ChatAttachment, Models, ToolCall, MessagePart } from "@/types/chatType"
 import { v4 as uuidv4 } from "uuid"
@@ -35,12 +35,17 @@ const models = {
     // "gemini-3.1-flash-lite-preview": "Gemini 3.1 Flash Lite"
 }
 
+export interface ChatMessageInputRef {
+    setContent: (content: string) => void;
+    focusAndSelectText: (textToSelect: string) => void;
+}
+
 interface ChatMessageInputProps {
     attachments: File[];
     setAttachments: Dispatch<SetStateAction<File[]>>;
 }
 
-export default function ChatMessageInput({ attachments, setAttachments }: ChatMessageInputProps) {
+const ChatMessageInput = forwardRef<ChatMessageInputRef, ChatMessageInputProps>(({ attachments, setAttachments }, ref) => {
     const [content, setContent] = useState("")
     const [isThinking, setIsThinking] = useState(false)
     const { isLoading, setIsLoading } = useIsLoading()
@@ -51,6 +56,64 @@ export default function ChatMessageInput({ attachments, setAttachments }: ChatMe
     const editorRef = useRef<HTMLDivElement>(null)
     const fileInputRef = useRef<HTMLInputElement>(null)
     const abortControllerRef = useRef<AbortController | null>(null)
+
+    // Expose methods to parent via ref
+    useImperativeHandle(ref, () => ({
+        setContent: (newContent: string) => {
+            setContent(newContent);
+            if (editorRef.current) {
+                editorRef.current.innerHTML = newContent;
+            }
+        },
+        focusAndSelectText: (textToSelect: string) => {
+            if (editorRef.current) {
+                editorRef.current.focus();
+                const text = editorRef.current.innerText || "";
+                const index = text.indexOf(textToSelect);
+                if (index !== -1) {
+                    const selection = window.getSelection();
+                    if (selection) {
+                        const range = document.createRange();
+                        const walker = document.createTreeWalker(
+                            editorRef.current,
+                            NodeFilter.SHOW_TEXT,
+                            null
+                        );
+                        let charCount = 0;
+                        let startNode: Text | null = null;
+                        let startOffset = 0;
+                        let endNode: Text | null = null;
+                        let endOffset = 0;
+
+                        while (walker.nextNode()) {
+                            const node = walker.currentNode as Text;
+                            const nodeLength = node.textContent?.length || 0;
+                            
+                            if (!startNode && charCount + nodeLength > index) {
+                                startNode = node;
+                                startOffset = index - charCount;
+                            }
+                            
+                            if (!endNode && charCount + nodeLength >= index + textToSelect.length) {
+                                endNode = node;
+                                endOffset = index + textToSelect.length - charCount;
+                                break;
+                            }
+                            
+                            charCount += nodeLength;
+                        }
+
+                        if (startNode && endNode) {
+                            range.setStart(startNode, startOffset);
+                            range.setEnd(endNode, endOffset);
+                            selection.removeAllRanges();
+                            selection.addRange(range);
+                        }
+                    }
+                }
+            }
+        }
+    }), []);
     const { chatMessages, setChatMessages, currentChatId, setCurrentChatId, refreshChats, setChatTitle, setChatCache, chatInputHTML, setChatInputHTML, chatQuote, setChatQuote } = useChatMessages()
 
     // Audio recording
@@ -2098,14 +2161,19 @@ export default function ChatMessageInput({ attachments, setAttachments }: ChatMe
                                             <Button
                                                 variant="ghost"
                                                 size="icon"
-                                                className="h-10 w-10 rounded-full transition-all duration-200 hover:text-destructive hover:bg-transparent dark:hover:bg-transparent md:inline-flex hidden"
-                                                // onClick={handleMicToggle}
+                                                className={cn(
+                                                    "h-10 w-10 rounded-full transition-all duration-200 md:inline-flex hidden",
+                                                    isRecording
+                                                        ? "text-destructive bg-destructive/10 hover:bg-destructive/20"
+                                                        : "hover:text-primary hover:bg-primary/10"
+                                                )}
+                                                onClick={handleMicToggle}
                                             >
-                                                <MicOff size={18} />
+                                                <Mic size={18} />
                                             </Button>
                                         </TooltipTrigger>
                                         <TooltipContent>
-                                            <p>Voice note coming soon</p>
+                                            <p>{isRecording ? "Stop recording" : "Record voice note"}</p>
                                         </TooltipContent>
                                     </Tooltip>
                                     <Tooltip>
@@ -2134,4 +2202,6 @@ export default function ChatMessageInput({ attachments, setAttachments }: ChatMe
             </div >
         </>
     )
-}
+})
+
+export default ChatMessageInput

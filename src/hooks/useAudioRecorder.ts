@@ -1,6 +1,7 @@
 import { useRef, useState, useCallback } from "react";
 import { supabase } from "@/lib/supabaseClient";
 import { v4 as uuidv4 } from "uuid";
+import { toast } from "sonner";
 
 export type RecordingState = "idle" | "recording" | "uploading";
 
@@ -76,8 +77,24 @@ export function useAudioRecorder(): UseAudioRecorderReturn {
 
             mediaRecorder.start(100); // collect chunks every 100ms for smooth analysis
             setRecordingState("recording");
-        } catch (err) {
+        } catch (err: any) {
             console.error("Failed to start recording:", err);
+            if (err?.name === "NotAllowedError" || err?.name === "PermissionDeniedError") {
+                toast.error("Microphone access denied. Please allow microphone permission in your browser settings.", {
+                    position: "bottom-right",
+                    duration: 4000,
+                });
+            } else if (err?.name === "NotFoundError" || err?.name === "DevicesNotFoundError") {
+                toast.error("No microphone found. Please connect a microphone and try again.", {
+                    position: "bottom-right",
+                    duration: 4000,
+                });
+            } else {
+                toast.error("Failed to start recording. Please try again.", {
+                    position: "bottom-right",
+                    duration: 3000,
+                });
+            }
         }
     }, []);
 

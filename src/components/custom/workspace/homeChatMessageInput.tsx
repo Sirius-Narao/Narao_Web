@@ -2,7 +2,7 @@ import { useSettings } from "@/context/settingsContext";
 import { useState, useRef, useCallback, useEffect, useMemo, useImperativeHandle, forwardRef } from "react";
 import { Button } from "@/components/ui/button";
 import { Tooltip, TooltipContent, TooltipTrigger } from "@/components/ui/tooltip";
-import { ArrowUp, Edit, FileImage, FileTypeCorner, Leaf, Lightbulb, Mic, Mic2, MicOff, Plus, Square, Trash2, X, Zap, FileText, Folder, Wrench } from "lucide-react";
+import { ArrowUp, Edit, FileImage, FileTypeCorner, Leaf, Lightbulb, Mic, Mic2, Plus, Square, Trash2, X, Zap, FileText, Folder, Wrench } from "lucide-react";
 import { useChatMessages } from "@/context/chatMessagesContext";
 import { useTabs } from "@/context/tabsContext";
 import { useUser } from "@/context/userContext";
@@ -28,6 +28,7 @@ type MentionItem = { id: string; title: string; type: "note" | "folder"; path?: 
 
 export interface HomeChatMessageInputRef {
     setContent: (content: string) => void;
+    focusAndSelectText: (textToSelect: string) => void;
 }
 
 interface HomeChatMessageInputProps {}
@@ -42,6 +43,54 @@ const HomeChatMessageInput = forwardRef<HomeChatMessageInputRef, HomeChatMessage
             setContent(newContent);
             if (editorRef.current) {
                 editorRef.current.innerHTML = newContent;
+            }
+        },
+        focusAndSelectText: (textToSelect: string) => {
+            if (editorRef.current) {
+                editorRef.current.focus();
+                const text = editorRef.current.innerText || "";
+                const index = text.indexOf(textToSelect);
+                if (index !== -1) {
+                    const selection = window.getSelection();
+                    if (selection) {
+                        const range = document.createRange();
+                        const walker = document.createTreeWalker(
+                            editorRef.current,
+                            NodeFilter.SHOW_TEXT,
+                            null
+                        );
+                        let charCount = 0;
+                        let startNode: Text | null = null;
+                        let startOffset = 0;
+                        let endNode: Text | null = null;
+                        let endOffset = 0;
+
+                        while (walker.nextNode()) {
+                            const node = walker.currentNode as Text;
+                            const nodeLength = node.textContent?.length || 0;
+                            
+                            if (!startNode && charCount + nodeLength > index) {
+                                startNode = node;
+                                startOffset = index - charCount;
+                            }
+                            
+                            if (!endNode && charCount + nodeLength >= index + textToSelect.length) {
+                                endNode = node;
+                                endOffset = index + textToSelect.length - charCount;
+                                break;
+                            }
+                            
+                            charCount += nodeLength;
+                        }
+
+                        if (startNode && endNode) {
+                            range.setStart(startNode, startOffset);
+                            range.setEnd(endNode, endOffset);
+                            selection.removeAllRanges();
+                            selection.addRange(range);
+                        }
+                    }
+                }
             }
         }
     }), []);
@@ -1495,14 +1544,19 @@ const HomeChatMessageInput = forwardRef<HomeChatMessageInputRef, HomeChatMessage
                                             <Button
                                                 variant="ghost"
                                                 size="icon"
-                                                className="h-10 w-10 rounded-full transition-all duration-200 hover:text-destructive hover:bg-transparent dark:hover:bg-transparent md:inline-flex hidden"
-                                                // onClick={handleMicToggle}
+                                                className={cn(
+                                                    "h-10 w-10 rounded-full transition-all duration-200 md:inline-flex hidden",
+                                                    isRecording
+                                                        ? "text-destructive bg-destructive/10 hover:bg-destructive/20"
+                                                        : "hover:text-primary hover:bg-primary/10"
+                                                )}
+                                                onClick={handleMicToggle}
                                             >
-                                                <MicOff size={18} />
+                                                <Mic size={18} />
                                             </Button>
                                         </TooltipTrigger>
                                         <TooltipContent>
-                                            <p>Voice note coming soon</p>
+                                            <p>{isRecording ? "Stop recording" : "Record voice note"}</p>
                                         </TooltipContent>
                                     </Tooltip>
 

@@ -2,7 +2,7 @@
 
 import { Sidebar, SidebarContent, SidebarHeader, SidebarTrigger, SidebarFooter, useSidebar } from "@/components/ui/sidebar";
 import Image from "next/image";
-import { User, Settings as SettingsIcon, X, Sun, Bot, Tags, ArrowUpLeft, Coins, InboxIcon, ChevronDown, CircleOff, Plus, Trash2 } from "lucide-react";
+import { User, Settings as SettingsIcon, X, Sun, Bot, Tags, ArrowUpLeft, Coins, InboxIcon, ChevronDown, CircleOff, Plus, Trash2, ChevronRight, Sparkle, CircleQuestionMark, LogOut } from "lucide-react";
 import { AnimatePresence, motion } from "framer-motion";
 import { Button } from "@/components/ui/button";
 import { cn } from "@/lib/utils";
@@ -20,6 +20,7 @@ import {
     TooltipTrigger,
 } from "@/components/ui/tooltip"
 import { Dialog, DialogClose, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from "@/components/ui/dialog";
+import { ScrollArea, ScrollBar } from "@/components/ui/scroll-area";
 import { Kbd, KbdGroup } from "@/components/ui/kbd";
 import { supabase } from "@/lib/supabaseClient";
 import ProfileType from "@/types/profileType";
@@ -32,6 +33,7 @@ import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
 import { useSettings } from "@/context/settingsContext";
 import { useUser } from "@/context/userContext";
+import { useUserAuth } from "@/context/userAuthContext";
 import ReviewItem from "./reviewItem";
 import { ReviewItemType } from "@/types/reviewItemType";
 import { useFetchedNotes } from "@/context/fetchedNotesContext";
@@ -41,9 +43,13 @@ import { useReviews } from "@/context/reviewContext";
 import { LanguageMultiSelect } from "./languageMultiSelect";
 import { Switch } from "@/components/ui/switch";
 import { toast } from "sonner";
+import { Popover, PopoverTrigger } from "@/components/ui/popover";
+import { PopoverContent } from "@radix-ui/react-popover";
+import { Separator } from "@/components/ui/separator";
+import Link from "next/link";
 
 export default function SidebarArea() {
-    const [userAuth, setUserAuth] = useState<any>(null);
+    const { userAuth } = useUserAuth();
     const [user, setUser] = useState<ProfileType | null>(null);
     const [announce, setAnnounce] = useState<AnnounceType | null>(null);
     const [announceFetched, setAnnounceFetched] = useState(false);
@@ -51,6 +57,8 @@ export default function SidebarArea() {
     const { state, setOpen } = useSidebar();
     const [settingsTab, setSettingsTab] = useState(0);
     const { settingsOpen, setSettingsOpen } = useSettingsOpen();
+
+    const [isLogoutConfirmOpen, setIsLogoutConfirmOpen] = useState(false);
 
     // settings state
     const { settings, setSettings } = useSettings();
@@ -78,14 +86,6 @@ export default function SidebarArea() {
     const [isDeleteConfirmOpen, setIsDeleteConfirmOpen] = useState(false);
     const [tagToDelete, setTagToDelete] = useState<{ name: string; color: string } | null>(null);
 
-    // auth fetch
-    useEffect(() => {
-        const fetchUserAuth = async () => {
-            const { data } = await supabase.auth.getUser();
-            setUserAuth(data.user);
-        }
-        fetchUserAuth();
-    }, [])
     // Fetch user data
     useEffect(() => {
         if (!userAuth) return;
@@ -496,6 +496,13 @@ export default function SidebarArea() {
         return insertedReviews;
     };
 
+    // LOG OUT
+    const handleLogout = async () => {
+        await supabase.auth.signOut();
+
+        window.location.href = "/";
+    };
+
     // Fetch AI reviews each 10 minutes when the user is active
     useEffect(() => {
         // Check if there are any notes or folders that are not reviewed
@@ -653,33 +660,130 @@ export default function SidebarArea() {
                     )}
                 </AnimatePresence>
                 <Dialog open={settingsOpen} onOpenChange={setSettingsOpen}>
-                    <Tooltip>
-                        <TooltipTrigger asChild>
+                    <Popover>
+                        <Tooltip>
+                            <TooltipTrigger asChild>
+                                <PopoverTrigger asChild>
+                                    <Button variant="ghost" className={cn(
+                                        "flex items-center justify-center z-30 gap-2 w-full h-10 border border-sidebar-border rounded-full px-2 bg-card overflow-hidden",
+                                        "group-data-[state=collapsed]:w-10 group-data-[state=collapsed]:h-10 group-data-[state=collapsed]:items-center group-data-[state=collapsed]:justify-center group-data-[state=collapsed]:gap-0 active:scale-100"
+                                    )}
 
-                            <Button variant="ghost" className={cn(
-                                "flex items-center justify-center z-30 gap-2 w-full h-10 border border-sidebar-border rounded-full px-2 bg-card overflow-hidden",
-                                "group-data-[state=collapsed]:w-10 group-data-[state=collapsed]:h-10 group-data-[state=collapsed]:items-center group-data-[state=collapsed]:justify-center group-data-[state=collapsed]:gap-0"
-                            )}
-                                onClick={() => { setSettingsOpen(true), setSettingsTab(0) }}
-                            >
-                                <User />
-                                {user ? <span className="text-lg font-bold transition-all duration-200 group-data-[state=collapsed]:hidden truncate w-full text-left pl-2">
-                                    {user?.username}
-                                </span> : <Skeleton className="w-full h-full rounded-full" />}
-                                <div className="flex items-center justify-end w-24">
-                                    <SettingsIcon size={24} className="group-data-[state=collapsed]:hidden w-full transition-all duration-200" />
+                                    >
+                                        <User />
+                                        {user ? <span className="text-lg font-bold transition-all duration-200 group-data-[state=collapsed]:hidden truncate w-full text-left pl-2">
+                                            {user?.username}
+                                        </span> : <Skeleton className="w-full h-full rounded-full" />}
+                                        <div className="flex items-center justify-end w-24">
+                                            <SettingsIcon size={24} className="group-data-[state=collapsed]:hidden w-full transition-all duration-200" />
+                                        </div>
+                                    </Button>
+                                </PopoverTrigger>
+
+                            </TooltipTrigger>
+                            <PopoverContent className="w-full h-full p-0 bg-popover border-border border shadow-md p-1 rounded-xl min-w-60 flex flex-col" align="start" side="top" sideOffset={10}>
+                                <Button variant="ghost"
+                                    className="w-full h-full justify-between py-3 rounded-3xl "
+                                    onClick={() => { setSettingsOpen(true), setSettingsTab(0) }}
+
+                                >
+                                    <div className="flex items-center justify-center gap-2">
+                                        <div className="bg-primary rounded-full" >
+                                            <p className="text-xs font-medium text-primary-foreground px-1.5 py-1">{user?.username ? (user.username.includes(" ") ? (user.username.split(" ")[0].at(0) || "") + (user.username.split(" ")[1].at(0) || "") : user.username.substring(0, 2)) : "?"}</p>
+                                        </div>
+                                        <p className="text-sm font-medium">{user?.username}</p>
+                                    </div>
+                                    <div className="flex items-center justify-center">
+                                        <ChevronRight className="w-4 h-4" />
+                                    </div>
+                                </Button>
+                                <Separator className="my-1 " />
+                                <Button
+                                    variant="ghost"
+                                    className="w-full h-full justify-start group/btn relative overflow-hidden bg-transparent"
+                                >
+                                    {/* Gradient Overlay - Fades in on hover */}
+                                    <div className="absolute inset-0 z-0 bg-linear-to-tl from-primary/20 via-primary/10 to-transparent opacity-0 transition-opacity duration-300 group-hover/btn:opacity-100" />
+                                    <div className="flex items-center justify-center gap-2 group-hover/btn:animate-pulse">
+                                        <Sparkle
+                                            size={16}
+                                            className="transition-all duration-300 group-hover/btn:rotate-225" // Triggers only for this button
+                                        />
+                                        <p className="text-sm font-medium">Try Pro</p>
+                                    </div>
+                                </Button>
+
+                                <Button variant="ghost"
+                                    className="w-full h-full justify-start group/btn"
+                                    onClick={() => { setSettingsOpen(true), setSettingsTab(1) }}
+                                >
+                                    <div className="flex items-center justify-center gap-2">
+                                        <SettingsIcon size={16} className="transition-all duration-300 group-hover/btn:rotate-180" />
+                                        <p className="text-sm font-medium">Settings</p>
+                                    </div>
+                                </Button>
+                                <Separator className="my-1 " />
+                                <Button variant="ghost"
+                                    className="w-full h-full justify-start"
+                                >
+                                    <div className="flex items-center justify-center gap-2">
+                                        <CircleQuestionMark size={16} />
+                                        <p className="text-sm font-medium">Help</p>
+                                    </div>
+                                </Button>
+                                <Button variant="ghost"
+                                    className="w-full h-full justify-start hover:text-destructive dark:hover:bg-destructive/10"
+                                    onClick={() => setIsLogoutConfirmOpen(true)}
+                                >
+                                    <div className="flex items-center justify-center gap-2">
+                                        <LogOut size={16} />
+                                        <p className="text-sm font-medium">Log Out</p>
+                                    </div>
+                                </Button>
+                            </PopoverContent>
+                            <TooltipContent className="flex items-center gap-2">
+                                <p>Settings</p>
+                                <KbdGroup className="hidden sm:inline-flex">
+                                    <Kbd className="bg-popover text-foreground">Ctrl + ,</Kbd>
+                                </KbdGroup>
+                            </TooltipContent>
+                        </Tooltip>
+                    </Popover>
+                    <DialogContent className="md:max-w-5xl max-w-[95vw] grid grid-cols-1 md:grid-cols-5 " showCloseButton={false}>
+                        {/* Mobile/Tablet: Horizontal scrollable tabs at top */}
+                        <ScrollArea className="md:hidden w-full border-b border-border flex overflow-x-auto py-2">
+                            <div className="flex gap-2 p-2">
+                                <div className={cn("flex items-center justify-center gap-2 px-4 py-2 rounded-lg border border-sidebar-border hover:bg-card/50 cursor-pointer transition-all duration-200 whitespace-nowrap shrink-0", settingsTab === 0 && "bg-card hover:bg-card")}
+                                    onClick={() => { setSettingsTab(0) }}>
+                                    <User size={16} />
+                                    <p className="text-sm font-medium">Account</p>
                                 </div>
-                            </Button>
-                        </TooltipTrigger>
-                        <TooltipContent className="flex items-center gap-2">
-                            <p>Settings</p>
-                            <KbdGroup className="hidden sm:inline-flex">
-                                <Kbd className="bg-popover text-foreground">Ctrl + ,</Kbd>
-                            </KbdGroup>
-                        </TooltipContent>
-                    </Tooltip>
-                    <DialogContent className="max-w-5xl grid grid-cols-5 " showCloseButton={false}>
-                        <div className="col-span-1 h-full flex flex-col gap-2 relative">
+                                <div className={cn("flex items-center justify-center gap-2 px-4 py-2 rounded-lg border border-sidebar-border hover:bg-card/50 cursor-pointer transition-all duration-200 whitespace-nowrap shrink-0", settingsTab === 1 && "bg-card hover:bg-card")}
+                                    onClick={() => { setSettingsTab(1) }}>
+                                    <Sun size={16} />
+                                    <p className="text-sm font-medium">Preferences</p>
+                                </div>
+                                <div className={cn("flex items-center justify-center gap-2 px-4 py-2 rounded-lg border border-sidebar-border hover:bg-card/50 cursor-pointer transition-all duration-200 whitespace-nowrap shrink-0", settingsTab === 2 && "bg-card hover:bg-card")}
+                                    onClick={() => { setSettingsTab(2) }}>
+                                    <Bot size={16} />
+                                    <p className="text-sm font-medium">AI Settings</p>
+                                </div>
+                                <div className={cn("flex items-center justify-center gap-2 px-4 py-2 rounded-lg border border-sidebar-border hover:bg-card/50 cursor-pointer transition-all duration-200 whitespace-nowrap shrink-0", settingsTab === 3 && "bg-card hover:bg-card")}
+                                    onClick={() => { setSettingsTab(3) }}>
+                                    <Tags size={16} />
+                                    <p className="text-sm font-medium">Tags</p>
+                                </div>
+                                <div className={cn("flex items-center justify-center gap-2 px-4 py-2 rounded-lg border bg-card border-sidebar-border hover:bg-card/50 cursor-pointer transition-all duration-200 whitespace-nowrap")}
+                                    onClick={() => { }}>
+                                    <ArrowUpLeft size={16} />
+                                    <p className="text-sm font-medium">About</p>
+                                </div>
+                            </div>
+                            <ScrollBar orientation="horizontal" />
+                        </ScrollArea>
+
+                        {/* Desktop: Vertical tabs on left side */}
+                        <div className="hidden md:flex col-span-1 h-full flex flex-col gap-1 relative">
                             <div className={cn("flex items-center justify-center w-full gap-2 p-4 py-2 rounded-lg border border-sidebar-border hover:bg-card/50 cursor-pointer transition-all duration-200 text-left justify-start ", settingsTab === 0 && "bg-card hover:bg-card")}
                                 onClick={() => { setSettingsTab(0) }}>
                                 <User size={16} />
@@ -707,7 +811,9 @@ export default function SidebarArea() {
                                 <p className="text-sm font-medium">About</p>
                             </div>
                         </div>
-                        <div className="col-span-4 flex flex-col h-full relative px-4">
+
+                        {/* Content area - full width on mobile, right side on desktop */}
+                        <div className="col-span-1 md:col-span-4 flex flex-col h-full relative md:px-4 px-0">
                             <DialogHeader className="border-b border-border pb-4">
                                 <DialogTitle>{settingsTab === 0 ? "Account" : settingsTab === 1 ? "Preferences" : settingsTab === 2 ? "AI Settings" : "Tags"}</DialogTitle>
                                 <DialogDescription>
@@ -716,7 +822,7 @@ export default function SidebarArea() {
                             </DialogHeader>
 
                             {settingsTab === 0 && (
-                                <div className="flex flex-col pb-6 h-[calc(100vh-250px)] sm:h-[calc(100vh-300px)] md:h-[calc(100vh-400px)] lg:h-[calc(100vh-500px)] overflow-y-auto scrollbar-hide">
+                                <div className="flex flex-col md:pb-12 pb-22 h-[calc(100vh-250px)] sm:h-[calc(100vh-300px)] md:h-[calc(100vh-400px)] lg:h-[calc(100vh-500px)] overflow-y-auto scrollbar-hide">
                                     <div className="flex gap-2 border-b border-border py-4 justify-between items-center">
                                         <p className="text-sm font-medium">Credits Left</p>
                                         <Tooltip>
@@ -767,7 +873,7 @@ export default function SidebarArea() {
                                 </div>
                             )}
                             {settingsTab === 1 && (
-                                <div className="flex flex-col pb-6 h-[calc(100vh-250px)] sm:h-[calc(100vh-300px)] md:h-[calc(100vh-400px)] lg:h-[calc(100vh-500px)] overflow-y-auto scrollbar-hide">
+                                <div className="flex flex-col md:pb-12 pb-22 h-[calc(100vh-250px)] sm:h-[calc(100vh-300px)] md:h-[calc(100vh-400px)] lg:h-[calc(100vh-500px)] overflow-y-auto scrollbar-hide">
                                     <div className="flex gap-2 justify-between items-center border-b border-border py-4">
                                         <p className="text-sm font-medium">Appearance</p>
                                         <Select
@@ -837,7 +943,7 @@ export default function SidebarArea() {
                                 </div>
                             )}
                             {settingsTab === 2 && (
-                                <div className="flex flex-col pb-6 h-[calc(100vh-250px)] sm:h-[calc(100vh-300px)] md:h-[calc(100vh-400px)] lg:h-[calc(100vh-500px)] overflow-y-auto scrollbar-hide pr-12 pb-12">
+                                <div className="flex flex-col md:pb-12 pb-22 h-[calc(100vh-250px)] sm:h-[calc(100vh-300px)] md:h-[calc(100vh-400px)] lg:h-[calc(100vh-500px)] overflow-y-auto scrollbar-hide pr-12 ">
                                     <div className="flex flex-col gap-2 border-b border-border py-4">
                                         <p className="text-sm font-medium">AI name</p>
                                         <Input
@@ -899,7 +1005,7 @@ export default function SidebarArea() {
                                 </div>
                             )}
                             {settingsTab === 3 && (
-                                <div className="flex flex-col pb-6 h-[calc(100vh-250px)] sm:h-[calc(100vh-300px)] md:h-[calc(100vh-400px)] lg:h-[calc(100vh-500px)] overflow-y-auto scrollbar-hide">
+                                <div className="flex flex-col md:pb-12 pb-22 h-[calc(100vh-250px)] sm:h-[calc(100vh-300px)] md:h-[calc(100vh-400px)] lg:h-[calc(100vh-500px)] overflow-y-auto scrollbar-hide">
                                     <div className="flex flex-col gap-4">
                                         {/* Create new tag section */}
                                         <div className="flex flex-col gap-3 border-b border-border py-4">
@@ -977,7 +1083,7 @@ export default function SidebarArea() {
                             )}
 
 
-                            <DialogFooter className="flex items-center justify-end gap-2 p-2 absolute bottom-0 left-1/2 -translate-x-1/2 bg-card/50 backdrop-blur-sm w-fit rounded-full border">
+                            <DialogFooter className="flex items-center justify-end gap-2 p-2 absolute bottom-0 left-1/2 -translate-x-1/2 bg-card/50 backdrop-blur-sm w-fit rounded-full border flex-nowrap">
                                 <DialogClose asChild>
                                     <Button variant="ghost" onClick={() => setSettingsOpen(false)} className="cursor-pointer">Close</Button>
                                 </DialogClose>
@@ -1008,8 +1114,28 @@ export default function SidebarArea() {
                         </DialogContent>
                     </Dialog>
 
+                    <Dialog open={isLogoutConfirmOpen} onOpenChange={setIsLogoutConfirmOpen}>
+                        <DialogContent className="w-xl" showCloseButton={false}>
+                            <DialogHeader>
+                                <DialogTitle>Log Out ?</DialogTitle>
+                                <DialogDescription>
+                                    Are you sure you want to log out?
+                                </DialogDescription>
+                            </DialogHeader>
+                            <DialogFooter>
+                                <Button variant="ghost" className="cursor-pointer" onClick={() => setIsLogoutConfirmOpen(false)}>
+                                    Cancel
+                                </Button>
+                                <Button variant="destructive" className="cursor-pointer dark:hover:bg-destructive/50" onClick={() => handleLogout()}>
+                                    <LogOut size={16} />
+                                    Logout
+                                </Button>
+                            </DialogFooter>
+                        </DialogContent>
+                    </Dialog>
+
                 </Dialog>
             </SidebarFooter>
-        </Sidebar>
+        </Sidebar >
     );
 }   

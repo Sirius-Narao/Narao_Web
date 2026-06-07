@@ -30,7 +30,10 @@ import {
     Split,
     Trash2,
     Plus,
+    Image as ImageIcon,
 } from "lucide-react";
+import { useRef } from "react";
+import { useUser } from "@/context/userContext";
 import { Tooltip, TooltipContent, TooltipTrigger } from "@/components/ui/tooltip";
 import { Button } from "@/components/ui/button";
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
@@ -43,6 +46,42 @@ import {
 
 export function EditorToolbar() {
     const { editor } = useEditorInstance();
+    const { user } = useUser();
+    const fileInputRef = useRef<HTMLInputElement>(null);
+
+    const handleImageUpload = async (event: React.ChangeEvent<HTMLInputElement>) => {
+        const file = event.target.files?.[0];
+        if (!file || !user) return;
+
+        try {
+            const formData = new FormData();
+            formData.append('file', file);
+            formData.append('userId', user.id);
+
+            const response = await fetch('/api/upload', {
+                method: 'POST',
+                body: formData,
+            });
+
+            if (!response.ok) {
+                throw new Error('Failed to upload image');
+            }
+
+            const data = await response.json();
+            
+            // Insert the image into the editor
+            editor?.chain().focus().setImage({ src: data.url }).run();
+        } catch (error) {
+            console.error('Error uploading image:', error);
+        } finally {
+            // Reset the file input
+            event.target.value = '';
+        }
+    };
+
+    const handleImageClick = () => {
+        fileInputRef.current?.click();
+    };
 
     // useEditorState re-runs the selector on every transaction (selection, content, mark changes)
     // This is the correct Tiptap v3 API for reactive toolbar state
@@ -252,6 +291,30 @@ export function EditorToolbar() {
                     </TooltipContent>
                 </Tooltip>
             ))}
+
+            {/* ── Image Upload ── */}
+            <Tooltip>
+                <TooltipTrigger asChild>
+                    <Button
+                        variant="ghost"
+                        onClick={handleImageClick}
+                        className={cn(
+                            "rounded-full cursor-pointer dark:hover:bg-primary/10 hover:bg-primary/10 hover:text-primary transition-all"
+                        )}
+                        aria-label="Insert image"
+                    >
+                        <ImageIcon size={14} />
+                    </Button>
+                </TooltipTrigger>
+                <TooltipContent className="text-xs">Insert image</TooltipContent>
+            </Tooltip>
+            <input
+                ref={fileInputRef}
+                type="file"
+                accept="image/jpeg,image/png,image/jpg"
+                onChange={handleImageUpload}
+                className="hidden"
+            />
 
             <Divider />
 
