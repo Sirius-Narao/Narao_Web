@@ -208,7 +208,7 @@ export default function ChatsTab({ tabId, initialChatId }: ChatsTabProps) {
 
     return (
         <div className="flex flex-col h-full relative">
-            <div className="flex items-center absolute top-1 left-0 right-0 z-50 p-1 rounded-3xl w-fit bg-popover/40 backdrop-blur-md shadow-lg mx-auto max-w-[calc(100%-2rem)]">
+            <div className="items-center absolute top-1 left-0 right-0 z-50 p-1 rounded-3xl w-fit bg-popover border border-border mx-auto max-w-[calc(100%-2rem)] hidden lg:flex">
                 {isRenamingChat ? (
                     <Input
                         value={tempChatTitle}
@@ -225,13 +225,13 @@ export default function ChatsTab({ tabId, initialChatId }: ChatsTabProps) {
                 ) : currentChatId ? (
                     <Button variant="ghost" className="text-lg md:p-2 rounded-3xl md:px-4 p-2 py-1.5 cursor-pointer text-sm md:text-lg" onClick={handleRenameChat}>{chatTitle}</Button>
                 ) : (
-                    <span className="text-lg font-medium md:p-2 rounded-3xl md:px-4 p-2 py-1.5 text-sm md:text-lg">New Chat</span>
+                    <span className="text-lg font-medium p-1 rounded-3xl px-4 text-sm md:text-lg">New Chat</span>
                 )}
             </div>
-            <div className="absolute right-2 flex items-center gap-1 rounded-3xl p-1 mt-1 z-50 bg-popover/40 backdrop-blur-md shadow-lg">
+            <div className="absolute right-2 flex items-center gap-1 rounded-3xl p-1 mt-1 z-50 bg-popover border border-border">
                 <Tooltip>
                     <TooltipTrigger asChild>
-                        <Button variant="ghost" className="w-8 h-8 md:w-10 md:h-10 p-0 rounded-full cursor-pointer" onClick={() => handleNewChat()}>
+                        <Button variant="ghost" className="w-9 h-9 p-0 rounded-full cursor-pointer" onClick={() => handleNewChat()}>
                             <PenSquare size={14} className="md:size-4" />
                         </Button>
                     </TooltipTrigger>
@@ -244,7 +244,7 @@ export default function ChatsTab({ tabId, initialChatId }: ChatsTabProps) {
                     <Tooltip>
                         <TooltipTrigger asChild>
                             <DropdownMenuTrigger asChild>
-                                <Button variant="ghost" className="w-8 h-8 md:w-10 md:h-10 p-0 rounded-full cursor-pointer active:scale-100">
+                                <Button variant="ghost" className="w-9 h-9 p-0 rounded-full cursor-pointer active:scale-100">
                                     <MoreVertical size={14} className="md:size-4" />
                                 </Button>
                             </DropdownMenuTrigger>
@@ -285,7 +285,7 @@ export default function ChatsTab({ tabId, initialChatId }: ChatsTabProps) {
                 }}
             >
                 {/* Collapsed: round search button */}
-                <div className={cn("flex items-center justify-center md:p-1 p-0 rounded-3xl w-fit bg-popover/40 backdrop-blur-md shadow-lg absolute top-0 left-0 z-50 transition-all duration-300", `${isSearchOpen && "translate-y-12 md:translate-y-0"}`)} style={{
+                <div className={cn("flex items-center justify-center p-1 rounded-3xl w-fit bg-popover border border-border absolute top-0 left-0 z-50 transition-all duration-300")} style={{
                     transition: "opacity 200ms ease, transform 200ms ease",
                     opacity: isSearchOpen ? 0 : 1,
                     pointerEvents: isSearchOpen ? "none" : "auto",
@@ -309,7 +309,7 @@ export default function ChatsTab({ tabId, initialChatId }: ChatsTabProps) {
                                     top: 0,
                                     left: 0,
                                 }}
-                                className="w-10 h-10 rounded-full flex items-center justify-center active:scale-95 cursor-pointer"
+                                className="w-9 h-9 rounded-full flex items-center justify-center active:scale-95 cursor-pointer"
                             >
                                 <Search size={16} className="text-foreground/80" />
                             </Button>
@@ -323,20 +323,20 @@ export default function ChatsTab({ tabId, initialChatId }: ChatsTabProps) {
                 {/* Expanded panel */}
                 <div
                     style={{
-                        transition: "opacity 250ms ease, transform 300ms cubic-bezier(0.34, 1.56, 0.64, 1)",
+                        transition: "opacity 100ms ease, transform 300ms cubic-bezier(0.34, 1.56, 0.64, 1)",
                         opacity: isSearchOpen ? 1 : 0,
                         pointerEvents: isSearchOpen ? "auto" : "none",
                         transform: isSearchOpen ? "scale(1) translateY(0px)" : "scale(0.92) translateY(-6px)",
                         transformOrigin: "top left",
                     }}
-                    className={cn("flex flex-col bg-card/30 backdrop-blur-md p-2 rounded-xl shadow-xl border border-border transition-all duration-300", `${isSearchOpen && "md:translate-y-0 translate-y-12"}`)}
+                    className={cn("flex flex-col bg-popover border border-border p-2 rounded-xl transition-all duration-300")}
                 >
                     {/* Search input row */}
-                    <InputGroup className="w-full shadow-md dark:bg-popover/40 bg-popover/40 backdrop-blur-md! border-border ">
+                    <InputGroup className="w-full shadow-md dark:bg-popover bg-popover border border-border ">
                         <InputGroupAddon align="inline-end" className="cursor-pointer">
                             <InputGroupText className="bg-transparent cursor-pointer">
                                 <KbdGroup className="hidden sm:inline-flex">
-                                    <Kbd className="bg-popover text-muted-foreground">Ctrl + K</Kbd>
+                                    <Kbd className="bg-card text-muted-foreground">Ctrl + K</Kbd>
                                 </KbdGroup>
                                 <Search size={15} />
                             </InputGroupText>
@@ -368,12 +368,12 @@ export default function ChatsTab({ tabId, initialChatId }: ChatsTabProps) {
                         }}
                         className="mt-2 rounded-lg shadow-md"
                     >
-                        <ScrollArea className="flex-1 rounded-lg border border-border px-1 shadow-lg bg-popover/40 backdrop-blur-md h-full max-h-[50vh] overflow-y-auto">
+                        <ScrollArea className="flex-1 rounded-lg border border-border px-1 h-full max-h-[50vh] overflow-y-auto">
                             <div className="h-1" key={"division-scroll"}></div>
                             {chats.length > 0 && chatsFetched ? filteredChats.length > 0 ? filteredChats.map((chat, index) => (
                                 <div
                                     key={index}
-                                    className="flex items-center justify-between pl-4 pr-2 py-2 rounded-lg hover:bg-popover cursor-pointer transition-all duration-100 ease-in-out mb-1"
+                                    className="flex items-center justify-between pl-4 pr-2 py-2 rounded-lg hover:bg-card cursor-pointer transition-all duration-100 ease-in-out mb-1"
                                 >
                                     <Tooltip>
                                         <TooltipTrigger asChild>

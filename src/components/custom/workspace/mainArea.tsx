@@ -188,7 +188,7 @@ export default function MainArea() {
             } else if (e.ctrlKey && key === "u" && e.shiftKey) {
                 e.preventDefault();
                 handleOpenFolders();
-            } else if (e.ctrlKey && key === "n" && !e.shiftKey) {
+            } else if (e.ctrlKey && key === "w" && e.shiftKey) {
                 e.preventDefault();
                 if (activeTabId) {
                     closeTab(activeTabId);

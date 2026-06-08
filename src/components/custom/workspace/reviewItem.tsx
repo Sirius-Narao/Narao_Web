@@ -11,12 +11,14 @@ import { useReviews } from "@/context/reviewContext";
 
 import { useUser } from "@/context/userContext";
 import { useState } from "react";
+import { useIsMobile } from "@/hooks/use-mobile";
 
 export default function ReviewItem({ review, index }: { review: ReviewItemType, index: number }) {
     const { openTab } = useTabs();
     const { reviews, setReviews } = useReviews();
     const { user, setUser } = useUser();
     const [loading, setLoading] = useState(false);
+    const isMobile = useIsMobile();
 
     const handleDelete = async (e: React.MouseEvent) => {
         e.stopPropagation();
@@ -119,7 +121,7 @@ export default function ReviewItem({ review, index }: { review: ReviewItemType, 
                         <div className={cn("w-2 h-2 rounded-full", review.importance === 1 ? "bg-folder-red" : review.importance === 2 ? "bg-folder-yellow w-2 h-2" : "bg-folder-green")} />
                         <p className="text-sm    font-medium">{review.title.length > 20 ? review.title.slice(0, 20) + "..." : review.title}</p>
                     </div>
-                    <Button variant="ghost" className="w-7 h-7 absolute right-1 opacity-0 transition-opacity" onClick={handleDelete}>
+                    <Button variant="ghost" className={cn("w-7 h-7 absolute right-1 opacity-0 transition-opacity", isMobile && "opacity-100")} onClick={handleDelete}>
                         <Trash className="text-muted-foreground" size={16} />
                     </Button>
                 </div>

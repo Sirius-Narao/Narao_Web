@@ -33,7 +33,12 @@ export default function Workspace() {
     }, [])
 
     if (isAuthLoading) {
-        return <div className="flex items-center justify-center w-screen h-screen bg-black"><Spinner /></div>; // Or a loading spinner if preferred
+        return (
+            <div className="flex flex-col items-center justify-center w-screen h-screen bg-background gap-3">
+                <p className="font-semibold text-xl font-serif fade-up">Loading Narao...</p>
+                <Spinner className="size-10" />
+            </div>
+        ); // Or a loading spinner if preferred
     }
 
     if (!userAuth) {
@@ -41,7 +46,11 @@ export default function Workspace() {
     }
 
     return (
-        <Suspense fallback={<div className="flex items-center justify-center w-screen h-screen bg-black"><Spinner /></div>}>
+        <Suspense fallback={
+            <div className="flex flex-col items-center justify-center w-screen h-screen bg-background gap-3">
+                <p className="font-semibold text-xl font-serif fade-up">Loading Narao...</p>
+                <Spinner className="size-10" />
+            </div>}>
             <div className="bg-background h-dvh w-screen relative selection:bg-primary/50">
                 <SidebarProvider>
                     <TabsProvider>

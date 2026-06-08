@@ -88,18 +88,18 @@ const ChatMessageInput = forwardRef<ChatMessageInputRef, ChatMessageInputProps>(
                         while (walker.nextNode()) {
                             const node = walker.currentNode as Text;
                             const nodeLength = node.textContent?.length || 0;
-                            
+
                             if (!startNode && charCount + nodeLength > index) {
                                 startNode = node;
                                 startOffset = index - charCount;
                             }
-                            
+
                             if (!endNode && charCount + nodeLength >= index + textToSelect.length) {
                                 endNode = node;
                                 endOffset = index + textToSelect.length - charCount;
                                 break;
                             }
-                            
+
                             charCount += nodeLength;
                         }
 
@@ -413,64 +413,45 @@ const ChatMessageInput = forwardRef<ChatMessageInputRef, ChatMessageInputProps>(
     }, [pendingEdit, setAttachments]); // intentionally narrow dep — only fires when a new edit is requested
 
     // update chat name
-    const updateChatName = async (chatId: string, firstUserContent: string) => {
+    const updateChatMetadata = async (chatId: string, firstUserContent: string, attachments: any[]) => {
         try {
-            const response = await fetch(`/api/chat/gemini-3.1-flash-lite-preview`, {
+            const response = await fetch(`/api/chat/metadata-gemini-3.1-flash-lite-preview`, {
                 method: "POST",
                 headers: { "Content-Type": "application/json" },
                 body: JSON.stringify({
-                    history: [],
-                    userInput: `Summarize this message in MAX 3-5 words to make it a chat title, it has to be as descriptive as possible: "${firstUserContent}". Only return the title, nothing else. ${settings.language === "auto-detect" ? "Detect the language of the user and use it. Make it simple" : `Use the language ${settings.language} if you cannot detect the language of the query.`}`,
-                    isThinking: false
+                    userInput: firstUserContent,
+                    attachments: attachments,
+                    language: settings.language
                 })
             });
 
-            const reader = response.body?.getReader();
-            const textDecoder = new TextDecoder();
-            let accumulatedAnswer = "";
-            let buffer = "";
+            if (!response.ok) throw new Error("Metadata request failed");
 
-            if (reader) {
-                while (true) {
-                    const { done, value } = await reader.read();
-                    if (done) break;
+            const data = await response.json();
+            const parsedContent = JSON.parse(data.content);
 
-                    buffer += textDecoder.decode(value, { stream: true });
-                    const lines = buffer.split("\n");
-                    buffer = lines.pop() || "";
+            if (parsedContent.title || parsedContent.description) {
+                const updatePayload: any = {};
+                if (parsedContent.title) updatePayload.title = parsedContent.title.trim().replace(/^["']|["']$/g, '');
+                if (parsedContent.description) updatePayload.description = parsedContent.description.trim().replace(/^["']|["']$/g, '');
 
-                    for (const line of lines) {
-                        if (!line.trim()) continue;
-                        try {
-                            const parsed = JSON.parse(line);
-                            if (parsed.type === "answer") {
-                                accumulatedAnswer += parsed.content;
-                            }
-                        } catch (e) {
-                            console.error("Error parsing title stream:", e);
-                        }
-                    }
-                }
-            }
-
-            if (accumulatedAnswer) {
-                const { data, error } = await supabase
+                const { data: dbData, error } = await supabase
                     .from("chats")
-                    .update({
-                        title: accumulatedAnswer.trim().replace(/^["']|["']$/g, '')
-                    })
+                    .update(updatePayload)
                     .select()
                     .eq("id", chatId);
 
                 if (error) {
-                    console.error("Error updating chat name:", error);
-                } else {
+                    console.error("Error updating chat metadata:", error);
+                } else if (dbData && dbData.length > 0) {
                     refreshChats();
-                    setChatTitle(data[0].title);
+                    if (updatePayload.title) {
+                        setChatTitle(dbData[0].title);
+                    }
                 }
             }
         } catch (e) {
-            console.error("Failed to update chat name:", e);
+            console.error("Failed to update chat metadata:", e);
         }
     };
 
@@ -835,8 +816,7 @@ const ChatMessageInput = forwardRef<ChatMessageInputRef, ChatMessageInputProps>(
                     // Save attachments linked to the user message
                     await addAttachmentsToChatAttachments(userMessage.id, uiAttachments);
                     // Rename and describe the chat in the background
-                    updateChatName(newChatId, currentContent);
-                    updateChatDescription(newChatId, currentContent);
+                    updateChatMetadata(newChatId, currentContent, apiAttachments);
                 }
             } else if (effectiveChatId) {
                 // Save user message for existing chat (must be awaited before attachments)
@@ -1863,11 +1843,12 @@ const ChatMessageInput = forwardRef<ChatMessageInputRef, ChatMessageInputProps>(
                 </>
                 }
 
-                < div className="flex gap-2 items-center items-end pb-1" >
+                < div className="flex gap-2 items-center items-end pb-1 animate-in" >
                     <div className={cn(
-                        "flex w-full rounded-[30px] border-1 border-border shadow-lg px-2 py-1 justify-center gap-2 transition-all duration-200 z-100",
-                        (isRecording || hasRecording) ? "items-center h-[50px]" : "items-end",
+                        "flex w-full rounded-[30px] border-1 border-border shadow-lg px-2 py-1 justify-center gap-2 z-100",
+                        (isRecording || hasRecording) ? "items-center py-2" : "items-end",
                         pendingEdit ? "bg-primary/10 border-primary/20 backdrop-blur-md" : "bg-popover"
+
                     )}>
                         <input
                             type="file"
@@ -1884,7 +1865,7 @@ const ChatMessageInput = forwardRef<ChatMessageInputRef, ChatMessageInputProps>(
                         {/* No review mode — audio is auto-attached on stop */}
 
                         {(isRecording || hasRecording) ? (
-                            <div className="flex items-center justify-between w-full h-[40px] px-2 animate-in fade-in zoom-in-95 duration-200">
+                            <div className="flex items-center justify-between w-full h-[40px] animate-in duration-200">
                                 {/* Left: Subdued Plus button/icon */}
                                 <Button
                                     type="button"
@@ -1897,16 +1878,16 @@ const ChatMessageInput = forwardRef<ChatMessageInputRef, ChatMessageInputProps>(
                                 </Button>
 
                                 {/* Center: Premium Waveform Animation & Timer */}
-                                <div className="flex items-center flex-grow min-w-0 mx-2">
+                                <div className="flex items-center flex-grow min-w-0 mx-2 w-full">
                                     {/* Premium Waveform Animation */}
-                                    <div className="flex items-center gap-3 flex-shrink-0">
+                                    <div className="flex items-center gap-3 flex-shrink-0 w-full">
                                         {/* Timer (subtle and premium) */}
-                                        <span className="text-xs font-mono font-medium text-muted-foreground bg-muted/40 dark:bg-muted/10 px-2 py-0.5 rounded-full select-none">
+                                        <span className="text-xs font-mono font-medium text-muted-foreground bg-muted/40 dark:bg-muted/10 px-2 rounded-full select-none">
                                             {formatDuration(recordingDuration)}
                                         </span>
 
                                         {/* Elegant Waveform Container */}
-                                        <div className="flex-grow flex items-center justify-center h-[40px] px-2">
+                                        <div className="flex-grow flex items-center justify-center h-[40px] px-2 w-full">
                                             <PremiumWaveform
                                                 analyserNode={analyserNode}
                                                 isRecording={isRecording}
@@ -1917,7 +1898,7 @@ const ChatMessageInput = forwardRef<ChatMessageInputRef, ChatMessageInputProps>(
                                 </div>
 
                                 {/* Right: Cancel (X) and Confirm/Submit (✓) buttons */}
-                                <div className="flex items-center gap-1.5 flex-shrink-0">
+                                <div className="flex items-center gap-1 flex-shrink-0">
                                     {/* Discard Recording */}
                                     <Tooltip>
                                         <TooltipTrigger asChild>
@@ -2162,7 +2143,7 @@ const ChatMessageInput = forwardRef<ChatMessageInputRef, ChatMessageInputProps>(
                                                 variant="ghost"
                                                 size="icon"
                                                 className={cn(
-                                                    "h-10 w-10 rounded-full transition-all duration-200 md:inline-flex hidden",
+                                                    "h-10 w-10 rounded-full transition-all duration-200",
                                                     isRecording
                                                         ? "text-destructive bg-destructive/10 hover:bg-destructive/20"
                                                         : "hover:text-primary hover:bg-primary/10"

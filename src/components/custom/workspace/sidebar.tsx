@@ -681,20 +681,20 @@ export default function SidebarArea() {
                                 </PopoverTrigger>
 
                             </TooltipTrigger>
-                            <PopoverContent className="w-full h-full p-0 bg-popover border-border border shadow-md p-1 rounded-xl min-w-60 flex flex-col" align="start" side="top" sideOffset={10}>
+                            <PopoverContent className="w-full h-full p-0 bg-popover border-border border shadow-md p-1 rounded-xl md:min-w-60 min-w-67 flex flex-col" align="start" side="top" sideOffset={8}>
                                 <Button variant="ghost"
-                                    className="w-full h-full justify-between py-3 rounded-3xl "
+                                    className="w-full h-full justify-between py-3 rounded-lg group/btn"
                                     onClick={() => { setSettingsOpen(true), setSettingsTab(0) }}
 
                                 >
                                     <div className="flex items-center justify-center gap-2">
                                         <div className="bg-primary rounded-full" >
-                                            <p className="text-xs font-medium text-primary-foreground px-1.5 py-1">{user?.username ? (user.username.includes(" ") ? (user.username.split(" ")[0].at(0) || "") + (user.username.split(" ")[1].at(0) || "") : user.username.substring(0, 2)) : "?"}</p>
+                                            <p className="text-xs font-medium text-primary-foreground px-1.5 py-2 font-serif">{user?.username ? (user.username.includes(" ") ? (user.username.split(" ")[0].at(0)?.toUpperCase() || "") + (user.username.split(" ")[1].at(0)?.toUpperCase() || "") : user.username.substring(0, 2).toUpperCase()) : "?"}</p>
                                         </div>
-                                        <p className="text-sm font-medium">{user?.username}</p>
+                                        <p className="text-sm font-medium font-serif">{user?.username.length > 15 ? user?.username.substring(0, 15) + "..." : user?.username}</p>
                                     </div>
                                     <div className="flex items-center justify-center">
-                                        <ChevronRight className="w-4 h-4" />
+                                        <ChevronRight className="w-4 h-4 group-hover/btn:translate-x-1   transition-all duration-200" />
                                     </div>
                                 </Button>
                                 <Separator className="my-1 " />
@@ -717,9 +717,14 @@ export default function SidebarArea() {
                                     className="w-full h-full justify-start group/btn"
                                     onClick={() => { setSettingsOpen(true), setSettingsTab(1) }}
                                 >
-                                    <div className="flex items-center justify-center gap-2">
-                                        <SettingsIcon size={16} className="transition-all duration-300 group-hover/btn:rotate-180" />
-                                        <p className="text-sm font-medium">Settings</p>
+                                    <div className="flex items-center justify-between gap-2 w-full">
+                                        <div className="flex items-center justify-center gap-2">
+                                            <SettingsIcon size={16} className="transition-all duration-300 group-hover/btn:rotate-180" />
+                                            <p className="text-sm font-medium">Settings</p>
+                                        </div>
+                                        <KbdGroup className="hidden sm:inline-flex">
+                                            <Kbd className="bg-card text-foreground">Ctrl + ,</Kbd>
+                                        </KbdGroup>
                                     </div>
                                 </Button>
                                 <Separator className="my-1 " />
@@ -732,24 +737,21 @@ export default function SidebarArea() {
                                     </div>
                                 </Button>
                                 <Button variant="ghost"
-                                    className="w-full h-full justify-start hover:text-destructive dark:hover:bg-destructive/10"
+                                    className="w-full h-full justify-start hover:text-destructive dark:hover:bg-destructive/10 group/btn"
                                     onClick={() => setIsLogoutConfirmOpen(true)}
                                 >
                                     <div className="flex items-center justify-center gap-2">
-                                        <LogOut size={16} />
-                                        <p className="text-sm font-medium">Log Out</p>
+                                        <LogOut size={16} className="group-hover/btn:translate-x-16 transition-all duration-300" />
+                                        <p className="text-sm font-medium group-hover/btn:translate-x-[-1.5rem] transition-all duration-300">Log Out</p>
                                     </div>
                                 </Button>
                             </PopoverContent>
                             <TooltipContent className="flex items-center gap-2">
-                                <p>Settings</p>
-                                <KbdGroup className="hidden sm:inline-flex">
-                                    <Kbd className="bg-popover text-foreground">Ctrl + ,</Kbd>
-                                </KbdGroup>
+                                <p>Profile & Settings</p>
                             </TooltipContent>
                         </Tooltip>
                     </Popover>
-                    <DialogContent className="md:max-w-5xl max-w-[95vw] grid grid-cols-1 md:grid-cols-5 " showCloseButton={false}>
+                    <DialogContent className="md:max-w-5xl max-w-[95vw] grid grid-cols-1 md:grid-cols-5 min-h-[80vh]" showCloseButton={false}>
                         {/* Mobile/Tablet: Horizontal scrollable tabs at top */}
                         <ScrollArea className="md:hidden w-full border-b border-border flex overflow-x-auto py-2">
                             <div className="flex gap-2 p-2">
@@ -822,7 +824,7 @@ export default function SidebarArea() {
                             </DialogHeader>
 
                             {settingsTab === 0 && (
-                                <div className="flex flex-col md:pb-12 pb-22 h-[calc(100vh-250px)] sm:h-[calc(100vh-300px)] md:h-[calc(100vh-400px)] lg:h-[calc(100vh-500px)] overflow-y-auto scrollbar-hide">
+                                <div className="flex flex-col md:pb-12 pb-22 h-full sm:max-h-[calc(100vh-300px)] md:max-h-[calc(100vh-400px)] lg:max-h-164 overflow-y-auto scrollbar-hide">
                                     <div className="flex gap-2 border-b border-border py-4 justify-between items-center">
                                         <p className="text-sm font-medium">Credits Left</p>
                                         <Tooltip>
@@ -873,7 +875,7 @@ export default function SidebarArea() {
                                 </div>
                             )}
                             {settingsTab === 1 && (
-                                <div className="flex flex-col md:pb-12 pb-22 h-[calc(100vh-250px)] sm:h-[calc(100vh-300px)] md:h-[calc(100vh-400px)] lg:h-[calc(100vh-500px)] overflow-y-auto scrollbar-hide">
+                                <div className="flex flex-col md:pb-12 pb-22 h-full sm:max-h-[calc(100vh-300px)] md:max-h-[calc(100vh-400px)] lg:max-h-164 overflow-y-auto scrollbar-hide">
                                     <div className="flex gap-2 justify-between items-center border-b border-border py-4">
                                         <p className="text-sm font-medium">Appearance</p>
                                         <Select
@@ -943,7 +945,7 @@ export default function SidebarArea() {
                                 </div>
                             )}
                             {settingsTab === 2 && (
-                                <div className="flex flex-col md:pb-12 pb-22 h-[calc(100vh-250px)] sm:h-[calc(100vh-300px)] md:h-[calc(100vh-400px)] lg:h-[calc(100vh-500px)] overflow-y-auto scrollbar-hide pr-12 ">
+                                <div className="flex flex-col md:pb-12 pb-22 h-[calc(100vh-250px)] sm:max-h-[calc(100vh-300px)] md:max-h-[calc(100vh-400px)] lg:max-h-164 overflow-y-auto scrollbar-hide pr-12 ">
                                     <div className="flex flex-col gap-2 border-b border-border py-4">
                                         <p className="text-sm font-medium">AI name</p>
                                         <Input
@@ -1005,7 +1007,7 @@ export default function SidebarArea() {
                                 </div>
                             )}
                             {settingsTab === 3 && (
-                                <div className="flex flex-col md:pb-12 pb-22 h-[calc(100vh-250px)] sm:h-[calc(100vh-300px)] md:h-[calc(100vh-400px)] lg:h-[calc(100vh-500px)] overflow-y-auto scrollbar-hide">
+                                <div className="flex flex-col md:pb-12 pb-22 h-[calc(100vh-250px)] sm:max-h-[calc(100vh-300px)] md:max-h-[calc(100vh-400px)] lg:max-h-164 overflow-y-auto scrollbar-hide">
                                     <div className="flex flex-col gap-4">
                                         {/* Create new tag section */}
                                         <div className="flex flex-col gap-3 border-b border-border py-4">

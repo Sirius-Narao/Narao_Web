@@ -27,8 +27,14 @@ export function useAudioRecorder(): UseAudioRecorderReturn {
     const streamRef = useRef<MediaStream | null>(null);
     const audioContextRef = useRef<AudioContext | null>(null);
 
+    // When true, the next onstop delivery should be discarded (reset was called
+    // before MediaRecorder's async onstop had a chance to fire).
+    const discardedRef = useRef(false);
+
     const startRecording = useCallback(async () => {
         try {
+            discardedRef.current = false;
+
             const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
             streamRef.current = stream;
 
@@ -37,7 +43,7 @@ export function useAudioRecorder(): UseAudioRecorderReturn {
             audioContextRef.current = audioContext;
             const source = audioContext.createMediaStreamSource(stream);
             const analyser = audioContext.createAnalyser();
-            analyser.fftSize = 64;
+            analyser.fftSize = 256;
             analyser.smoothingTimeConstant = 0.8;
             source.connect(analyser);
             setAnalyserNode(analyser);
@@ -58,13 +64,17 @@ export function useAudioRecorder(): UseAudioRecorderReturn {
             };
 
             mediaRecorder.onstop = () => {
-                const blob = new Blob(audioChunksRef.current, { type: mimeType });
-                const url = URL.createObjectURL(blob);
-                setAudioBlob(blob);
-                setAudioURL(url);
+                // If reset() was called first, this recording was discarded — don't set blob.
+                if (discardedRef.current) {
+                    audioChunksRef.current = [];
+                } else {
+                    const blob = new Blob(audioChunksRef.current, { type: mimeType });
+                    const url = URL.createObjectURL(blob);
+                    setAudioBlob(blob);
+                    setAudioURL(url);
+                }
 
-                // Cleanup audio context and null the ref so reset() doesn't
-                // try to close it a second time (InvalidStateError).
+                // Cleanup audio context
                 if (audioContextRef.current === audioContext && audioContextRef.current.state !== "closed") {
                     audioContext.close();
                 }
@@ -135,13 +145,16 @@ export function useAudioRecorder(): UseAudioRecorderReturn {
     );
 
     const reset = useCallback(() => {
+        // Signal onstop (which fires async) to discard the next blob delivery
+        discardedRef.current = true;
+
         if (audioURL) URL.revokeObjectURL(audioURL);
         setAudioURL(null);
-        setAudioBlob(null);
+        setAudioBlob(null);          // Eagerly clear — prevents ghost hasRecording state
         setRecordingState("idle");
         audioChunksRef.current = [];
 
-        // If still recording, stop
+        // If still recording, stop the MediaRecorder (onstop will fire but will be ignored)
         if (mediaRecorderRef.current && mediaRecorderRef.current.state !== "inactive") {
             mediaRecorderRef.current.stop();
         }
