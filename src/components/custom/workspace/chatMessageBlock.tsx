@@ -49,7 +49,7 @@ export function ToolCallCard({ part }: { part: any }) {
 
     return (
         <div
-            className="group/tool flex flex-col justify-start items-start p-4 py-3 my-1 rounded-xl text-xs text-muted-foreground max-w-[85%] animate-in fade-in slide-in-from-top-1 hover:bg-popover/40 cursor-pointer border border-border"
+            className="group/tool flex flex-col justify-start items-start p-4 py-3 my-1 rounded-xl text-xs text-muted-foreground lg:max-w-[85%] max-w-full animate-in fade-in slide-in-from-top-1 hover:bg-popover/40 cursor-pointer border border-border"
             onClick={() => setIsExpanded(!isExpanded)}
         >
             <div className="flex gap-2 items-center w-full">
@@ -170,8 +170,6 @@ export default function ChatMessageBlock({ message, isFollowUp }: { message: Cha
     }, [isLoading, phraseIndex]);
 
     const proceed = () => requestQuickSend("Okay, let's proceed!");
-    const refuse = () => requestQuickSend("Do not proceed.");
-
     const likeMessage = async () => {
         if (isLiked) return;
         const { data, error } = await supabase
@@ -241,14 +239,14 @@ export default function ChatMessageBlock({ message, isFollowUp }: { message: Cha
                         {message.attachments && message.attachments.length > 0 && (
                             <div className="flex flex-row relative w-full h-fit mt-2 flex-wrap gap-2 justify-end">
                                 {message.attachments.map((attachment) => (
-                                    <div key={attachment.id} className="flex flex-row w-fit h-fit bg-secondary/80 px-4 py-2 rounded-lg shadow-sm border border-border/10 items-center gap-2">
+                                    <div key={attachment.id} className="flex flex-row max-w-[200px] h-fit bg-secondary/80 px-4 py-2 rounded-lg shadow-sm border border-border/10 items-center gap-2">
                                         {attachment.file_type === "image" && (
-                                            <FileImage className="w-4 h-4 text-primary" />
+                                            <FileImage className="w-4 h-4 text-primary shrink-0" />
                                         )}
                                         {attachment.file_type === "pdf" && (
-                                            <FileTypeCorner className="w-4 h-4 text-destructive" />
+                                            <FileTypeCorner className="w-4 h-4 text-destructive shrink-0" />
                                         )}
-                                        <p>{attachment.file_name}</p>
+                                        <p className="truncate text-sm">{attachment.file_name}</p>
                                     </div>
                                 ))}
                             </div>
@@ -302,7 +300,7 @@ export default function ChatMessageBlock({ message, isFollowUp }: { message: Cha
                         {message.messageParts && message.messageParts.length > 0 ? (
                             <div className="flex flex-col w-full">
                                 {message.thought && (
-                                    <div className="flex flex-col mb-4 p-4 bg-popover/30 rounded-xl border border-border max-w-[85%] text-xs text-muted-foreground animate-in fade-in slide-in-from-top-1 overflow-hidden transition-all duration-300">
+                                    <div className="flex flex-col mb-4 p-4 bg-popover/30 rounded-xl border border-border lg:max-w-[85%] max-w-full text-xs text-muted-foreground animate-in fade-in slide-in-from-top-1 overflow-hidden transition-all duration-300">
                                         <div className="flex flex-row w-full h-fit items-center justify-between cursor-pointer select-none" onClick={() => setIsThoughtExpanded(!isThoughtExpanded)}>
                                             <span className="text-lg tracking-wider font-medium">
                                                 {message.content || (message.messageParts?.some(p => p.type === 'text' && (p as any).content)) ? (
@@ -337,7 +335,7 @@ export default function ChatMessageBlock({ message, isFollowUp }: { message: Cha
                                     ) : part.content ? (
                                         <div
                                             key={i}
-                                            className="w-full max-w-[90%] p-2"
+                                            className="w-full lg:max-w-[90%] p-2"
                                             data-quote-source={`Chat: ${chatTitle}`}
                                             data-quote-type="chat"
                                         >
@@ -348,7 +346,6 @@ export default function ChatMessageBlock({ message, isFollowUp }: { message: Cha
                                 {!isLoading && message.content.endsWith("Do you want to proceed now?") && (
                                     <div className="w-fit p-2 flex flex-row gap-2">
                                         <Button variant="ghost" className="hover:bg-folder-green/20 hover:text-foreground bg-folder-green/20 cursor-pointer hover:bg-folder-green/50 dark:hover:bg-folder-green/50" onClick={() => { proceed() }}>Okay, let's proceed!</Button>
-                                        <Button variant="ghost" className="hover:bg-folder-red/20 hover:text-foreground bg-folder-red/20 cursor-pointer hover:bg-folder-red/50 dark:hover:bg-folder-red/50" onClick={() => { refuse() }}>Do not proceed</Button>
                                     </div>
                                 )}
                             </div>
@@ -409,7 +406,6 @@ export default function ChatMessageBlock({ message, isFollowUp }: { message: Cha
                                 {!isLoading && message.content.endsWith("Do you want to proceed now?") && !isFollowUp && (
                                     <div className="w-fit p-2 flex flex-row gap-2">
                                         <Button variant="ghost" className="hover:bg-folder-green/20 hover:text-foreground bg-folder-green/20 cursor-pointer hover:bg-folder-green/50 dark:hover:bg-folder-green/50" onClick={() => { proceed() }}>Okay, let's proceed!</Button>
-                                        <Button variant="ghost" className="hover:bg-folder-red/20 hover:text-foreground bg-folder-red/20 cursor-pointer hover:bg-folder-red/50 dark:hover:bg-folder-red/50" onClick={() => { refuse() }}>Do not proceed</Button>
                                     </div>
                                 )}
                             </>

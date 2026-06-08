@@ -79,7 +79,7 @@ export default function TabCard({ tab, index }: TabCardProps) {
                         onDragLeave={handleDragLeave}
                         onClick={() => setActiveTabId(tab.id)}
                         className={cn(
-                            "relative bg-card border border-border transition-all duration-100 rounded-3xl h-9 px-4 flex items-center group hover:bg-accent flex-shrink min-w-10 overflow-hidden cursor-pointer select-none fade-up pr-8 md:pr-4",
+                            "relative bg-card border border-border transition-all duration-100 rounded-3xl h-9 px-4 flex items-center group hover:bg-accent flex-shrink min-w-10 overflow-hidden cursor-pointer select-none fade-up pr-8 lg:pr-4",
                             isActive && "bg-accent text-accent-foreground hover:bg-accent/80"
                         )}
                     >
@@ -95,7 +95,7 @@ export default function TabCard({ tab, index }: TabCardProps) {
                         {activeTabId !== tab.id || !isMobile ? <Button
                             variant="ghost"
                             onClick={handleClose}
-                            className="absolute right-1 w-7 h-7 p-0 rounded-full opacity-100 md:opacity-0 md:group-hover:opacity-100 dark:hover:bg-card/60 hover:bg-secondary transition-all duration-100 scale-90 cursor-pointer z-50"
+                            className="absolute right-1 w-7 h-7 p-0 rounded-full opacity-100 lg:opacity-0 lg:group-hover:opacity-100 dark:hover:bg-card/60 hover:bg-secondary transition-all duration-100 scale-90 cursor-pointer z-50"
                         >
                             <X className="w-4 h-4" />
                         </Button> : <Tooltip>
@@ -103,7 +103,7 @@ export default function TabCard({ tab, index }: TabCardProps) {
                                 <Button
                                     variant="ghost"
                                     onClick={handleClose}
-                                    className="absolute right-1 w-7 h-7 p-0 rounded-full opacity-100 md:opacity-0 md:group-hover:opacity-100 dark:hover:bg-card/60 hover:bg-secondary transition-all duration-100 scale-90 cursor-pointer z-50"
+                                    className="absolute right-1 w-7 h-7 p-0 rounded-full opacity-100 lg:opacity-0 lg:group-hover:opacity-100 dark:hover:bg-card/60 hover:bg-secondary transition-all duration-100 scale-90 cursor-pointer z-50"
                                 >
                                     <X className="w-4 h-4" />
                                 </Button>

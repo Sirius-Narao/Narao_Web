@@ -24,9 +24,13 @@ import getSystemPromptString from "@/constants/systemPromptString"
 import { useReviews } from "@/context/reviewContext"
 import { SelectionQuote, getSelectionQuoteMarkdown } from "./selectionQuote"
 import { Switch } from "@/components/ui/switch"
+import ChatEditor, { ChatEditorRef } from "./ChatEditor"
 
 // ── @mention types ──────────────────────────────────────────────────────────
 type MentionItem = { id: string; title: string; type: "note" | "folder"; path?: string; color?: string };
+
+// Export MentionItem for use in ChatEditor
+export type { MentionItem }
 
 const models = {
     "gemini-2.5-flash": "Gemini 2.5 Flash",
@@ -53,7 +57,7 @@ const ChatMessageInput = forwardRef<ChatMessageInputRef, ChatMessageInputProps>(
     const [outOfCredits, setOutOfCredits] = useState(false)
     const outOfCreditsRef = useRef(false)
 
-    const editorRef = useRef<HTMLDivElement>(null)
+    const chatEditorRef = useRef<ChatEditorRef>(null)
     const fileInputRef = useRef<HTMLInputElement>(null)
     const abortControllerRef = useRef<AbortController | null>(null)
 
@@ -61,57 +65,10 @@ const ChatMessageInput = forwardRef<ChatMessageInputRef, ChatMessageInputProps>(
     useImperativeHandle(ref, () => ({
         setContent: (newContent: string) => {
             setContent(newContent);
-            if (editorRef.current) {
-                editorRef.current.innerHTML = newContent;
-            }
+            chatEditorRef.current?.setContent(newContent);
         },
         focusAndSelectText: (textToSelect: string) => {
-            if (editorRef.current) {
-                editorRef.current.focus();
-                const text = editorRef.current.innerText || "";
-                const index = text.indexOf(textToSelect);
-                if (index !== -1) {
-                    const selection = window.getSelection();
-                    if (selection) {
-                        const range = document.createRange();
-                        const walker = document.createTreeWalker(
-                            editorRef.current,
-                            NodeFilter.SHOW_TEXT,
-                            null
-                        );
-                        let charCount = 0;
-                        let startNode: Text | null = null;
-                        let startOffset = 0;
-                        let endNode: Text | null = null;
-                        let endOffset = 0;
-
-                        while (walker.nextNode()) {
-                            const node = walker.currentNode as Text;
-                            const nodeLength = node.textContent?.length || 0;
-
-                            if (!startNode && charCount + nodeLength > index) {
-                                startNode = node;
-                                startOffset = index - charCount;
-                            }
-
-                            if (!endNode && charCount + nodeLength >= index + textToSelect.length) {
-                                endNode = node;
-                                endOffset = index + textToSelect.length - charCount;
-                                break;
-                            }
-
-                            charCount += nodeLength;
-                        }
-
-                        if (startNode && endNode) {
-                            range.setStart(startNode, startOffset);
-                            range.setEnd(endNode, endOffset);
-                            selection.removeAllRanges();
-                            selection.addRange(range);
-                        }
-                    }
-                }
-            }
+            chatEditorRef.current?.focusAndSelectText(textToSelect);
         }
     }), []);
     const { chatMessages, setChatMessages, currentChatId, setCurrentChatId, refreshChats, setChatTitle, setChatCache, chatInputHTML, setChatInputHTML, chatQuote, setChatQuote } = useChatMessages()
@@ -185,138 +142,56 @@ const ChatMessageInput = forwardRef<ChatMessageInputRef, ChatMessageInputProps>(
     // Sync highlighted index when suggestions change
     useEffect(() => { setMentionIndex(0) }, [mentionSuggestions])
 
+
+
     // ── @mention helpers ────────────────────────────────────────────────────
     const closeMention = useCallback(() => {
         setMentionQuery(null)
         setMentionStart(-1)
     }, [])
 
-    /** Extract plain text from the contenteditable div, normalising <br> → \n */
-    const getEditorText = useCallback((): string => {
-        const el = editorRef.current
-        if (!el) return ""
-        const walk = (node: Node): string => {
-            if (node.nodeType === Node.TEXT_NODE) return node.textContent ?? ""
-            if ((node as Element).tagName === "BR") return "\n"
-            return Array.from(node.childNodes).map(walk).join("")
-        }
-        return walk(el)
+    // ChatEditor handlers
+    const handleEditorContentChange = useCallback((content: string, html: string) => {
+        setContent(content)
+        setChatInputHTML(html)
     }, [])
 
-    /** Get the flat character offset of the current caret inside the editor div */
-    const getCaretOffset = useCallback((): number => {
-        const el = editorRef.current
-        if (!el) return 0
-        const sel = window.getSelection()
-        if (!sel || sel.rangeCount === 0) return 0
-        const range = sel.getRangeAt(0).cloneRange()
-        range.selectNodeContents(el)
-        range.setEnd(sel.getRangeAt(0).endContainer, sel.getRangeAt(0).endOffset)
-        return range.toString().length
+    const handleEditorMentionQuery = useCallback((query: string | null, start: number) => {
+        setMentionQuery(query)
+        setMentionStart(start)
     }, [])
 
-    /**
-     * confirmMention — uses TreeWalker to locate the @query boundaries.
-     * TreeWalker(SHOW_TEXT) visits every text node in document order, making
-     * character counting consistent with getCaretOffset() (which uses range.toString()).
-     */
-    const confirmMention = useCallback((item: MentionItem) => {
-        const el = editorRef.current
-        if (!el) return
+    const handleEditorMentionIndexChange = useCallback((index: number) => {
+        setMentionIndex(index)
+    }, [])
 
-        const caretPos = getCaretOffset()
-        // mentionStart is the flat-text offset of "@"
-        // caretPos is where the user's cursor is (right after the query)
+    const handleEditorConfirmMention = useCallback((item: MentionItem) => {
+        // Content will be updated by ChatEditor's internal logic
+        // We just need to handle any additional logic if needed
+    }, [])
 
-        // Walk all text nodes in DOM order and find the boundary nodes
-        const walker = document.createTreeWalker(el, NodeFilter.SHOW_TEXT)
-        let charCount = 0
-        let startNode: Text | null = null
-        let startOffset = 0
-        let endNode: Text | null = null
-        let endOffset = 0
-
-        let node = walker.nextNode() as Text | null
-        while (node) {
-            const len = node.textContent?.length ?? 0
-
-            if (!startNode && charCount + len > mentionStart) {
-                startNode = node
-                startOffset = mentionStart - charCount
-            }
-
-            if (!endNode && charCount + len >= caretPos) {
-                endNode = node
-                endOffset = caretPos - charCount
-                break // both found
-            }
-
-            charCount += len
-            node = walker.nextNode() as Text | null
+    const handleEditorMentionClick = useCallback((id: string, type: string, title: string, path?: string) => {
+        if (type === "note") {
+            openTab({ type: "note", title, noteId: id })
+        } else if (type === "folder") {
+            openTab({ type: "folder", title, location: path || "/" })
         }
+    }, [openTab])
 
-        // If start wasn't found yet but end was (edge: @ is at very end), use endNode
-        if (!startNode && endNode) {
-            startNode = endNode
-            startOffset = Math.max(0, endOffset - (caretPos - mentionStart))
-        }
-
-        if (!startNode || !endNode) return
-
-        // Clamp offsets to be safe
-        startOffset = Math.min(startOffset, startNode.length)
-        endOffset = Math.min(endOffset, endNode.length)
-
-        // Delete the @query from the DOM
-        const range = document.createRange()
-        range.setStart(startNode, startOffset)
-        range.setEnd(endNode, endOffset)
-        range.deleteContents()
-
-        // Build the chip span (contentEditable=false → caret jumps over it atomically)
-        const chip = document.createElement("span")
-        chip.className = "mention-token"
-        chip.contentEditable = "false"
-        chip.textContent = `@${item.title}`
-        chip.dataset.mentionId = item.id
-        chip.dataset.mentionType = item.type
-        if (item.type === "folder") {
-            chip.dataset.path = item.path || "/"
-        }
-
-        // Trailing non-breaking space so the caret can land after the chip
-        const space = document.createTextNode("\u00A0")
-
-        // Insert at the now-collapsed range position
-        range.insertNode(space)
-        range.insertNode(chip)
-
-        // Place caret after the space
-        const sel = window.getSelection()
-        if (sel) {
-            const newRange = document.createRange()
-            newRange.setStartAfter(space)
-            newRange.collapse(true)
-            sel.removeAllRanges()
-            sel.addRange(newRange)
-        }
-
-        setContent(getEditorText())
-        closeMention()
-        editorRef.current?.focus()
-    }, [mentionStart, closeMention, getEditorText, getCaretOffset])
 
     useEffect(() => {
         if (activeTab?.type === "chat") {
             // Only restore if the editor is currently empty or has a different content
-            // to avoid overwriting user input during active typing (though this is mostly for mount/tab-switch)
-            if (editorRef.current && editorRef.current.innerHTML !== chatInputHTML) {
-                editorRef.current.innerHTML = chatInputHTML;
-                setContent(getEditorText());
+            if (chatEditorRef.current) {
+                const currentHTML = chatEditorRef.current.getHTML()
+                if (currentHTML !== chatInputHTML) {
+                    chatEditorRef.current.setContent(chatInputHTML)
+                    setContent(chatEditorRef.current.getContent())
+                }
             }
-            editorRef.current?.focus();
+            chatEditorRef.current?.focus()
         }
-    }, [activeTab, chatInputHTML, getEditorText]);
+    }, [activeTab, chatInputHTML])
 
     // Recording duration timer
     useEffect(() => {
@@ -382,8 +257,8 @@ const ChatMessageInput = forwardRef<ChatMessageInputRef, ChatMessageInputProps>(
     // Deletion happens only when the user actually sends.
     useEffect(() => {
         if (!pendingEdit) return;
-        if (editorRef.current) {
-            editorRef.current.innerText = pendingEdit.content
+        if (chatEditorRef.current) {
+            chatEditorRef.current.setContent(pendingEdit.content)
         }
         setContent(pendingEdit.content);
 
@@ -409,7 +284,7 @@ const ChatMessageInput = forwardRef<ChatMessageInputRef, ChatMessageInputProps>(
             setAttachments([]);
         }
 
-        setTimeout(() => editorRef.current?.focus(), 50);
+        setTimeout(() => chatEditorRef.current?.focus(), 50);
     }, [pendingEdit, setAttachments]); // intentionally narrow dep — only fires when a new edit is requested
 
     // update chat name
@@ -688,7 +563,7 @@ const ChatMessageInput = forwardRef<ChatMessageInputRef, ChatMessageInputProps>(
             toast.error("You've run out of credits! Please top up to continue.", { position: "bottom-right" });
             return;
         }
-        editorRef.current?.focus()
+        chatEditorRef.current?.focus()
 
         setIsLoading(true);
         const controller = new AbortController();
@@ -769,7 +644,7 @@ const ChatMessageInput = forwardRef<ChatMessageInputRef, ChatMessageInputProps>(
             setContent("");
             setChatInputHTML(""); // Clear persistent draft on send
             setChatQuote(null); // Clear quote
-            if (editorRef.current) editorRef.current.innerHTML = ""
+            if (chatEditorRef.current) chatEditorRef.current.setContent("")
             setAttachments([]);
 
             // 3. Prepare Assistant placeholder
@@ -1674,7 +1549,7 @@ const ChatMessageInput = forwardRef<ChatMessageInputRef, ChatMessageInputProps>(
 
             if (e.ctrlKey && key === "o" && e.shiftKey && !e.altKey) {
                 e.preventDefault();
-                editorRef.current?.focus();
+                chatEditorRef.current?.focus();
             }
         };
 
@@ -1745,7 +1620,7 @@ const ChatMessageInput = forwardRef<ChatMessageInputRef, ChatMessageInputProps>(
                                     <Edit size={14} className="text-primary" />
                                     <span>Editing message</span>
                                     <button
-                                        onClick={() => { clearEdit(); setContent(""); if (editorRef.current) editorRef.current.innerHTML = ""; setAttachments([]); setChatQuote(null); }}
+                                        onClick={() => { clearEdit(); setContent(""); if (chatEditorRef.current) chatEditorRef.current.setContent(""); setAttachments([]); setChatQuote(null); }}
                                         className="text-muted-foreground hover:text-foreground transition-colors cursor-pointer"
                                         aria-label="Cancel edit"
                                     >
@@ -1803,7 +1678,7 @@ const ChatMessageInput = forwardRef<ChatMessageInputRef, ChatMessageInputProps>(
                                 <Edit size={14} className="text-primary" />
                                 <span>Editing message</span>
                                 <button
-                                    onClick={() => { clearEdit(); setContent(""); if (editorRef.current) editorRef.current.innerHTML = ""; setAttachments([]); setChatQuote(null); }}
+                                    onClick={() => { clearEdit(); setContent(""); if (chatEditorRef.current) chatEditorRef.current.setContent(""); setAttachments([]); setChatQuote(null); }}
                                     className="text-muted-foreground hover:text-foreground transition-colors cursor-pointer"
                                     aria-label="Cancel edit"
                                 >
@@ -2000,106 +1875,19 @@ const ChatMessageInput = forwardRef<ChatMessageInputRef, ChatMessageInputProps>(
                                     </Popover>
                                 </div>
                                 <div className="relative w-full">
-                                    {/* Single contenteditable div — no mirror needed */}
-                                    <div
-                                        ref={editorRef}
-                                        contentEditable
-                                        suppressContentEditableWarning
-                                        role="textbox"
-                                        aria-multiline="true"
-                                        aria-label={`Ask ${settings.aiName} anything...`}
-                                        data-placeholder={`Ask ${settings.aiName} anything...`}
-                                        className="mention-editor w-full focus:outline-none outline-none scrollbar-no-bg"
-                                        onInput={(e) => {
-                                            const el = e.currentTarget
-                                            const walk = (node: Node): string => {
-                                                if (node.nodeType === Node.TEXT_NODE) return node.textContent ?? ""
-                                                if ((node as Element).tagName === "BR") return "\n"
-                                                // For mention-token spans, return their text as-is
-                                                if ((node as HTMLElement).classList?.contains("mention-token")) return node.textContent ?? ""
-                                                return Array.from(node.childNodes).map(walk).join("")
-                                            }
-                                            const text = walk(el)
-                                            setContent(text)
-                                            setChatInputHTML(el.innerHTML) // Sync HTML structure for persistence (chips)
-
-                                            // Detect @mention trigger using caret offset
-                                            const sel = window.getSelection()
-                                            if (!sel || sel.rangeCount === 0) return
-                                            const range = sel.getRangeAt(0).cloneRange()
-                                            range.selectNodeContents(el)
-                                            range.setEnd(sel.getRangeAt(0).endContainer, sel.getRangeAt(0).endOffset)
-                                            const caretOffset = range.toString().length
-
-                                            const slice = text.slice(0, caretOffset)
-                                            const match = slice.match(/@([\w\s.-]*)$/)
-                                            if (match) {
-                                                const atPos = caretOffset - match[0].length
-                                                setMentionStart(atPos)
-                                                setMentionQuery(match[1])
-                                            } else {
-                                                closeMention()
-                                            }
-                                        }}
-                                        onKeyDown={(e) => {
-                                            // @mention navigation
-                                            if (mentionQuery !== null && mentionSuggestions.length > 0) {
-                                                if (e.key === "ArrowDown") {
-                                                    e.preventDefault()
-                                                    setMentionIndex(i => (i + 1) % mentionSuggestions.length)
-                                                    return
-                                                }
-                                                if (e.key === "ArrowUp") {
-                                                    e.preventDefault()
-                                                    setMentionIndex(i => (i - 1 + mentionSuggestions.length) % mentionSuggestions.length)
-                                                    return
-                                                }
-                                                if (e.key === "Tab" || e.key === "Enter") {
-                                                    e.preventDefault()
-                                                    confirmMention(mentionSuggestions[mentionIndex])
-                                                    return
-                                                }
-                                                if (e.key === "Escape") {
-                                                    e.preventDefault()
-                                                    closeMention()
-                                                    return
-                                                }
-                                            }
-
-                                            if (e.key === "Enter" && !e.shiftKey) {
-                                                e.preventDefault()
-                                                handleSend()
-                                                return
-                                            }
-                                            // Shift+Enter inserts a newline naturally
-                                        }}
-                                        onBlur={() => {
-                                            // Brief delay so click on suggestion registers first
-                                            setTimeout(() => closeMention(), 150)
-                                        }}
-                                        onPaste={(e) => {
-                                            // Strip HTML on paste — insert plain text only
-                                            e.preventDefault()
-                                            const text = e.clipboardData.getData("text/plain")
-                                            document.execCommand("insertText", false, text)
-                                        }}
-                                        onClick={(e) => {
-                                            // Event delegation for mention-tokens (restored from innerHTML)
-                                            const target = e.target as HTMLElement
-                                            const chip = target.closest(".mention-token") as HTMLElement
-                                            if (chip) {
-                                                const id = chip.dataset.mentionId
-                                                const type = chip.dataset.mentionType
-                                                const title = chip.textContent?.slice(1) || "Item"
-                                                if (id && type) {
-                                                    if (type === "note") {
-                                                        openTab({ type: "note", title, noteId: id })
-                                                    } else if (type === "folder") {
-                                                        openTab({ type: "folder", title, location: chip.dataset.path || "/" })
-                                                    }
-                                                }
-                                            }
-                                        }}
+                                    {/* ChatEditor component — handles contentEditable logic */}
+                                    <ChatEditor
+                                        ref={chatEditorRef}
+                                        onContentChange={handleEditorContentChange}
+                                        onMentionQuery={handleEditorMentionQuery}
+                                        placeholder={`Ask ${settings.aiName} anything...`}
+                                        mentionSuggestions={mentionSuggestions}
+                                        mentionIndex={mentionIndex}
+                                        onMentionIndexChange={handleEditorMentionIndexChange}
+                                        onConfirmMention={handleEditorConfirmMention}
+                                        onCloseMention={closeMention}
+                                        onSend={handleSend}
+                                        onMentionClick={handleEditorMentionClick}
                                     />
                                     {/* @mention suggestion dropdown */}
                                     {mentionQuery !== null && mentionSuggestions.length > 0 && (
@@ -2120,7 +1908,7 @@ const ChatMessageInput = forwardRef<ChatMessageInputRef, ChatMessageInputProps>(
                                                     )}
                                                     onMouseDown={(e) => {
                                                         e.preventDefault() // prevent blur
-                                                        confirmMention(item)
+                                                        handleEditorConfirmMention(item)
                                                     }}
                                                     onMouseEnter={() => setMentionIndex(idx)}
                                                 >

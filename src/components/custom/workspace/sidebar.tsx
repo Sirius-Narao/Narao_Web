@@ -681,7 +681,7 @@ export default function SidebarArea() {
                                 </PopoverTrigger>
 
                             </TooltipTrigger>
-                            <PopoverContent className="w-full h-full p-0 bg-popover border-border border shadow-md p-1 rounded-xl md:min-w-60 min-w-67 flex flex-col" align="start" side="top" sideOffset={8}>
+                            <PopoverContent className="w-full h-full p-0 bg-popover border-border border shadow-md p-1 rounded-xl md:min-w-60 min-w-68 flex flex-col" align="start" side="top" sideOffset={8}>
                                 <Button variant="ghost"
                                     className="w-full h-full justify-between py-3 rounded-lg group/btn"
                                     onClick={() => { setSettingsOpen(true), setSettingsTab(0) }}
